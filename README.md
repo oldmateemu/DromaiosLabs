@@ -16,6 +16,7 @@ Private company command cockpit for Dromaios Labs.
 
 1. Copy `.env.example` to `.env`.
 2. Set `SESSION_SECRET`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`.
+   Keep `COOKIE_SECURE=false` for local or VPN-only HTTP. Set it to `true` only after serving the app over HTTPS.
 3. Start Postgres: `docker compose up -d postgres`.
 4. Install dependencies: `pnpm install`.
 5. Generate Prisma client: `pnpm db:generate`.

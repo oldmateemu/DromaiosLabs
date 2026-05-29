@@ -10,10 +10,12 @@ import {
   ReviewType
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { buildActionRegisterWhere } from "./action-filters";
 import { assertAutomationCanRun } from "./automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
+import { buildOperatingBrief } from "./operating-brief";
 
 export async function getReferenceData() {
   const [streams, companyFunctions] = await Promise.all([
@@ -35,9 +37,19 @@ export async function getTodayData() {
     prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 5 })
   ]);
 
+  const buckets = bucketActionsForToday(actions);
+  const draftsNeedingReview = drafts.filter((draft) => draft.state !== AssistantDraftState.APPROVED).length;
+
   return {
     actions,
-    buckets: bucketActionsForToday(actions),
+    buckets,
+    brief: buildOperatingBrief({
+      now: new Date(),
+      overdueCount: buckets.overdue.length,
+      blockedCount: buckets.blocked.length,
+      draftCount: draftsNeedingReview,
+      automationCount: automations.length
+    }),
     links,
     automations,
     drafts
@@ -275,12 +287,7 @@ export async function runAutomation(automationId: string, approved: boolean, use
 }
 
 export async function getActionRegisterData(filters: Record<string, string | undefined>) {
-  const where = {
-    status: filters.status && filters.status !== "ALL" ? (filters.status as ActionStatus) : undefined,
-    priority: filters.priority && filters.priority !== "ALL" ? (filters.priority as Priority) : undefined,
-    streamId: filters.streamId || undefined,
-    companyFunctionId: filters.companyFunctionId || undefined
-  };
+  const where = buildActionRegisterWhere(filters);
 
   const [actions, reference] = await Promise.all([
     prisma.action.findMany({

@@ -1,6 +1,8 @@
-import { Priority, ActionStatus, AutomationSafetyLevel } from "@prisma/client";
+import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel } from "@prisma/client";
+import Link from "next/link";
 
 type ReferenceItem = { id: string; name: string };
+type FilterValues = Record<string, string | undefined>;
 
 export function ActionForm({
   streams,
@@ -35,6 +37,36 @@ export function ActionForm({
       </label>
       <div className="flex justify-end md:col-span-2">
         <button className="button button-primary" type="submit">Create action</button>
+      </div>
+    </form>
+  );
+}
+
+export function ActionRegisterFilters({
+  streams,
+  companyFunctions,
+  values
+}: {
+  streams: ReferenceItem[];
+  companyFunctions: ReferenceItem[];
+  values: FilterValues;
+}) {
+  return (
+    <form className="panel grid gap-4 md:grid-cols-2 xl:grid-cols-4" method="get">
+      <div className="md:col-span-2 xl:col-span-4">
+        <p className="eyebrow">Find the right work</p>
+        <h2>Filters</h2>
+      </div>
+      <Select name="status" label="Status" values={["ALL", ...Object.values(ActionStatus)]} defaultValue={values.status ?? "ALL"} />
+      <Select name="priority" label="Priority" values={["ALL", ...Object.values(Priority)]} defaultValue={values.priority ?? "ALL"} />
+      <Select name="source" label="Source" values={["ALL", ...Object.values(ActionSource)]} defaultValue={values.source ?? "ALL"} />
+      <SelectItems name="streamId" label="Stream" items={streams} defaultValue={values.streamId ?? ""} emptyLabel="All streams" />
+      <SelectItems name="companyFunctionId" label="Function" items={companyFunctions} defaultValue={values.companyFunctionId ?? ""} emptyLabel="All functions" />
+      <Field name="dueBefore" label="Due on/before" type="date" defaultValue={values.dueBefore ?? ""} />
+      <Field name="reviewBefore" label="Review on/before" type="date" defaultValue={values.reviewBefore ?? ""} />
+      <div className="flex items-end gap-2">
+        <button className="button button-primary" type="submit">Apply filters</button>
+        <Link className="button button-secondary" href="/actions">Clear</Link>
       </div>
     </form>
   );
@@ -137,41 +169,55 @@ function Field({
   label,
   type = "text",
   required = false,
-  placeholder
+  placeholder,
+  defaultValue
 }: {
   name: string;
   label: string;
   type?: string;
   required?: boolean;
   placeholder?: string;
+  defaultValue?: string;
 }) {
   return (
     <div>
       <label className="field-label" htmlFor={name}>{label}</label>
-      <input className="input" id={name} name={name} placeholder={placeholder} required={required} type={type} />
+      <input className="input" defaultValue={defaultValue} id={name} name={name} placeholder={placeholder} required={required} type={type} />
     </div>
   );
 }
 
-function Select({ name, label, values }: { name: string; label: string; values: string[] }) {
+function Select({ name, label, values, defaultValue }: { name: string; label: string; values: string[]; defaultValue?: string }) {
   return (
     <div>
       <label className="field-label" htmlFor={name}>{label}</label>
-      <select className="select" id={name} name={name}>
+      <select className="select" defaultValue={defaultValue} id={name} name={name}>
         {values.map((value) => (
-          <option key={value} value={value}>{value.replaceAll("_", " ")}</option>
+          <option key={value} value={value}>{value === "ALL" ? "All" : value.replaceAll("_", " ")}</option>
         ))}
       </select>
     </div>
   );
 }
 
-function SelectItems({ name, label, items }: { name: string; label: string; items: ReferenceItem[] }) {
+function SelectItems({
+  name,
+  label,
+  items,
+  defaultValue,
+  emptyLabel = "Unassigned"
+}: {
+  name: string;
+  label: string;
+  items: ReferenceItem[];
+  defaultValue?: string;
+  emptyLabel?: string;
+}) {
   return (
     <div>
       <label className="field-label" htmlFor={name}>{label}</label>
-      <select className="select" id={name} name={name}>
-        <option value="">Unassigned</option>
+      <select className="select" defaultValue={defaultValue} id={name} name={name}>
+        <option value="">{emptyLabel}</option>
         {items.map((item) => (
           <option key={item.id} value={item.id}>{item.name}</option>
         ))}

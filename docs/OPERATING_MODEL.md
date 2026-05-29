@@ -15,7 +15,12 @@ Finance, legal, compliance, admin, sales, marketing, delivery, product, research
 ## Daily Rhythm
 
 Open the Today Command Board, review overdue/due/blocked/waiting work, quick-capture loose notes, approve assistant drafts, and select a small focus set.
+Use the daily command brief as the first prompt for company maintenance, especially compliance, review dates, and safe automation setup.
 
 ## Weekly Rhythm
 
 Run the weekly review across compliance, finance, sales, delivery, product, governance, risk, and founder workload. Review-generated items become proposed actions for approval.
+
+## Local Session Rule
+
+Local/VPN-first HTTP deployments must use `COOKIE_SECURE=false`. Switch to `COOKIE_SECURE=true` only when the cockpit is behind HTTPS.

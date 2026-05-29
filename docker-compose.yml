@@ -29,6 +29,7 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-Dromaios Admin}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:1b}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "127.0.0.1:3300:3000"
 

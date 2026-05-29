@@ -1,4 +1,5 @@
 import { quickCaptureAction } from "@/app/actions";
+import { OperatingBriefPanel } from "@/components/operating-brief-panel";
 import { TodayBoard } from "@/components/today-board";
 import { getTodayData } from "@/lib/services";
 
@@ -10,6 +11,7 @@ export default async function HomePage() {
   return (
     <div className="space-y-6">
       <TodayBoard buckets={data.buckets} quickCaptureAction={quickCaptureAction} />
+      <OperatingBriefPanel brief={data.brief} />
       <section className="grid gap-5 lg:grid-cols-3">
         <div className="panel">
           <p className="eyebrow">Launchpad</p>

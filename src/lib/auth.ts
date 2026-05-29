@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "./db";
+import { shouldUseSecureSessionCookie } from "./session-cookie";
 
 const SESSION_COOKIE = "dromaios_session";
 const SESSION_DAYS = 14;
@@ -23,7 +24,7 @@ export async function loginWithPassword(email: string, password: string) {
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureSessionCookie(),
     expires: expiresAt,
     path: "/"
   });

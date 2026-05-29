@@ -1,5 +1,5 @@
 import { createActionAction, completeActionAction } from "@/app/actions";
-import { ActionForm } from "@/components/forms";
+import { ActionForm, ActionRegisterFilters } from "@/components/forms";
 import { getActionRegisterData } from "@/lib/services";
 import { priorityLabel, statusLabel } from "@/lib/domain";
 
@@ -20,6 +20,7 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
         </div>
         <p className="muted max-w-2xl">One action system across every stream and function.</p>
       </div>
+      <ActionRegisterFilters streams={data.streams} companyFunctions={data.companyFunctions} values={params} />
       <ActionForm streams={data.streams} companyFunctions={data.companyFunctions} action={createActionAction} />
       <section className="panel overflow-x-auto">
         <table className="data-table">
