@@ -35,6 +35,32 @@ Existing specialist tools remain in place. Examples include Xero, Airwallex, Law
 - Deployment: Docker Compose on Hetzner, behind Caddy for HTTPS and reverse proxying.
 - Documentation: AI-readable maintenance pack committed with the app.
 
+## Visual And Product Design Direction
+
+The cockpit should feel like a tidy command-and-control workspace for a serious healthcare innovation company. It should be beautiful through clarity, hierarchy, spacing, typography, and restraint, not through decorative clutter.
+
+The visual tone should be:
+
+- Clean and calm.
+- Operational and company-grade.
+- Easy to read for long working sessions.
+- Confident enough to feel like a command centre.
+- Tidy enough that overdue work, risks, and priorities are not visually buried.
+- More like an executive operations desk than a consumer productivity app.
+
+Design principles:
+
+- Prioritise readable text, strong hierarchy, and scannable lists over oversized cards or marketing-style hero layouts.
+- Use restrained colour with clear semantic meaning: urgent, due soon, blocked, completed, draft, approved, and risk.
+- Use compact but comfortable density so the user can see enough company state without feeling overwhelmed.
+- Use tabs, segmented controls, filters, command buttons, badges, and icon buttons for common operator actions.
+- Keep the daily board uncluttered: the most important work should be visible without searching.
+- Avoid decorative gradients, background blobs, oversized illustrations, or novelty UI.
+- Make empty states useful by suggesting the next action, not by filling the screen with explanation.
+- Make the app feel polished on desktop first, with responsive support for tablet/mobile checks.
+
+The target impression is: "This is where I run the company."
+
 ## Core Modules
 
 ### Today Command Board
@@ -296,6 +322,7 @@ The first implementation should not include:
 ## Acceptance Criteria
 
 - A user can open the cockpit and understand what needs attention today.
+- The interface feels clean, readable, tidy, and command-and-control rather than decorative or cluttered.
 - A user can capture messy notes and approve structured action drafts.
 - Actions can be filtered across all streams and company functions.
 - Company software links can be grouped, annotated, and tied to renewals or recurring checks.
@@ -311,5 +338,6 @@ Implementation should include:
 - Unit tests for data mapping and assistant draft parsing.
 - API tests for action, launchpad, review, and automation flows.
 - UI tests for Today board, quick capture, weekly review, and launchpad management.
+- Visual review of desktop and mobile layouts to confirm readable text, clear hierarchy, no overlaps, and useful information density.
 - A local smoke test for Docker Compose startup.
 - A manual safety check confirming blocked actions cannot execute without explicit review.
