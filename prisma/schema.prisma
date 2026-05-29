@@ -1,0 +1,320 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum ActionStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  WAITING
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ActionSource {
+  USER
+  ASSISTANT
+  REVIEW
+  AUTOMATION
+  LAUNCHPAD
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReviewType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum AssistantProvider {
+  OLLAMA
+  OPENAI
+  ANTHROPIC
+  MANUAL
+}
+
+enum AssistantDraftState {
+  PENDING
+  READY
+  FAILED
+  APPROVED
+  REJECTED
+}
+
+enum AutomationSafetyLevel {
+  DRAFT_ONLY
+  APPROVAL_REQUIRED
+  TRUSTED_LOOP
+  BLOCKED
+}
+
+enum AutomationStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum AutomationRunStatus {
+  SUCCESS
+  FAILED
+  BLOCKED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         UserRole @default(ADMIN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions        Session[]
+  actionsCreated  Action[]         @relation("ActionCreatedBy")
+  assistantDrafts AssistantDraft[]
+  reviews         Review[]
+  automationRuns  AutomationRun[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Stream {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  actions Action[]
+  risks   Risk[]
+}
+
+model CompanyFunction {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  actions Action[]
+  risks   Risk[]
+}
+
+model Action {
+  id                String       @id @default(cuid())
+  title             String
+  description       String?
+  status            ActionStatus @default(OPEN)
+  priority          Priority     @default(MEDIUM)
+  source            ActionSource @default(USER)
+  dueAt             DateTime?
+  reviewAt          DateTime?
+  nextStep          String?
+  sensitive         Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  completedAt       DateTime?
+
+  streamId          String?
+  companyFunctionId String?
+  createdById       String?
+  launchpadLinkId   String?
+  reviewId          String?
+  assistantDraftId  String?      @unique
+  automationId      String?
+
+  stream          Stream?          @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  companyFunction CompanyFunction? @relation(fields: [companyFunctionId], references: [id], onDelete: SetNull)
+  createdBy       User?            @relation("ActionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  launchpadLink   LaunchpadLink?   @relation(fields: [launchpadLinkId], references: [id], onDelete: SetNull)
+  review          Review?          @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  assistantDraft  AssistantDraft?  @relation(fields: [assistantDraftId], references: [id], onDelete: SetNull)
+  automation      Automation?      @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  risks           Risk[]
+  decisions       Decision[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([dueAt])
+  @@index([reviewAt])
+  @@index([streamId])
+  @@index([companyFunctionId])
+}
+
+model LaunchpadLink {
+  id           String    @id @default(cuid())
+  name         String
+  url          String
+  group        String
+  description  String?
+  cost         Decimal?  @db.Decimal(10, 2)
+  renewalAt    DateTime?
+  loginNote    String?
+  riskLevel    RiskLevel @default(LOW)
+  owner        String?
+  sensitive    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  actions Action[]
+
+  @@index([group])
+  @@index([renewalAt])
+  @@index([riskLevel])
+}
+
+model Review {
+  id                String     @id @default(cuid())
+  type              ReviewType
+  periodStart       DateTime
+  periodEnd         DateTime
+  answers           Json
+  assistantSummary  String?
+  unresolvedRisks   Json?
+  createdById       String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  createdBy User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  actions   Action[]
+  risks     Risk[]
+  decisions Decision[]
+
+  @@index([type])
+  @@index([periodStart])
+}
+
+model Risk {
+  id                String    @id @default(cuid())
+  issue             String
+  severity          RiskLevel @default(MEDIUM)
+  status            String    @default("OPEN")
+  mitigation        String?
+  nextReviewAt      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  streamId          String?
+  companyFunctionId String?
+  actionId          String?
+  reviewId          String?
+
+  stream          Stream?          @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  companyFunction CompanyFunction? @relation(fields: [companyFunctionId], references: [id], onDelete: SetNull)
+  action          Action?          @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  review          Review?          @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+
+  @@index([severity])
+  @@index([nextReviewAt])
+}
+
+model Decision {
+  id             String   @id @default(cuid())
+  decision       String
+  rationale      String?
+  decidedAt      DateTime @default(now())
+  affectedArea   String?
+  relatedDocs    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  followUpActionId String?
+  reviewId         String?
+
+  followUpAction Action? @relation(fields: [followUpActionId], references: [id], onDelete: SetNull)
+  review         Review? @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+
+  @@index([decidedAt])
+}
+
+model AssistantDraft {
+  id            String              @id @default(cuid())
+  provider      AssistantProvider
+  model         String
+  state         AssistantDraftState @default(PENDING)
+  sourceSummary String
+  sourceText    String?
+  prompt        String
+  output        Json?
+  error         String?
+  approvedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  action      Action?
+
+  @@index([state])
+  @@index([provider])
+}
+
+model Automation {
+  id             String                @id @default(cuid())
+  name           String
+  description    String?
+  trigger        String
+  targetTool     String
+  webhookUrl     String?
+  safetyLevel    AutomationSafetyLevel
+  status         AutomationStatus      @default(ACTIVE)
+  rollbackNote   String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  actions Action[]
+  runs    AutomationRun[]
+
+  @@index([safetyLevel])
+  @@index([status])
+}
+
+model AutomationRun {
+  id              String              @id @default(cuid())
+  automationId    String
+  triggeredById   String?
+  status          AutomationRunStatus
+  requestSummary  String?
+  responseSummary String?
+  error           String?
+  createdAt       DateTime            @default(now())
+
+  automation  Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  triggeredBy User?      @relation(fields: [triggeredById], references: [id], onDelete: SetNull)
+
+  @@index([automationId])
+  @@index([status])
+}

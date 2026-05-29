@@ -1,1 +1,10 @@
 .superpowers/
+.worktrees/
+node_modules/
+.next/
+.next-dev-logs/
+.env
+.env.local
+coverage/
+test-results/
+playwright-report/

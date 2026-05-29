@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dromaios
+      POSTGRES_PASSWORD: dromaios
+      POSTGRES_DB: dromaios_cockpit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dromaios -d dromaios_cockpit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    command: sh -c "pnpm db:deploy && pnpm db:seed && pnpm start"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://dromaios:dromaios@postgres:5432/dromaios_cockpit?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:-replace-with-at-least-24-random-characters}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@dromaios.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-now}
+      ADMIN_NAME: ${ADMIN_NAME:-Dromaios Admin}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:1b}
+    ports:
+      - "127.0.0.1:3300:3000"
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - app
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

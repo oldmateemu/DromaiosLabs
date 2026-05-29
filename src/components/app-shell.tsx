@@ -1,0 +1,84 @@
+import {
+  Bot,
+  ClipboardList,
+  FileText,
+  Gauge,
+  Link as LinkIcon,
+  LogOut,
+  Repeat,
+  ShieldCheck
+} from "lucide-react";
+import Link from "next/link";
+import { logoutAction } from "@/app/actions";
+
+const navItems = [
+  { href: "/", label: "Today", icon: Gauge },
+  { href: "/actions", label: "Actions", icon: ClipboardList },
+  { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
+  { href: "/reviews", label: "Reviews", icon: ShieldCheck },
+  { href: "/assistant", label: "Assistant", icon: Bot },
+  { href: "/automations", label: "Automations", icon: Repeat },
+  { href: "/docs", label: "AI Docs", icon: FileText }
+];
+
+export function AppShell({ children, userName }: { children: React.ReactNode; userName: string }) {
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="border-b border-white/10 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Dromaios Labs</p>
+          <h1 className="mt-2 text-xl font-semibold tracking-normal text-white">Company Cockpit</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Command and control for daily company running.</p>
+        </div>
+        <nav className="flex-1 space-y-1 p-4">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link className="sidebar-link" href={item.href} key={item.href}>
+                <Icon aria-hidden="true" size={18} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="border-t border-white/10 p-4">
+          <p className="mb-3 text-sm text-slate-300">{userName}</p>
+          <form action={logoutAction}>
+            <button className="sidebar-link w-full" type="submit">
+              <LogOut aria-hidden="true" size={18} />
+              Sign out
+            </button>
+          </form>
+        </div>
+      </aside>
+      <div className="content-wrap">
+        <header className="topbar">
+          <div className="mx-auto max-w-[1500px]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="eyebrow">Private operations workspace</p>
+                <p className="text-sm font-medium text-command-ink">Dromaios Cockpit</p>
+              </div>
+              <div className="hidden items-center gap-2 md:flex">
+                <span className="meta-pill">Local/VPN first</span>
+                <span className="meta-pill">Ollama ready</span>
+              </div>
+            </div>
+            <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Compact navigation">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link className="button button-secondary whitespace-nowrap" href={item.href} key={item.href}>
+                    <Icon aria-hidden="true" size={16} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </header>
+        <main className="page">{children}</main>
+      </div>
+    </div>
+  );
+}
