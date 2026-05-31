@@ -10,6 +10,8 @@ export type ActionLike = {
   status: ActionStatus;
   priority: Priority;
   dueAt: Date | string | null;
+  stream?: { name: string } | null;
+  companyFunction?: { name: string } | null;
 };
 
 export type TodayBuckets<T extends ActionLike = ActionLike> = {

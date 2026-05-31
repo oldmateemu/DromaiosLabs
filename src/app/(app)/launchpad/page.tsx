@@ -1,11 +1,14 @@
 import { createLaunchpadLinkAction } from "@/app/actions";
-import { LaunchpadForm } from "@/components/forms";
+import { CollapsiblePanel, LaunchpadForm } from "@/components/forms";
+import { LaunchpadHealthPanel } from "@/components/launchpad-health";
+import { buildLaunchpadHealth } from "@/lib/cockpit-insights";
 import { getLaunchpadData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
 export default async function LaunchpadPage() {
   const links = await getLaunchpadData();
+  const health = buildLaunchpadHealth(links);
   const grouped = links.reduce<Record<string, typeof links>>((groups, link) => {
     groups[link.group] ??= [];
     groups[link.group].push(link);
@@ -21,7 +24,10 @@ export default async function LaunchpadPage() {
         </div>
         <p className="muted max-w-2xl">Group every tool you use, then tie it to cost, renewal, risk, and recurring checks.</p>
       </div>
-      <LaunchpadForm action={createLaunchpadLinkAction} />
+      <LaunchpadHealthPanel health={health} />
+      <CollapsiblePanel eyebrow="Systems" summary="Add new systems deliberately, with owner, cost, renewal, and risk context where known." title="Add Launchpad Link">
+        <LaunchpadForm action={createLaunchpadLinkAction} />
+      </CollapsiblePanel>
       <section className="grid gap-5 lg:grid-cols-2">
         {Object.entries(grouped).map(([group, groupLinks]) => (
           <div className="panel" key={group}>

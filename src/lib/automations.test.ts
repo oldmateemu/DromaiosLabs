@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertAutomationCanRun, canAutomationRun } from "./automations";
+import { assertAutomationCanPrepareDraft, assertAutomationCanRun, canAutomationPrepareDraft, canAutomationRun } from "./automations";
 
 describe("canAutomationRun", () => {
   it("blocks draft-only and blocked automations", () => {
@@ -20,5 +20,33 @@ describe("canAutomationRun", () => {
 describe("assertAutomationCanRun", () => {
   it("throws with a user-readable message when blocked", () => {
     expect(() => assertAutomationCanRun("DRAFT_ONLY", true)).toThrow("Draft-only automations cannot execute.");
+  });
+});
+
+describe("canAutomationPrepareDraft", () => {
+  it("allows draft-only local prep without allowing external execution", () => {
+    expect(canAutomationPrepareDraft("DRAFT_ONLY")).toEqual({ allowed: true });
+    expect(canAutomationRun("DRAFT_ONLY", true)).toEqual({ allowed: false, reason: "Draft-only automations cannot execute." });
+  });
+
+  it("blocks non-draft local prep paths", () => {
+    expect(canAutomationPrepareDraft("APPROVAL_REQUIRED")).toEqual({
+      allowed: false,
+      reason: "Only draft-only automations can prepare local drafts."
+    });
+    expect(canAutomationPrepareDraft("TRUSTED_LOOP")).toEqual({
+      allowed: false,
+      reason: "Only draft-only automations can prepare local drafts."
+    });
+    expect(canAutomationPrepareDraft("BLOCKED")).toEqual({
+      allowed: false,
+      reason: "Blocked automations cannot prepare drafts."
+    });
+  });
+});
+
+describe("assertAutomationCanPrepareDraft", () => {
+  it("throws when a non-draft automation tries to prepare local output", () => {
+    expect(() => assertAutomationCanPrepareDraft("APPROVAL_REQUIRED")).toThrow("Only draft-only automations can prepare local drafts.");
   });
 });

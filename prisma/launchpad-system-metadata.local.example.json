@@ -1,0 +1,84 @@
+{
+  "systems": [
+    {
+      "name": "Xero",
+      "group": "Money",
+      "cost": "0.00",
+      "renewalAt": "2026-07-01",
+      "owner": "Callum",
+      "riskLevel": "HIGH",
+      "loginNote": "Password manager entry name for the Xero admin account",
+      "sensitive": true
+    },
+    {
+      "name": "Airwallex",
+      "group": "Money",
+      "cost": "0.00",
+      "renewalAt": null,
+      "owner": "Callum",
+      "riskLevel": "HIGH",
+      "loginNote": "Password manager entry name for the Airwallex admin account",
+      "sensitive": true
+    },
+    {
+      "name": "Lawpath",
+      "group": "Legal/Admin",
+      "cost": "0.00",
+      "renewalAt": "2026-07-01",
+      "owner": "Callum",
+      "riskLevel": "HIGH",
+      "loginNote": "Password manager entry name for the Lawpath admin account",
+      "sensitive": true
+    },
+    {
+      "name": "Skool",
+      "group": "Community/Sales",
+      "cost": "0.00",
+      "renewalAt": "2026-07-01",
+      "owner": "Callum",
+      "riskLevel": "MEDIUM",
+      "loginNote": "Password manager entry name for the Skool owner account",
+      "sensitive": true
+    },
+    {
+      "name": "ChatGPT",
+      "group": "AI/Workbench",
+      "cost": "0.00",
+      "renewalAt": "2026-07-01",
+      "owner": "Callum",
+      "riskLevel": "MEDIUM",
+      "loginNote": "Password manager entry name for the ChatGPT or OpenAI account",
+      "sensitive": true
+    },
+    {
+      "name": "Ollama",
+      "group": "AI/Workbench",
+      "cost": "0.00",
+      "renewalAt": null,
+      "owner": "Callum",
+      "riskLevel": "LOW",
+      "loginNote": "Local-only service; record workstation or model-management note here",
+      "sensitive": false
+    },
+    {
+      "name": "GitHub",
+      "group": "Product",
+      "cost": "0.00",
+      "renewalAt": null,
+      "owner": "Callum",
+      "riskLevel": "HIGH",
+      "loginNote": "Password manager entry name for the GitHub account and recovery codes",
+      "sensitive": true
+    },
+    {
+      "name": "Hetzner",
+      "group": "Infrastructure",
+      "cost": "0.00",
+      "renewalAt": null,
+      "owner": "Callum",
+      "riskLevel": "CRITICAL",
+      "loginNote": "Password manager entry name for Hetzner Cloud admin",
+      "sensitive": true
+    }
+  ]
+}

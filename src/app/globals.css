@@ -104,6 +104,10 @@ a {
     @apply border-command-line bg-white text-command-ink hover:bg-slate-50;
   }
 
+  .button-active {
+    @apply border-command-navy bg-command-navy text-white hover:bg-[#172D4A];
+  }
+
   .field-label {
     @apply block text-sm font-medium text-command-ink;
   }
@@ -124,6 +128,70 @@ a {
 
   .action-row {
     @apply rounded-md border border-command-line bg-white p-3 shadow-control;
+  }
+
+  .next-action {
+    @apply mb-4 flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .next-action-neutral {
+    @apply border-command-line bg-white;
+  }
+
+  .next-action-danger {
+    @apply border-red-200 bg-red-50;
+  }
+
+  .next-action-warning {
+    @apply border-amber-200 bg-amber-50;
+  }
+
+  .next-action-blocked {
+    @apply border-slate-300 bg-slate-100;
+  }
+
+  .next-action-success {
+    @apply border-emerald-200 bg-emerald-50;
+  }
+
+  .focus-card {
+    @apply rounded-md border border-command-line bg-command-panel p-3 transition hover:border-command-navy hover:bg-white;
+  }
+
+  .metric-card {
+    @apply rounded-md border bg-white p-3;
+  }
+
+  .metric-neutral {
+    @apply border-command-line;
+  }
+
+  .metric-warning {
+    @apply border-amber-200 bg-amber-50;
+  }
+
+  .metric-danger {
+    @apply border-red-200 bg-red-50;
+  }
+
+  .compact-panel {
+    @apply p-4;
+  }
+
+  .saved-view-link {
+    @apply inline-flex items-center rounded-full border border-command-line bg-white px-3 py-1.5 text-sm font-medium text-command-ink transition hover:border-command-navy hover:bg-slate-50;
+  }
+
+  .disclosure-panel {
+    @apply p-0;
+  }
+
+  .disclosure-summary {
+    @apply flex cursor-pointer list-none items-center justify-between gap-4 p-5;
+  }
+
+  .disclosure-summary::-webkit-details-marker {
+    display: none;
   }
 
   .empty-state {

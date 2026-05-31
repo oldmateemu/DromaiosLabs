@@ -25,3 +25,12 @@
 - Due-soon compliance checks.
 - Lead follow-up drafts.
 - Post-course feedback follow-up drafts.
+
+## Local Draft Runner
+
+The first implemented local runner is `Weekly review prep`.
+
+- Safety level: `DRAFT_ONLY`.
+- Scope: reads local cockpit records only.
+- Output: writes a generated weekly review brief to the automation run log.
+- Hard limits: no webhook call, no external service, no public publishing, no credential change, and no action/review records are created automatically.

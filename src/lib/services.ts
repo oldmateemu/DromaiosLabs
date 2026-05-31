@@ -11,7 +11,9 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
-import { assertAutomationCanRun } from "./automations";
+import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
+import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
+import { buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
@@ -26,7 +28,7 @@ export async function getReferenceData() {
 }
 
 export async function getTodayData() {
-  const [actions, links, automations, drafts] = await Promise.all([
+  const [actions, links, automations, drafts, risks, decisions] = await Promise.all([
     prisma.action.findMany({
       orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
       include: { stream: true, companyFunction: true },
@@ -34,25 +36,40 @@ export async function getTodayData() {
     }),
     prisma.launchpadLink.findMany({ orderBy: [{ group: "asc" }, { name: "asc" }], take: 12 }),
     prisma.automation.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
-    prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 5 })
+    prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
+    prisma.risk.findMany({ orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { createdAt: "desc" }], take: 5 }),
+    prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 5 })
   ]);
 
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const buckets = bucketActionsForToday(actions);
   const draftsNeedingReview = drafts.filter((draft) => draft.state !== AssistantDraftState.APPROVED).length;
 
   return {
     actions,
     buckets,
+    nextAction: buildNextBestAction({
+      buckets,
+      today,
+      draftCount: draftsNeedingReview,
+      automationCount: automations.length
+    }),
+    focusSet: buildFocusSet(buckets),
     brief: buildOperatingBrief({
-      now: new Date(),
+      now,
       overdueCount: buckets.overdue.length,
       blockedCount: buckets.blocked.length,
       draftCount: draftsNeedingReview,
       automationCount: automations.length
     }),
+    launchpadHealth: buildLaunchpadHealth(links, now),
+    governanceSummary: buildGovernanceSummary({ risks, decisions }),
     links,
     automations,
-    drafts
+    drafts,
+    risks,
+    decisions
   };
 }
 
@@ -279,6 +296,71 @@ export async function runAutomation(automationId: string, approved: boolean, use
         status: error instanceof Error && error.message.includes("cannot execute") ? AutomationRunStatus.BLOCKED : AutomationRunStatus.FAILED,
         requestSummary: `Manual trigger for ${automation.name}`,
         error: error instanceof Error ? error.message : "Automation failed."
+      }
+    });
+  }
+
+  revalidatePath("/automations");
+}
+
+export async function prepareDraftAutomation(automationId: string, userId: string) {
+  const automation = await prisma.automation.findUnique({ where: { id: automationId } });
+  if (!automation) throw new Error("Automation not found.");
+
+  const requestSummary = `Local draft prep for ${automation.name}`;
+  const kind = getLocalDraftAutomationKind(automation);
+
+  try {
+    assertAutomationCanPrepareDraft(automation.safetyLevel);
+    if (automation.status !== "ACTIVE") {
+      throw new Error("Paused automations cannot prepare drafts.");
+    }
+    if (kind !== "WEEKLY_REVIEW_PREP") {
+      throw new Error("No local draft runner is registered for this automation.");
+    }
+
+    const [actions, risks, links, draftsNeedingReview] = await Promise.all([
+      prisma.action.findMany({
+        include: { stream: true, companyFunction: true },
+        orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { updatedAt: "asc" }],
+        take: 120
+      }),
+      prisma.risk.findMany({
+        orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { updatedAt: "desc" }],
+        take: 50
+      }),
+      prisma.launchpadLink.findMany({ orderBy: [{ riskLevel: "desc" }, { renewalAt: "asc" }, { name: "asc" }], take: 80 }),
+      prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } })
+    ]);
+
+    const responseSummary = buildWeeklyReviewPrepDraft({
+      now: new Date(),
+      actions,
+      risks,
+      links,
+      draftsNeedingReview
+    });
+
+    await prisma.automationRun.create({
+      data: {
+        automationId,
+        triggeredById: userId,
+        status: AutomationRunStatus.SUCCESS,
+        requestSummary,
+        responseSummary
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Draft automation failed.";
+    await prisma.automationRun.create({
+      data: {
+        automationId,
+        triggeredById: userId,
+        status: message.includes("draft-only") || message.includes("Blocked") || message.includes("Paused")
+          ? AutomationRunStatus.BLOCKED
+          : AutomationRunStatus.FAILED,
+        requestSummary,
+        error: message
       }
     });
   }

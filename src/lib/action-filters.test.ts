@@ -36,4 +36,19 @@ describe("buildActionRegisterWhere", () => {
 
     expect(where).toEqual({});
   });
+
+  it("supports saved-view company function slugs when no id is available", () => {
+    const where = buildActionRegisterWhere({
+      companyFunction: "founder workload"
+    });
+
+    expect(where).toEqual({
+      companyFunction: {
+        name: {
+          equals: "founder workload",
+          mode: "insensitive"
+        }
+      }
+    });
+  });
 });

@@ -4,6 +4,64 @@ import Link from "next/link";
 type ReferenceItem = { id: string; name: string };
 type FilterValues = Record<string, string | undefined>;
 
+export function CollapsiblePanel({
+  eyebrow,
+  title,
+  summary,
+  defaultOpen = false,
+  children
+}: {
+  eyebrow: string;
+  title: string;
+  summary?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="panel disclosure-panel" open={defaultOpen}>
+      <summary className="disclosure-summary">
+        <span>
+          <span className="eyebrow block">{eyebrow}</span>
+          <span className="block text-lg font-semibold text-command-ink">{title}</span>
+          {summary ? <span className="muted mt-1 block">{summary}</span> : null}
+        </span>
+        <span className="button button-secondary">Open</span>
+      </summary>
+      <div className="mt-4 border-t border-command-line pt-4">{children}</div>
+    </details>
+  );
+}
+
+export function ActionSavedViews({ today, weekEnd }: { today: string; weekEnd: string }) {
+  const links = [
+    ["Today", `/actions?dueBefore=${today}`],
+    ["This week", `/actions?dueBefore=${weekEnd}`],
+    ["Waiting", "/actions?status=WAITING"],
+    ["Blocked", "/actions?status=BLOCKED"],
+    ["Compliance", "/actions?companyFunction=compliance"],
+    ["Revenue", "/actions?companyFunction=sales"],
+    ["Founder load", "/actions?companyFunction=founder+workload"]
+  ] as const;
+
+  return (
+    <section className="panel compact-panel">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="eyebrow">Saved views</p>
+          <h2 className="text-lg font-semibold text-command-ink">Operating lenses</h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {links.map(([label, href]) => (
+            <Link className="saved-view-link" href={href} key={label}>
+              {label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ActionForm({
   streams,
   companyFunctions,
@@ -14,7 +72,7 @@ export function ActionForm({
   action: (formData: FormData) => Promise<void>;
 }) {
   return (
-    <form action={action} className="panel grid gap-4 md:grid-cols-2">
+    <form action={action} className="grid gap-4 md:grid-cols-2">
       <div className="md:col-span-2">
         <p className="eyebrow">Capture</p>
         <h2>New Action</h2>
@@ -52,7 +110,7 @@ export function ActionRegisterFilters({
   values: FilterValues;
 }) {
   return (
-    <form className="panel grid gap-4 md:grid-cols-2 xl:grid-cols-4" method="get">
+    <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" method="get">
       <div className="md:col-span-2 xl:col-span-4">
         <p className="eyebrow">Find the right work</p>
         <h2>Filters</h2>
@@ -74,7 +132,7 @@ export function ActionRegisterFilters({
 
 export function LaunchpadForm({ action }: { action: (formData: FormData) => Promise<void> }) {
   return (
-    <form action={action} className="panel grid gap-4 md:grid-cols-2">
+    <form action={action} className="grid gap-4 md:grid-cols-2">
       <div className="md:col-span-2">
         <p className="eyebrow">Systems</p>
         <h2>Add Launchpad Link</h2>
@@ -137,7 +195,7 @@ export function WeeklyReviewForm({ action }: { action: (formData: FormData) => P
 
 export function AutomationForm({ action }: { action: (formData: FormData) => Promise<void> }) {
   return (
-    <form action={action} className="panel grid gap-4 md:grid-cols-2">
+    <form action={action} className="grid gap-4 md:grid-cols-2">
       <div className="md:col-span-2">
         <p className="eyebrow">Control room</p>
         <h2>Register Automation</h2>

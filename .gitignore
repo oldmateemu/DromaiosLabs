@@ -5,6 +5,7 @@ node_modules/
 .next-dev-logs/
 .env
 .env.local
+prisma/launchpad-system-metadata.local.json
 coverage/
 test-results/
 playwright-report/

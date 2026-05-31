@@ -17,8 +17,25 @@ export function canAutomationRun(level: AutomationSafetyLevel, approved: boolean
   return { allowed: true };
 }
 
+export function canAutomationPrepareDraft(level: AutomationSafetyLevel): AutomationRunDecision {
+  if (level === "DRAFT_ONLY") {
+    return { allowed: true };
+  }
+  if (level === "BLOCKED") {
+    return { allowed: false, reason: "Blocked automations cannot prepare drafts." };
+  }
+  return { allowed: false, reason: "Only draft-only automations can prepare local drafts." };
+}
+
 export function assertAutomationCanRun(level: AutomationSafetyLevel, approved: boolean) {
   const decision = canAutomationRun(level, approved);
+  if (!decision.allowed) {
+    throw new Error(decision.reason);
+  }
+}
+
+export function assertAutomationCanPrepareDraft(level: AutomationSafetyLevel) {
+  const decision = canAutomationPrepareDraft(level);
   if (!decision.allowed) {
     throw new Error(decision.reason);
   }

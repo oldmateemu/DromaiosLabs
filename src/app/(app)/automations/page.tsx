@@ -1,6 +1,7 @@
-import { createAutomationAction, runAutomationAction } from "@/app/actions";
+import { createAutomationAction, prepareDraftAutomationAction, runAutomationAction } from "@/app/actions";
 import { AutomationRegistry } from "@/components/automation-registry";
-import { AutomationForm } from "@/components/forms";
+import { AutomationStarterTemplates } from "@/components/automation-starters";
+import { AutomationForm, CollapsiblePanel } from "@/components/forms";
 import { getAutomationData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +17,11 @@ export default async function AutomationsPage() {
         </div>
         <p className="muted max-w-2xl">Register low-risk loops first. The cockpit logs every attempt and blocks unsafe execution.</p>
       </div>
-      <AutomationRegistry automations={automations} runAction={runAutomationAction} />
-      <AutomationForm action={createAutomationAction} />
+      <AutomationStarterTemplates action={createAutomationAction} />
+      <AutomationRegistry automations={automations} prepareDraftAction={prepareDraftAutomationAction} runAction={runAutomationAction} />
+      <CollapsiblePanel eyebrow="Control room" summary="Use custom registration after a starter template is too limited." title="Register Automation">
+        <AutomationForm action={createAutomationAction} />
+      </CollapsiblePanel>
     </div>
   );
 }

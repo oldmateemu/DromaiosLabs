@@ -8,8 +8,8 @@ import {
   Repeat,
   ShieldCheck
 } from "lucide-react";
-import Link from "next/link";
 import { logoutAction } from "@/app/actions";
+import { AppNavLink } from "@/components/nav-link";
 
 const navItems = [
   { href: "/", label: "Today", icon: Gauge },
@@ -34,10 +34,10 @@ export function AppShell({ children, userName }: { children: React.ReactNode; us
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
-              <Link className="sidebar-link" href={item.href} key={item.href}>
+              <AppNavLink className="sidebar-link" href={item.href} key={item.href}>
                 <Icon aria-hidden="true" size={18} />
                 {item.label}
-              </Link>
+              </AppNavLink>
             );
           })}
         </nav>
@@ -68,10 +68,10 @@ export function AppShell({ children, userName }: { children: React.ReactNode; us
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <Link className="button button-secondary whitespace-nowrap" href={item.href} key={item.href}>
+                  <AppNavLink activeClassName="button-active" className="button button-secondary whitespace-nowrap" href={item.href} key={item.href}>
                     <Icon aria-hidden="true" size={16} />
                     {item.label}
-                  </Link>
+                  </AppNavLink>
                 );
               })}
             </nav>

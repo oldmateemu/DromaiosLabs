@@ -1,5 +1,5 @@
 import { createActionAction, completeActionAction } from "@/app/actions";
-import { ActionForm, ActionRegisterFilters } from "@/components/forms";
+import { ActionForm, ActionRegisterFilters, ActionSavedViews, CollapsiblePanel } from "@/components/forms";
 import { getActionRegisterData } from "@/lib/services";
 import { priorityLabel, statusLabel } from "@/lib/domain";
 
@@ -10,6 +10,10 @@ type SearchParams = Promise<Record<string, string | undefined>>;
 export default async function ActionsPage({ searchParams }: { searchParams?: SearchParams }) {
   const params = (await searchParams) ?? {};
   const data = await getActionRegisterData(params);
+  const today = new Date();
+  const weekEnd = new Date(today);
+  weekEnd.setDate(today.getDate() + 7);
+  const hasFilters = Object.values(params).some((value) => value && value !== "ALL");
 
   return (
     <div className="space-y-6">
@@ -20,8 +24,10 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
         </div>
         <p className="muted max-w-2xl">One action system across every stream and function.</p>
       </div>
-      <ActionRegisterFilters streams={data.streams} companyFunctions={data.companyFunctions} values={params} />
-      <ActionForm streams={data.streams} companyFunctions={data.companyFunctions} action={createActionAction} />
+      <ActionSavedViews today={today.toISOString().slice(0, 10)} weekEnd={weekEnd.toISOString().slice(0, 10)} />
+      <CollapsiblePanel defaultOpen={hasFilters} eyebrow="Find the right work" summary="Open only when the saved views are not specific enough." title="Filters">
+        <ActionRegisterFilters streams={data.streams} companyFunctions={data.companyFunctions} values={params} />
+      </CollapsiblePanel>
       <section className="panel overflow-x-auto">
         <table className="data-table">
           <thead>
@@ -62,6 +68,9 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
           </tbody>
         </table>
       </section>
+      <CollapsiblePanel eyebrow="Capture" summary="Use quick capture for messy notes; use this form when the action is already clear." title="New Action">
+        <ActionForm streams={data.streams} companyFunctions={data.companyFunctions} action={createActionAction} />
+      </CollapsiblePanel>
     </div>
   );
 }

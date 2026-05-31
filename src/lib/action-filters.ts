@@ -15,7 +15,19 @@ export function buildActionRegisterWhere(filters: RegisterFilters): Prisma.Actio
   if (priority) where.priority = priority;
   if (source) where.source = source;
   if (filters.streamId) where.streamId = filters.streamId;
-  if (filters.companyFunctionId) where.companyFunctionId = filters.companyFunctionId;
+  if (filters.companyFunctionId) {
+    where.companyFunctionId = filters.companyFunctionId;
+  } else {
+    const companyFunction = nameFilter(filters.companyFunction);
+    if (companyFunction) {
+      where.companyFunction = {
+        name: {
+          equals: companyFunction,
+          mode: "insensitive"
+        }
+      };
+    }
+  }
   if (dueBefore) where.dueAt = { lte: dueBefore };
   if (reviewBefore) where.reviewAt = { lte: reviewBefore };
 
@@ -31,4 +43,9 @@ function endOfDayFilter(value: string | undefined) {
   if (!value) return undefined;
   const date = new Date(`${value}T23:59:59.999`);
   return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function nameFilter(value: string | undefined) {
+  const normalized = value?.replaceAll("+", " ").trim();
+  return normalized ? normalized : undefined;
 }

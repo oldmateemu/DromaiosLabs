@@ -13,6 +13,14 @@
 2. Add seed entries only if the group should exist for every environment.
 3. Update `docs/OPERATING_MODEL.md` if it changes how the company is run.
 
+## Import Launchpad System Metadata
+
+1. Copy `prisma/launchpad-system-metadata.local.example.json` to `prisma/launchpad-system-metadata.local.json`.
+2. Fill exact cost, renewal date, owner, risk level, and credential-location notes for the seeded systems.
+3. Keep real credential values out of the file; store only where the credential lives.
+4. Run `pnpm db:seed`. The seed fills empty metadata on existing systems and treats the local import as authoritative for exact values.
+5. Open the Launchpad and check System health for remaining metadata gaps.
+
 ## Add An Automation
 
 1. Register it in the Automation Control Room.

@@ -1,4 +1,5 @@
 import { approveDraftAction } from "@/app/actions";
+import { PostingGuardrailChecker } from "@/components/posting-guardrail-checker";
 import { getAssistantDraftData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function AssistantPage() {
         </div>
         <p className="muted max-w-2xl">AI can draft structure. You decide what becomes company work.</p>
       </div>
+      <PostingGuardrailChecker />
       <section className="space-y-4">
         <div className="panel">
           <p className="eyebrow">Needs judgement</p>

@@ -10,6 +10,7 @@ import {
   createAutomation,
   createLaunchpadLink,
   createQuickCaptureDraft,
+  prepareDraftAutomation,
   runAutomation,
   updateActionStatus
 } from "@/lib/services";
@@ -76,5 +77,12 @@ export async function runAutomationAction(formData: FormData) {
   const automationId = String(formData.get("automationId") ?? "");
   const approved = formData.get("approved") === "true";
   await runAutomation(automationId, approved, user.id);
+  redirect("/automations");
+}
+
+export async function prepareDraftAutomationAction(formData: FormData) {
+  const user = await requireUser();
+  const automationId = String(formData.get("automationId") ?? "");
+  await prepareDraftAutomation(automationId, user.id);
   redirect("/automations");
 }

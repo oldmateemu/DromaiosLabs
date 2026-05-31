@@ -1,4 +1,6 @@
 import { quickCaptureAction } from "@/app/actions";
+import { GovernanceSummaryPanel } from "@/components/governance-summary";
+import { LaunchpadHealthPanel } from "@/components/launchpad-health";
 import { OperatingBriefPanel } from "@/components/operating-brief-panel";
 import { TodayBoard } from "@/components/today-board";
 import { getTodayData } from "@/lib/services";
@@ -10,8 +12,12 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <TodayBoard buckets={data.buckets} quickCaptureAction={quickCaptureAction} />
+      <TodayBoard buckets={data.buckets} focusSet={data.focusSet} nextAction={data.nextAction} quickCaptureAction={quickCaptureAction} />
       <OperatingBriefPanel brief={data.brief} />
+      <section className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+        <LaunchpadHealthPanel health={data.launchpadHealth} />
+        <GovernanceSummaryPanel summary={data.governanceSummary} />
+      </section>
       <section className="grid gap-5 lg:grid-cols-3">
         <div className="panel">
           <p className="eyebrow">Launchpad</p>

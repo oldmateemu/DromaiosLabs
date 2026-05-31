@@ -1,5 +1,10 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient, UserRole } from "@prisma/client";
+import {
+  launchpadSystemKey,
+  loadLaunchpadSystemMetadata,
+  type LaunchpadSystemMetadata
+} from "../src/lib/launchpad-system-metadata";
 
 const prisma = new PrismaClient();
 
@@ -26,21 +31,11 @@ const functions = [
   ["founder workload", "Energy, capacity, focus, and founder operating rhythm."]
 ] as const;
 
-const launchpadLinks = [
-  ["Xero", "https://www.xero.com/", "Money", "Accounting and reconciliation"],
-  ["Airwallex", "https://www.airwallex.com/", "Money", "Business payments and cards"],
-  ["Lawpath", "https://lawpath.com.au/", "Legal/Admin", "Legal documents and company support"],
-  ["Skool", "https://www.skool.com/", "Community/Sales", "Community and course audience"],
-  ["ChatGPT", "https://chatgpt.com/", "AI/Workbench", "Cloud AI drafting and strategy"],
-  ["Ollama", "http://localhost:11434/", "AI/Workbench", "Local AI runtime"],
-  ["GitHub", "https://github.com/", "Product", "Code repositories and issues"],
-  ["Hetzner", "https://console.hetzner.cloud/", "Infrastructure", "Server hosting"]
-] as const;
-
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@dromaios.local";
   const adminPassword = process.env.ADMIN_PASSWORD ?? "change-me-now";
   const adminName = process.env.ADMIN_NAME ?? "Dromaios Admin";
+  const launchpadMetadata = loadLaunchpadSystemMetadata();
 
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
@@ -66,14 +61,65 @@ async function main() {
     });
   }
 
-  for (const [name, url, group, description] of launchpadLinks) {
-    const existing = await prisma.launchpadLink.findFirst({ where: { name, group } });
+  for (const system of launchpadMetadata.systems) {
+    const existing = await prisma.launchpadLink.findFirst({ where: { name: system.name, group: system.group } });
+    const imported = launchpadMetadata.importedKeys.has(launchpadSystemKey(system));
     if (existing) {
-      await prisma.launchpadLink.update({ where: { id: existing.id }, data: { url, description } });
+      await prisma.launchpadLink.update({
+        where: { id: existing.id },
+        data: {
+          url: system.url,
+          description: system.description,
+          ...metadataUpdateForExisting(existing, system, imported)
+        }
+      });
     } else {
-      await prisma.launchpadLink.create({ data: { name, url, group, description } });
+      await prisma.launchpadLink.create({ data: metadataForCreate(system) });
     }
   }
+}
+
+function metadataForCreate(system: LaunchpadSystemMetadata) {
+  return {
+    name: system.name,
+    url: system.url,
+    group: system.group,
+    description: system.description,
+    owner: system.owner,
+    cost: system.cost,
+    renewalAt: dateOrNull(system.renewalAt),
+    loginNote: system.loginNote,
+    riskLevel: system.riskLevel,
+    sensitive: system.sensitive
+  };
+}
+
+function metadataUpdateForExisting(
+  existing: {
+    cost: unknown;
+    renewalAt: Date | null;
+    loginNote: string | null;
+    riskLevel: string;
+    owner: string | null;
+    sensitive: boolean;
+  },
+  system: LaunchpadSystemMetadata,
+  imported: boolean
+) {
+  const update: Partial<ReturnType<typeof metadataForCreate>> = {};
+
+  if (imported || !existing.owner?.trim()) update.owner = system.owner;
+  if (imported || existing.cost === null || existing.cost === undefined) update.cost = system.cost;
+  if (imported || !existing.renewalAt) update.renewalAt = dateOrNull(system.renewalAt);
+  if (imported || !existing.loginNote?.trim()) update.loginNote = system.loginNote;
+  if (imported || existing.riskLevel === "LOW") update.riskLevel = system.riskLevel;
+  if (imported || (!existing.sensitive && system.sensitive)) update.sensitive = system.sensitive;
+
+  return update;
+}
+
+function dateOrNull(date: string | null) {
+  return date ? new Date(`${date}T00:00:00`) : null;
 }
 
 main()
