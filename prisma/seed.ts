@@ -119,7 +119,7 @@ function metadataUpdateForExisting(
 }
 
 function dateOrNull(date: string | null) {
-  return date ? new Date(`${date}T00:00:00`) : null;
+  return date ? new Date(`${date}T00:00:00.000Z`) : null;
 }
 
 main()

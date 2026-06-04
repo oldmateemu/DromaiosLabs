@@ -13,15 +13,15 @@ const templates = [
     name: "Stale task summary",
     safetyLevel: AutomationSafetyLevel.DRAFT_ONLY,
     trigger: "Manual stale action scan",
-    targetTool: "n8n or Activepieces",
-    description: "Prepares a short digest of open actions that have not moved recently.",
+    targetTool: "local cockpit",
+    description: "Drafts a local digest of open actions that have not moved recently.",
     rollbackNote: "Discard the digest. No company records are changed by the draft loop."
   },
   {
     name: "Renewal reminder",
     safetyLevel: AutomationSafetyLevel.APPROVAL_REQUIRED,
     trigger: "Manual launchpad renewal check",
-    targetTool: "webhook",
+    targetTool: "local cockpit",
     description: "Checks launchpad renewal dates and creates reminders only after approval.",
     rollbackNote: "Mark generated reminder actions done or cancelled if the run was not useful."
   },

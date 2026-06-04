@@ -13,11 +13,12 @@ import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
 import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
-import { buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
+import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
+import { buildRenewalReminderRun, getLocalApprovalAutomationKind } from "./renewal-reminders";
 
 export async function getReferenceData() {
   const [streams, companyFunctions] = await Promise.all([
@@ -265,8 +266,15 @@ export async function runAutomation(automationId: string, approved: boolean, use
   const automation = await prisma.automation.findUnique({ where: { id: automationId } });
   if (!automation) throw new Error("Automation not found.");
 
+  const localApprovalKind = getLocalApprovalAutomationKind(automation);
+
   try {
     assertAutomationCanRun(automation.safetyLevel, approved);
+    if (localApprovalKind === "RENEWAL_REMINDER") {
+      await runRenewalReminderAutomation(automationId, userId);
+      return;
+    }
+
     if (!automation.webhookUrl) {
       throw new Error("Automation has no webhook URL configured.");
     }
@@ -303,6 +311,70 @@ export async function runAutomation(automationId: string, approved: boolean, use
   revalidatePath("/automations");
 }
 
+async function runRenewalReminderAutomation(automationId: string, userId: string) {
+  const now = new Date();
+  const links = await prisma.launchpadLink.findMany({
+    orderBy: [{ renewalAt: "asc" }, { riskLevel: "desc" }, { name: "asc" }],
+    take: 100
+  });
+  const run = buildRenewalReminderRun({ now, links });
+  const launchpadLinkIds = run.actionsToCreate.map((action) => action.launchpadLinkId);
+  const existingReminders = launchpadLinkIds.length > 0
+    ? await prisma.action.findMany({
+      where: {
+        automationId,
+        launchpadLinkId: { in: launchpadLinkIds },
+        status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
+      },
+      select: { launchpadLinkId: true }
+    })
+    : [];
+  const existingIds = new Set(existingReminders.map((action) => action.launchpadLinkId).filter((id): id is string => Boolean(id)));
+  const actionsToCreate = run.actionsToCreate.filter((action) => !existingIds.has(action.launchpadLinkId));
+
+  await prisma.$transaction(async (tx) => {
+    for (const action of actionsToCreate) {
+      await tx.action.create({
+        data: {
+          title: action.title,
+          description: action.description,
+          status: ActionStatus.OPEN,
+          priority: action.priority,
+          source: ActionSource.AUTOMATION,
+          dueAt: dateFromKey(action.dueAt),
+          reviewAt: dateFromKey(action.reviewAt),
+          nextStep: action.nextStep,
+          sensitive: action.sensitive,
+          createdById: userId,
+          launchpadLinkId: action.launchpadLinkId,
+          automationId
+        }
+      });
+    }
+
+    await tx.automationRun.create({
+      data: {
+        automationId,
+        triggeredById: userId,
+        status: AutomationRunStatus.SUCCESS,
+        requestSummary: "Approved local renewal reminder run",
+        responseSummary: [
+          run.responseSummary,
+          "",
+          "Run result",
+          `- Reminder actions created this run: ${actionsToCreate.length}`,
+          `- Existing open reminders skipped: ${existingIds.size}`
+        ].join("\n")
+      }
+    });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath("/launchpad");
+  revalidatePath("/automations");
+}
+
 export async function prepareDraftAutomation(automationId: string, userId: string) {
   const automation = await prisma.automation.findUnique({ where: { id: automationId } });
   if (!automation) throw new Error("Automation not found.");
@@ -315,31 +387,32 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
     if (automation.status !== "ACTIVE") {
       throw new Error("Paused automations cannot prepare drafts.");
     }
-    if (kind !== "WEEKLY_REVIEW_PREP") {
+    if (!kind) {
       throw new Error("No local draft runner is registered for this automation.");
     }
 
-    const [actions, risks, links, draftsNeedingReview] = await Promise.all([
-      prisma.action.findMany({
-        include: { stream: true, companyFunction: true },
-        orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { updatedAt: "asc" }],
-        take: 120
-      }),
-      prisma.risk.findMany({
-        orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { updatedAt: "desc" }],
-        take: 50
-      }),
-      prisma.launchpadLink.findMany({ orderBy: [{ riskLevel: "desc" }, { renewalAt: "asc" }, { name: "asc" }], take: 80 }),
-      prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } })
-    ]);
-
-    const responseSummary = buildWeeklyReviewPrepDraft({
-      now: new Date(),
-      actions,
-      risks,
-      links,
-      draftsNeedingReview
+    const now = new Date();
+    const actions = await prisma.action.findMany({
+      include: { stream: true, companyFunction: true },
+      orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { updatedAt: "asc" }],
+      take: 120
     });
+
+    const responseSummary = kind === "WEEKLY_REVIEW_PREP"
+      ? buildWeeklyReviewPrepDraft({
+        now,
+        actions,
+        risks: await prisma.risk.findMany({
+          orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { updatedAt: "desc" }],
+          take: 50
+        }),
+        links: await prisma.launchpadLink.findMany({ orderBy: [{ riskLevel: "desc" }, { renewalAt: "asc" }, { name: "asc" }], take: 80 }),
+        draftsNeedingReview: await prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } })
+      })
+      : buildStaleTaskSummaryDraft({
+        now,
+        actions
+      });
 
     await prisma.automationRun.create({
       data: {
@@ -411,12 +484,16 @@ function optionalString(formData: FormData, key: string) {
 
 function dateValue(formData: FormData, key: string) {
   const value = optionalString(formData, key);
-  return value ? new Date(`${value}T00:00:00`) : undefined;
+  return value ? dateFromKey(value) : undefined;
 }
 
 function decimalValue(formData: FormData, key: string) {
   const value = optionalString(formData, key);
   return value ? value : undefined;
+}
+
+function dateFromKey(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
 }
 
 function enumValue<T extends Record<string, string>>(formData: FormData, key: string, values: T, fallback: T[keyof T]) {

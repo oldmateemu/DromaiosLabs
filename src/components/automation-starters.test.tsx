@@ -14,5 +14,6 @@ describe("AutomationStarterTemplates", () => {
     expect(screen.getAllByRole("button", { name: "Add starter" })).toHaveLength(4);
     expect(screen.getAllByDisplayValue("DRAFT_ONLY").length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue("APPROVAL_REQUIRED")).toBeInTheDocument();
+    expect(screen.getAllByDisplayValue("local cockpit")).toHaveLength(3);
   });
 });

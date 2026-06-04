@@ -1,5 +1,6 @@
 import { canAutomationRun, type AutomationSafetyLevel } from "@/lib/automations";
 import { getLocalDraftAutomationKind } from "@/lib/draft-automations";
+import { getLocalApprovalAutomationKind } from "@/lib/renewal-reminders";
 
 type AutomationRunView = {
   id: string;
@@ -67,13 +68,15 @@ function AutomationCard({
   const missingWebhook = !automation.webhookUrl;
   const inactive = automation.status !== "ACTIVE";
   const localDraftKind = getLocalDraftAutomationKind(automation);
-  const canPrepareLocalDraft = !inactive && automation.safetyLevel === "DRAFT_ONLY" && localDraftKind === "WEEKLY_REVIEW_PREP";
-  const canRun = runCheck.allowed && !missingWebhook && !inactive;
+  const localApprovalKind = getLocalApprovalAutomationKind(automation);
+  const canPrepareLocalDraft = !inactive && automation.safetyLevel === "DRAFT_ONLY" && Boolean(localDraftKind);
+  const canRunLocalApproval = Boolean(localApprovalKind);
+  const canRun = runCheck.allowed && (!missingWebhook || canRunLocalApproval) && !inactive;
   const runBlockReason = inactive
     ? "Paused automations cannot run."
     : !runCheck.allowed
       ? runCheck.reason
-      : missingWebhook
+      : missingWebhook && !canRunLocalApproval
         ? "Add a webhook URL before this can run."
         : undefined;
 
@@ -113,6 +116,11 @@ function AutomationCard({
               <input name="approved" required type="checkbox" value="true" />
               I approve this manual run
             </label>
+          ) : null}
+          {canRunLocalApproval ? (
+            <p className="mb-3 text-sm font-medium text-command-muted">
+              Approval creates local renewal reminders; no webhook is called.
+            </p>
           ) : null}
           {canRun ? (
             <button className="button button-primary" type="submit">
