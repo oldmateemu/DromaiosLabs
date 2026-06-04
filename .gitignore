@@ -5,6 +5,8 @@ node_modules/
 .next-dev-logs/
 .env
 .env.local
+.env.hetzner
+.env.production
 prisma/launchpad-system-metadata.local.json
 coverage/
 test-results/

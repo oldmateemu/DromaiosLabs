@@ -1,28 +1,34 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: dromaios
-      POSTGRES_PASSWORD: dromaios
-      POSTGRES_DB: dromaios_cockpit
+      POSTGRES_USER: ${POSTGRES_USER:-dromaios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dromaios}
+      POSTGRES_DB: ${POSTGRES_DB:-dromaios_cockpit}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_BIND_IP:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dromaios -d dromaios_cockpit"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 5
 
   app:
     build: .
-    command: sh -c "pnpm db:deploy && pnpm db:seed && pnpm start"
+    restart: unless-stopped
+    command: sh -c "node scripts/deployment-preflight.mjs && pnpm db:deploy && pnpm db:seed && pnpm start"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://dromaios:dromaios@postgres:5432/dromaios_cockpit?schema=public
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-local}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dromaios}:${POSTGRES_PASSWORD:-dromaios}@postgres:5432/${POSTGRES_DB:-dromaios_cockpit}?schema=public
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dromaios}
+      POSTGRES_BIND_IP: ${POSTGRES_BIND_IP:-127.0.0.1}
+      COCKPIT_BIND_IP: ${COCKPIT_BIND_IP:-127.0.0.1}
       SESSION_SECRET: ${SESSION_SECRET:-replace-with-at-least-24-random-characters}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@dromaios.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-now}
@@ -30,15 +36,18 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:1b}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:3300:3000"
+      - "${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-3300}:3000"
 
   caddy:
     image: caddy:2-alpine
+    restart: unless-stopped
     depends_on:
       - app
     ports:
-      - "127.0.0.1:8080:80"
+      - "${COCKPIT_BIND_IP:-127.0.0.1}:${COCKPIT_HTTP_PORT:-8080}:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

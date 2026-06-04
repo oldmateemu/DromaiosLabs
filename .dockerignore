@@ -4,6 +4,8 @@ node_modules
 .superpowers
 .worktrees
 .env
+.env*
+prisma/launchpad-system-metadata.local.json
 coverage
 playwright-report
 test-results

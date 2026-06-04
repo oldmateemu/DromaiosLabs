@@ -24,11 +24,24 @@ Private company command cockpit for Dromaios Labs.
 7. Seed initial data: `pnpm db:seed`.
 8. Run the app: `pnpm dev`.
 
+## Hetzner Deployment
+
+This repo is packaged for a local/VPN-first Hetzner Docker Compose deployment using the root `Dockerfile`, `docker-compose.yml`, and `Caddyfile`.
+
+Start with:
+
+- `docs/deployment/HETZNER_RUNBOOK.md`
+- `docs/deployment/ENV_CHECKLIST.md`
+- `.env.hetzner.example`
+
+The production app container runs `node scripts/deployment-preflight.mjs` before migrations, seeding, and startup. Keep public-domain hardening as a separate project; this deployment path is for SSH-tunnel or VPN access.
+
 ## Verification
 
 - `pnpm test`
 - `pnpm lint`
 - `pnpm build`
+- `node scripts/deployment-preflight.mjs`
 - `pnpm smoke:compose`
 
 ## AI Maintenance
