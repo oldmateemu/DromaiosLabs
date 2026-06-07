@@ -1,10 +1,13 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient, UserRole } from "@prisma/client";
+import { PrismaClient, Priority, UserRole } from "@prisma/client";
+import { COMPANY_SETUP_CHECKLIST } from "../src/lib/company-setup-checklist";
 import {
   launchpadSystemKey,
   loadLaunchpadSystemMetadata,
   type LaunchpadSystemMetadata
 } from "../src/lib/launchpad-system-metadata";
+
+const SETUP_CHECKLIST_STREAM = "Company Core";
 
 const prisma = new PrismaClient();
 
@@ -39,7 +42,7 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: { name: adminName, passwordHash, role: UserRole.ADMIN },
     create: { email: adminEmail, name: adminName, passwordHash, role: UserRole.ADMIN }
@@ -61,6 +64,8 @@ async function main() {
     });
   }
 
+  await seedCompanySetupChecklist(admin.id);
+
   for (const system of launchpadMetadata.systems) {
     const existing = await prisma.launchpadLink.findFirst({ where: { name: system.name, group: system.group } });
     const imported = launchpadMetadata.importedKeys.has(launchpadSystemKey(system));
@@ -76,6 +81,31 @@ async function main() {
     } else {
       await prisma.launchpadLink.create({ data: metadataForCreate(system) });
     }
+  }
+}
+
+async function seedCompanySetupChecklist(adminId: string) {
+  const stream = await prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } });
+  const functions = await prisma.companyFunction.findMany();
+  const functionIdByName = new Map(functions.map((fn) => [fn.name, fn.id]));
+
+  for (const item of COMPANY_SETUP_CHECKLIST) {
+    const existing = await prisma.action.findFirst({ where: { title: item.title } });
+    // Idempotent: never overwrite a tracked action's status, dates, or notes.
+    if (existing) continue;
+
+    await prisma.action.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        priority: item.priority as Priority,
+        nextStep: item.nextStep,
+        sensitive: item.sensitive,
+        streamId: stream?.id,
+        companyFunctionId: functionIdByName.get(item.companyFunction),
+        createdById: adminId
+      }
+    });
   }
 }
 

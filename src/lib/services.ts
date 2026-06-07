@@ -14,6 +14,12 @@ import { buildActionRegisterWhere } from "./action-filters";
 import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
+import {
+  COMPANY_SETUP_CHECKLIST,
+  normaliseSetupTitle,
+  summariseSetupChecklist,
+  type SetupItemStatus
+} from "./company-setup-checklist";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
@@ -454,6 +460,20 @@ export async function getActionRegisterData(filters: Record<string, string | und
   ]);
 
   return { actions, ...reference };
+}
+
+export async function getCompanySetupData() {
+  const titles = COMPANY_SETUP_CHECKLIST.map((item) => item.title);
+  const actions = await prisma.action.findMany({
+    where: { title: { in: titles } },
+    select: { id: true, title: true, status: true }
+  });
+
+  const statusByTitle = new Map<string, SetupItemStatus>(
+    actions.map((action) => [normaliseSetupTitle(action.title), action.status as SetupItemStatus])
+  );
+
+  return summariseSetupChecklist(COMPANY_SETUP_CHECKLIST, statusByTitle);
 }
 
 export async function getLaunchpadData() {

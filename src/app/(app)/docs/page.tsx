@@ -1,6 +1,7 @@
 const docs = [
   ["AI_CONTEXT.md", "Where future AI sessions should start."],
   ["docs/OPERATING_MODEL.md", "Streams, functions, review rhythm, and company rules."],
+  ["docs/COMPANY_SETUP_CHECKLIST.md", "What the company still needs to set up; powers the /setup page."],
   ["docs/DATA_MODEL.md", "Core records and relationships."],
   ["docs/AUTOMATIONS.md", "Automation safety levels and approval rules."],
   ["docs/AI_GUIDE.md", "Model routing, privacy rules, and prompt patterns."],

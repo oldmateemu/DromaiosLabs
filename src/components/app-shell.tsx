@@ -4,6 +4,7 @@ import {
   FileText,
   Gauge,
   Link as LinkIcon,
+  ListChecks,
   LogOut,
   Repeat,
   ShieldCheck
@@ -13,6 +14,7 @@ import { AppNavLink } from "@/components/nav-link";
 
 const navItems = [
   { href: "/", label: "Today", icon: Gauge },
+  { href: "/setup", label: "Setup", icon: ListChecks },
   { href: "/actions", label: "Actions", icon: ClipboardList },
   { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
   { href: "/reviews", label: "Reviews", icon: ShieldCheck },
