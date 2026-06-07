@@ -1,0 +1,34 @@
+name: Strategy Guardrail
+
+# Enforces the public-posting guardrail on outward-facing acquisition copy, and runs
+# the guardrail tooling's own tests. Mirrors the local pre-commit hook so the check is
+# also enforced on pushes and pull requests, not just on developers' machines.
+#
+# Intentionally dependency-free: the linter and its tests are pure Node (no install),
+# so this job stays fast and cannot be broken by a flaky dependency install.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guardrail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Guardrail tooling tests
+        run: node --test scripts/strategy-guardrail-check.test.mjs
+
+      - name: Guardrail check on public copy
+        run: node scripts/strategy-guardrail-check.mjs

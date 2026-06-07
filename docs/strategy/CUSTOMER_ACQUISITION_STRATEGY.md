@@ -268,8 +268,8 @@ These turn the strategy into action. All written to the guardrail.
   follow-up scripts for Tier-1 warm outreach, plus discovery-call prep.
 - **Email nurture sequence:** `email-nurture-sequence.md` — 6-email post-download sequence + the
   ongoing fortnightly list email.
-- **Owned article #1:** `article-first-30-seconds.md` — pillar content the posts and emails orbit,
-  with a repurposing checklist.
+- **Owned articles:** `article-first-30-seconds.md` and `article-documentation-lottery.md` — pillar
+  content the posts and emails orbit, each with a repurposing checklist.
 - **Rung-1 workshop package:** `workshop-package-rung1.md` — the first paid offer ("The First 30
   Seconds"): run sheet, pricing posture, sell sheet, and proposal template.
 - **Partnership & webinar kit:** `webinar-partnership-kit.md` — the volume play: partner pitch,
@@ -289,6 +289,9 @@ Public-facing copy is checked mechanically against `Dromaios_Labs_public_posting
   staged and blocks the commit on a Red-list violation. Activate once per clone with
   `git config core.hooksPath .githooks`. The linter is **fail-closed** — every new `docs/strategy`
   copy file is scanned by default (only the internal planning docs are excluded).
+- **CI:** `.github/workflows/strategy-guardrail.yml` runs the tooling tests and the guardrail check
+  on every push and pull request, so the guardrail is enforced server-side too — not just locally.
+  It's dependency-free (pure Node), so it stays fast and can't be broken by a flaky install.
 - **Tests:** `scripts/strategy-guardrail-check.test.mjs` (run via `pnpm test:run-flow`) — 9 tests
   covering Red detection, Amber surfacing, ignore markers, line accuracy, and a scan of every
   shipped public-content file.
