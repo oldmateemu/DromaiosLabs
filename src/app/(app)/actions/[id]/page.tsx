@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { updateActionAction } from "@/app/actions";
-import { ActionEditForm } from "@/components/forms";
+import { addDecisionToActionAction, addRiskToActionAction, updateActionAction } from "@/app/actions";
+import { ActionEditForm, InlineDecisionForm, InlineRiskForm } from "@/components/forms";
 import { priorityLabel, statusLabel } from "@/lib/domain";
 import { getActionDetail } from "@/lib/services";
 
@@ -70,6 +70,7 @@ export default async function ActionDetailPage({ params }: { params: Params }) {
               ))
             )}
           </div>
+          <InlineRiskForm actionId={action.id} action={addRiskToActionAction} />
         </div>
         <div className="panel">
           <p className="eyebrow">Linked governance</p>
@@ -86,6 +87,7 @@ export default async function ActionDetailPage({ params }: { params: Params }) {
               ))
             )}
           </div>
+          <InlineDecisionForm actionId={action.id} action={addDecisionToActionAction} />
         </div>
       </section>
 

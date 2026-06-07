@@ -192,7 +192,13 @@ export function ActionRegisterFilters({
   );
 }
 
-export function LaunchpadForm({ action }: { action: (formData: FormData) => Promise<void> }) {
+export function LaunchpadForm({
+  action,
+  streams = []
+}: {
+  action: (formData: FormData) => Promise<void>;
+  streams?: ReferenceItem[];
+}) {
   return (
     <form action={action} className="grid gap-4 md:grid-cols-2">
       <div className="md:col-span-2">
@@ -202,6 +208,7 @@ export function LaunchpadForm({ action }: { action: (formData: FormData) => Prom
       <Field name="name" label="Name" required />
       <Field name="url" label="URL" required />
       <Field name="group" label="Group" required placeholder="Money, Legal/Admin, AI/Workbench..." />
+      <SelectItems name="streamId" label="Stream" items={streams} emptyLabel="No stream (shared)" />
       <Select name="riskLevel" label="Risk level" values={["LOW", "MEDIUM", "HIGH", "CRITICAL"]} />
       <Field name="cost" label="Monthly/annual cost" />
       <Field name="renewalAt" label="Renewal date" type="date" />
@@ -341,6 +348,39 @@ export function DecisionForm({ action }: { action: (formData: FormData) => Promi
       </div>
       <div className="flex justify-end md:col-span-2">
         <button className="button button-primary" type="submit">Record decision</button>
+      </div>
+    </form>
+  );
+}
+
+export function InlineRiskForm({ actionId, action }: { actionId: string; action: (formData: FormData) => Promise<void> }) {
+  return (
+    <form action={action} className="mt-3 space-y-2 rounded-md border border-command-line bg-command-panel p-3">
+      <input name="actionId" type="hidden" value={actionId} />
+      <p className="field-label">Log a risk for this action</p>
+      <input className="input" name="issue" placeholder="What could go wrong" required type="text" />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-36 flex-1">
+          <Select name="severity" label="Severity" values={Object.values(RiskLevel)} defaultValue={RiskLevel.MEDIUM} />
+        </div>
+        <button className="button button-primary" type="submit">Add risk</button>
+      </div>
+    </form>
+  );
+}
+
+export function InlineDecisionForm({ actionId, action }: { actionId: string; action: (formData: FormData) => Promise<void> }) {
+  return (
+    <form action={action} className="mt-3 space-y-2 rounded-md border border-command-line bg-command-panel p-3">
+      <input name="followUpActionId" type="hidden" value={actionId} />
+      <p className="field-label">Record a decision from this action</p>
+      <input className="input" name="decision" placeholder="The call that was made" required type="text" />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-36 flex-1">
+          <label className="field-label" htmlFor="rationale">Rationale</label>
+          <input className="input" id="rationale" name="rationale" placeholder="Why" type="text" />
+        </div>
+        <button className="button button-primary" type="submit">Add decision</button>
       </div>
     </form>
   );

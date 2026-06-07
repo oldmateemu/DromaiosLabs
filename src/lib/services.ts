@@ -17,7 +17,9 @@ import { buildCompanyPulse } from "./company-pulse";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import { buildOperatingDigest } from "./operating-digest";
 import { buildRenewalCalendar } from "./renewal-calendar";
+import { buildReviewMomentum } from "./review-momentum";
 import { buildStreamPortfolio } from "./stream-portfolio";
+import { buildStreamSpend } from "./stream-spend";
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { prisma } from "./db";
@@ -243,11 +245,13 @@ export async function createLaunchpadLink(formData: FormData) {
       loginNote: optionalString(formData, "loginNote"),
       riskLevel: enumValue(formData, "riskLevel", RiskLevel, RiskLevel.LOW),
       owner: optionalString(formData, "owner"),
+      streamId: optionalString(formData, "streamId"),
       sensitive: formData.get("sensitive") === "on"
     }
   });
 
   revalidatePath("/launchpad");
+  revalidatePath("/portfolio");
 }
 
 export async function completeWeeklyReview(formData: FormData, userId: string) {
@@ -513,7 +517,19 @@ export async function getLaunchpadData() {
 }
 
 export async function getReviewData() {
-  return prisma.review.findMany({ include: { actions: true }, orderBy: { createdAt: "desc" }, take: 20 });
+  const reviews = await prisma.review.findMany({ include: { actions: true }, orderBy: { createdAt: "desc" }, take: 20 });
+  const lastReviewAt = reviews[0]?.createdAt ?? null;
+  const sinceFilter = lastReviewAt ? { gte: lastReviewAt } : undefined;
+
+  const [completedCount, createdCount, newRiskCount, decisionCount] = await Promise.all([
+    prisma.action.count({ where: { completedAt: lastReviewAt ? { gte: lastReviewAt } : { not: null } } }),
+    prisma.action.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
+    prisma.risk.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
+    prisma.decision.count({ where: sinceFilter ? { decidedAt: sinceFilter } : undefined })
+  ]);
+
+  const momentum = buildReviewMomentum({ lastReviewAt, completedCount, createdCount, newRiskCount, decisionCount });
+  return { reviews, momentum };
 }
 
 export async function getAssistantDraftData() {
@@ -540,6 +556,8 @@ export async function createRisk(formData: FormData) {
   const issue = stringValue(formData, "issue");
   if (!issue) throw new Error("Risk issue is required.");
 
+  const actionId = optionalString(formData, "actionId");
+
   await prisma.risk.create({
     data: {
       issue,
@@ -548,12 +566,14 @@ export async function createRisk(formData: FormData) {
       mitigation: optionalString(formData, "mitigation"),
       nextReviewAt: dateValue(formData, "nextReviewAt"),
       streamId: optionalString(formData, "streamId"),
-      companyFunctionId: optionalString(formData, "companyFunctionId")
+      companyFunctionId: optionalString(formData, "companyFunctionId"),
+      actionId
     }
   });
 
   revalidatePath("/governance");
   revalidatePath("/");
+  if (actionId) revalidatePath(`/actions/${actionId}`);
 }
 
 export async function updateRiskStatus(riskId: string, status: string) {
@@ -567,18 +587,22 @@ export async function createDecision(formData: FormData) {
   const decision = stringValue(formData, "decision");
   if (!decision) throw new Error("Decision text is required.");
 
+  const followUpActionId = optionalString(formData, "followUpActionId");
+
   await prisma.decision.create({
     data: {
       decision,
       rationale: optionalString(formData, "rationale"),
       affectedArea: optionalString(formData, "affectedArea"),
       relatedDocs: optionalString(formData, "relatedDocs"),
-      decidedAt: dateValue(formData, "decidedAt") ?? new Date()
+      decidedAt: dateValue(formData, "decidedAt") ?? new Date(),
+      followUpActionId
     }
   });
 
   revalidatePath("/governance");
   revalidatePath("/");
+  if (followUpActionId) revalidatePath(`/actions/${followUpActionId}`);
 }
 
 export async function getGovernanceData() {
@@ -596,7 +620,7 @@ export async function getGovernanceData() {
 export async function getPortfolioData() {
   const now = new Date();
   const weekStart = startOfWeek(now);
-  const [streams, actions, risks] = await Promise.all([
+  const [streams, actions, risks, spendLinks] = await Promise.all([
     prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     prisma.action.findMany({
       where: {
@@ -607,9 +631,13 @@ export async function getPortfolioData() {
     prisma.risk.findMany({
       where: { status: { notIn: ["CLOSED", "RESOLVED", "DONE"] } },
       select: { streamId: true, status: true, severity: true }
-    })
+    }),
+    prisma.launchpadLink.findMany({ select: { cost: true, streamId: true } })
   ]);
-  return { portfolio: buildStreamPortfolio({ now, streams, actions, risks }) };
+  return {
+    portfolio: buildStreamPortfolio({ now, streams, actions, risks }),
+    spend: buildStreamSpend({ streams, links: spendLinks })
+  };
 }
 
 export async function getActionDetail(id: string) {

@@ -1,4 +1,5 @@
 import { StreamPortfolioPanel } from "@/components/stream-portfolio-panel";
+import { StreamSpendPanel } from "@/components/stream-spend-panel";
 import { getPortfolioData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function PortfolioPage() {
         title="All streams"
         description="Overdue and risk-weighted so the most pressing venture is first."
       />
+      <StreamSpendPanel spend={data.spend} />
     </div>
   );
 }

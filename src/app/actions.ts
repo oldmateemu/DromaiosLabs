@@ -111,6 +111,20 @@ export async function createDecisionAction(formData: FormData) {
   redirect("/governance");
 }
 
+export async function addRiskToActionAction(formData: FormData) {
+  await requireUser();
+  const actionId = String(formData.get("actionId") ?? "");
+  await createRisk(formData);
+  redirect(`/actions/${actionId}`);
+}
+
+export async function addDecisionToActionAction(formData: FormData) {
+  await requireUser();
+  const actionId = String(formData.get("followUpActionId") ?? "");
+  await createDecision(formData);
+  redirect(`/actions/${actionId}`);
+}
+
 export async function prepareDraftAutomationAction(formData: FormData) {
   const user = await requireUser();
   const automationId = String(formData.get("automationId") ?? "");
