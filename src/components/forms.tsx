@@ -100,6 +100,68 @@ export function ActionForm({
   );
 }
 
+type EditableAction = {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  dueAt?: Date | string | null;
+  reviewAt?: Date | string | null;
+  nextStep?: string | null;
+  streamId?: string | null;
+  companyFunctionId?: string | null;
+  sensitive?: boolean | null;
+};
+
+function dateInputValue(value?: Date | string | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+export function ActionEditForm({
+  action,
+  streams,
+  companyFunctions,
+  updateAction
+}: {
+  action: EditableAction;
+  streams: ReferenceItem[];
+  companyFunctions: ReferenceItem[];
+  updateAction: (formData: FormData) => Promise<void>;
+}) {
+  return (
+    <form action={updateAction} className="grid gap-4 md:grid-cols-2">
+      <input name="actionId" type="hidden" value={action.id} />
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="title">Title</label>
+        <input className="input" defaultValue={action.title} id="title" name="title" required type="text" />
+      </div>
+      <Select name="priority" label="Priority" values={Object.values(Priority)} defaultValue={action.priority} />
+      <Select name="status" label="Status" values={Object.values(ActionStatus)} defaultValue={action.status} />
+      <SelectItems name="streamId" label="Stream" items={streams} defaultValue={action.streamId ?? ""} emptyLabel="Unassigned" />
+      <SelectItems name="companyFunctionId" label="Company function" items={companyFunctions} defaultValue={action.companyFunctionId ?? ""} emptyLabel="Unassigned" />
+      <Field name="dueAt" label="Due date" type="date" defaultValue={dateInputValue(action.dueAt)} />
+      <Field name="reviewAt" label="Review date" type="date" defaultValue={dateInputValue(action.reviewAt)} />
+      <div className="md:col-span-2">
+        <Field name="nextStep" label="Next step" defaultValue={action.nextStep ?? ""} />
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="description">Description</label>
+        <textarea className="text-area" defaultValue={action.description ?? ""} id="description" name="description" rows={3} />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-command-muted">
+        <input defaultChecked={Boolean(action.sensitive)} name="sensitive" type="checkbox" />
+        Sensitive
+      </label>
+      <div className="flex justify-end md:col-span-2">
+        <button className="button button-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  );
+}
+
 export function ActionRegisterFilters({
   streams,
   companyFunctions,

@@ -14,7 +14,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       label: action.title,
       hint: `Action · ${action.status}`,
       group: "Actions",
-      href: "/actions"
+      href: `/actions/${action.id}`
     })),
     ...palette.links.map((link) => ({
       id: `link-${link.id}`,

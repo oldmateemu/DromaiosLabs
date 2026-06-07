@@ -14,6 +14,7 @@ export type CommandItem = {
 
 const NAV_ITEMS: CommandItem[] = [
   { id: "nav-today", label: "Today", hint: "Command brief and focus", group: "Pages", href: "/" },
+  { id: "nav-portfolio", label: "Portfolio", hint: "Stream command view", group: "Pages", href: "/portfolio" },
   { id: "nav-actions", label: "Actions", hint: "Action register", group: "Pages", href: "/actions" },
   { id: "nav-launchpad", label: "Launchpad", hint: "Systems and links", group: "Pages", href: "/launchpad" },
   { id: "nav-governance", label: "Governance", hint: "Risks and decisions", group: "Pages", href: "/governance" },

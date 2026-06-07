@@ -14,6 +14,7 @@ import {
   createRisk,
   prepareDraftAutomation,
   runAutomation,
+  updateActionFromForm,
   updateActionStatus,
   updateRiskStatus
 } from "@/lib/services";
@@ -49,6 +50,13 @@ export async function completeActionAction(formData: FormData) {
   const actionId = String(formData.get("actionId") ?? "");
   await updateActionStatus(actionId, ActionStatus.DONE);
   redirect("/actions");
+}
+
+export async function updateActionAction(formData: FormData) {
+  await requireUser();
+  const actionId = String(formData.get("actionId") ?? "");
+  await updateActionFromForm(actionId, formData);
+  redirect(`/actions/${actionId}`);
 }
 
 export async function approveDraftAction(formData: FormData) {

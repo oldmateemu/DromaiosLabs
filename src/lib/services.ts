@@ -15,6 +15,8 @@ import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./autom
 import { summariseAutomationRuns } from "./automation-history";
 import { buildCompanyPulse } from "./company-pulse";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
+import { buildOperatingDigest } from "./operating-digest";
+import { buildStreamPortfolio } from "./stream-portfolio";
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { prisma } from "./db";
@@ -54,7 +56,7 @@ export async function getTodayData() {
   pulseSince.setDate(pulseSince.getDate() - 7);
   const todayStart = startOfDay(now);
 
-  const [pulseActions, pulseRuns, pulseLinks, openRiskCount] = await Promise.all([
+  const [pulseActions, pulseRuns, pulseLinks, streamRefs, portfolioActions, portfolioRisks] = await Promise.all([
     prisma.action.findMany({
       where: {
         OR: [
@@ -72,13 +74,31 @@ export async function getTodayData() {
     }),
     prisma.automationRun.findMany({ orderBy: { createdAt: "desc" }, take: 50, select: { status: true } }),
     prisma.launchpadLink.findMany({ select: { cost: true } }),
-    prisma.risk.count({ where: { status: { notIn: ["CLOSED", "RESOLVED", "DONE"] } } })
+    prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
+    prisma.action.findMany({
+      where: {
+        OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
+      },
+      select: { status: true, streamId: true, dueAt: true, completedAt: true }
+    }),
+    prisma.risk.findMany({
+      where: { status: { notIn: ["CLOSED", "RESOLVED", "DONE"] } },
+      select: { streamId: true, status: true, severity: true }
+    })
   ]);
 
-  const pulse = buildCompanyPulse({ now, actions: pulseActions, automationRuns: pulseRuns, links: pulseLinks, openRiskCount });
+  const pulse = buildCompanyPulse({
+    now,
+    actions: pulseActions,
+    automationRuns: pulseRuns,
+    links: pulseLinks,
+    openRiskCount: portfolioRisks.length
+  });
+  const portfolio = buildStreamPortfolio({ now, streams: streamRefs, actions: portfolioActions, risks: portfolioRisks });
 
   return {
     pulse,
+    portfolio,
     actions,
     buckets,
     nextAction: buildNextBestAction({
@@ -570,6 +590,117 @@ export async function getGovernanceData() {
     getReferenceData()
   ]);
   return { risks, decisions, ...reference };
+}
+
+export async function getPortfolioData() {
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const [streams, actions, risks] = await Promise.all([
+    prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
+    prisma.action.findMany({
+      where: {
+        OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
+      },
+      select: { status: true, streamId: true, dueAt: true, completedAt: true }
+    }),
+    prisma.risk.findMany({
+      where: { status: { notIn: ["CLOSED", "RESOLVED", "DONE"] } },
+      select: { streamId: true, status: true, severity: true }
+    })
+  ]);
+  return { portfolio: buildStreamPortfolio({ now, streams, actions, risks }) };
+}
+
+export async function getActionDetail(id: string) {
+  const [action, reference] = await Promise.all([
+    prisma.action.findUnique({
+      where: { id },
+      include: {
+        stream: true,
+        companyFunction: true,
+        assistantDraft: true,
+        automation: true,
+        review: true,
+        launchpadLink: true,
+        risks: true,
+        decisions: true
+      }
+    }),
+    getReferenceData()
+  ]);
+  return { action, ...reference };
+}
+
+export async function updateActionFromForm(actionId: string, formData: FormData) {
+  const title = stringValue(formData, "title");
+  if (!title) throw new Error("Action title is required.");
+
+  const existing = await prisma.action.findUnique({ where: { id: actionId }, select: { completedAt: true } });
+  if (!existing) throw new Error("Action not found.");
+
+  const status = enumValue(formData, "status", ActionStatus, ActionStatus.OPEN);
+
+  await prisma.action.update({
+    where: { id: actionId },
+    data: {
+      title,
+      description: optionalString(formData, "description") ?? null,
+      status,
+      priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+      dueAt: dateValue(formData, "dueAt") ?? null,
+      reviewAt: dateValue(formData, "reviewAt") ?? null,
+      nextStep: optionalString(formData, "nextStep") ?? null,
+      streamId: optionalString(formData, "streamId") ?? null,
+      companyFunctionId: optionalString(formData, "companyFunctionId") ?? null,
+      sensitive: formData.get("sensitive") === "on",
+      completedAt: status === ActionStatus.DONE ? existing.completedAt ?? new Date() : null
+    }
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath(`/actions/${actionId}`);
+}
+
+export async function getOperatingDigest() {
+  const data = await getTodayData();
+  const closed = new Set(["CLOSED", "RESOLVED", "DONE"]);
+
+  const active = [
+    ...data.buckets.overdue,
+    ...data.buckets.dueToday,
+    ...data.buckets.blocked,
+    ...data.buckets.waiting,
+    ...data.buckets.upcoming
+  ];
+
+  const topActions = active.slice(0, 10).map((action) => ({
+    title: action.title,
+    status: action.status,
+    priority: action.priority,
+    streamName: action.stream?.name ?? null,
+    dueKey: action.dueAt ? new Date(action.dueAt).toISOString().slice(0, 10) : null
+  }));
+
+  const openRisks = data.risks
+    .filter((risk) => !closed.has(risk.status.toUpperCase()))
+    .map((risk) => ({ issue: risk.issue, severity: risk.severity, status: risk.status }));
+
+  const recentDecisions = data.decisions.map((decision) => ({ decision: decision.decision, decidedAt: decision.decidedAt }));
+
+  const renewalsDue = [...data.launchpadHealth.renewalsDue, ...data.launchpadHealth.renewalsSoon].map((link) => ({
+    name: link.name
+  }));
+
+  return buildOperatingDigest({
+    generatedAt: new Date(),
+    pulse: data.pulse,
+    portfolio: data.portfolio,
+    topActions,
+    openRisks,
+    recentDecisions,
+    renewalsDue
+  });
 }
 
 export async function getCommandPaletteItems() {

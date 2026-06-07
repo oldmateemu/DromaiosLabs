@@ -3,6 +3,7 @@ import {
   ClipboardList,
   FileText,
   Gauge,
+  LayoutGrid,
   Link as LinkIcon,
   LogOut,
   Repeat,
@@ -15,6 +16,7 @@ import { AppNavLink } from "@/components/nav-link";
 
 const navItems = [
   { href: "/", label: "Today", icon: Gauge },
+  { href: "/portfolio", label: "Portfolio", icon: LayoutGrid },
   { href: "/actions", label: "Actions", icon: ClipboardList },
   { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
   { href: "/governance", label: "Governance", icon: ShieldAlert },
