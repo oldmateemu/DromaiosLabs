@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { assertAutomationCanPrepareDraft, assertAutomationCanRun, canAutomationPrepareDraft, canAutomationRun } from "./automations";
+import {
+  AutomationBlockedError,
+  assertAutomationCanPrepareDraft,
+  assertAutomationCanRun,
+  canAutomationPrepareDraft,
+  canAutomationRun
+} from "./automations";
 
 describe("canAutomationRun", () => {
   it("blocks draft-only and blocked automations", () => {
@@ -20,6 +26,11 @@ describe("canAutomationRun", () => {
 describe("assertAutomationCanRun", () => {
   it("throws with a user-readable message when blocked", () => {
     expect(() => assertAutomationCanRun("DRAFT_ONLY", true)).toThrow("Draft-only automations cannot execute.");
+  });
+
+  it("throws a typed AutomationBlockedError so callers can distinguish policy blocks from failures", () => {
+    expect(() => assertAutomationCanRun("APPROVAL_REQUIRED", false)).toThrow(AutomationBlockedError);
+    expect(() => assertAutomationCanPrepareDraft("BLOCKED")).toThrow(AutomationBlockedError);
   });
 });
 

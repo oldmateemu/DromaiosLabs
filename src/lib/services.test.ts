@@ -321,7 +321,7 @@ describe("runAutomation", () => {
     expect(run.error).toBe("Draft-only automations cannot execute.");
   });
 
-  it("records a FAILED run when approval is required but not granted", async () => {
+  it("records a BLOCKED run when approval is required but not granted", async () => {
     prismaMock.automation.findUnique.mockResolvedValue({
       id: "auto-1",
       name: "Approval loop",
@@ -331,8 +331,23 @@ describe("runAutomation", () => {
     await services.runAutomation("auto-1", false, "user-1");
 
     const run = prismaMock.automationRun.create.mock.calls[0][0].data;
-    expect(run.status).toBe(AutomationRunStatus.FAILED);
+    expect(run.status).toBe(AutomationRunStatus.BLOCKED);
     expect(run.error).toBe("Approval is required before this automation can run.");
+  });
+
+  it("records a BLOCKED run for an automation gated at the BLOCKED safety level", async () => {
+    prismaMock.automation.findUnique.mockResolvedValue({
+      id: "auto-1",
+      name: "Gated loop",
+      safetyLevel: AutomationSafetyLevel.BLOCKED,
+      webhookUrl: "https://hooks.test/run"
+    });
+
+    await services.runAutomation("auto-1", true, "user-1");
+
+    const run = prismaMock.automationRun.create.mock.calls[0][0].data;
+    expect(run.status).toBe(AutomationRunStatus.BLOCKED);
+    expect(run.error).toBe("This automation is blocked without explicit review.");
   });
 
   it("calls the webhook and records a SUCCESS run", async () => {

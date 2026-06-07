@@ -11,7 +11,7 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
-import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
+import { AutomationBlockedError, assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
@@ -301,7 +301,7 @@ export async function runAutomation(automationId: string, approved: boolean, use
       data: {
         automationId,
         triggeredById: userId,
-        status: error instanceof Error && error.message.includes("cannot execute") ? AutomationRunStatus.BLOCKED : AutomationRunStatus.FAILED,
+        status: error instanceof AutomationBlockedError ? AutomationRunStatus.BLOCKED : AutomationRunStatus.FAILED,
         requestSummary: `Manual trigger for ${automation.name}`,
         error: error instanceof Error ? error.message : "Automation failed."
       }
@@ -385,7 +385,7 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
   try {
     assertAutomationCanPrepareDraft(automation.safetyLevel);
     if (automation.status !== "ACTIVE") {
-      throw new Error("Paused automations cannot prepare drafts.");
+      throw new AutomationBlockedError("Paused automations cannot prepare drafts.");
     }
     if (!kind) {
       throw new Error("No local draft runner is registered for this automation.");
@@ -429,9 +429,7 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
       data: {
         automationId,
         triggeredById: userId,
-        status: message.includes("draft-only") || message.includes("Blocked") || message.includes("Paused")
-          ? AutomationRunStatus.BLOCKED
-          : AutomationRunStatus.FAILED,
+        status: error instanceof AutomationBlockedError ? AutomationRunStatus.BLOCKED : AutomationRunStatus.FAILED,
         requestSummary,
         error: message
       }

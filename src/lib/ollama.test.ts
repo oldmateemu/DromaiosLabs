@@ -3,8 +3,10 @@ import { draftActionFromQuickCapture } from "./ollama";
 
 const originalEnv = { ...process.env };
 
+type FetchArgs = [input: RequestInfo | URL, init?: RequestInit];
+
 function mockFetchResponse(body: { ok: boolean; status?: number; json?: unknown }) {
-  return vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
+  return vi.fn<(...args: FetchArgs) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>>(async () => ({
     ok: body.ok,
     status: body.status ?? (body.ok ? 200 : 500),
     json: async () => body.json ?? {}
