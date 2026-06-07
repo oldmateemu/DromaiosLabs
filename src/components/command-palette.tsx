@@ -19,6 +19,7 @@ const NAV_ITEMS: CommandItem[] = [
   { id: "nav-launchpad", label: "Launchpad", hint: "Systems and links", group: "Pages", href: "/launchpad" },
   { id: "nav-governance", label: "Governance", hint: "Risks and decisions", group: "Pages", href: "/governance" },
   { id: "nav-reviews", label: "Reviews", hint: "Weekly company review", group: "Pages", href: "/reviews" },
+  { id: "nav-activity", label: "Activity", hint: "Company timeline and throughput", group: "Pages", href: "/activity" },
   { id: "nav-assistant", label: "Assistant", hint: "Draft review", group: "Pages", href: "/assistant" },
   { id: "nav-automations", label: "Automations", hint: "Control room", group: "Pages", href: "/automations" },
   { id: "nav-docs", label: "AI Docs", hint: "Maintenance guides", group: "Pages", href: "/docs" }

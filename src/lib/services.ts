@@ -11,8 +11,10 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
+import { buildActivityFeed } from "./activity-feed";
 import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
 import { summariseAutomationRuns } from "./automation-history";
+import { buildCompletionTrend } from "./completion-trend";
 import { buildCompanyPulse } from "./company-pulse";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import { buildOperatingDigest } from "./operating-digest";
@@ -735,6 +737,38 @@ export async function getOperatingDigest() {
     renewalsDue,
     renewalForecast: { total: calendar.windowTotal, count: calendar.windowCount, monthsAhead: calendar.monthsAhead }
   });
+}
+
+export async function getActivityData() {
+  const now = new Date();
+  const [completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews, completedForTrend] =
+    await Promise.all([
+      prisma.action.findMany({
+        where: { completedAt: { not: null } },
+        orderBy: { completedAt: "desc" },
+        take: 20,
+        select: { id: true, title: true, completedAt: true, stream: { select: { name: true } } }
+      }),
+      prisma.action.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: { id: true, title: true, createdAt: true, source: true }
+      }),
+      prisma.risk.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, issue: true, severity: true, createdAt: true } }),
+      prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 15, select: { id: true, decision: true, decidedAt: true } }),
+      prisma.automationRun.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 15,
+        select: { id: true, status: true, createdAt: true, automation: { select: { name: true } } }
+      }),
+      prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, sourceSummary: true, state: true, createdAt: true } }),
+      prisma.review.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { id: true, type: true, createdAt: true } }),
+      prisma.action.findMany({ where: { completedAt: { not: null } }, orderBy: { completedAt: "desc" }, take: 400, select: { completedAt: true } })
+    ]);
+
+  const feed = buildActivityFeed({ completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews }, 40);
+  const trend = buildCompletionTrend({ now, completedAts: completedForTrend.map((action) => action.completedAt), weeks: 8 });
+  return { feed, trend };
 }
 
 export async function getCommandPaletteItems() {

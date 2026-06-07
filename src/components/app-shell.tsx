@@ -1,4 +1,5 @@
 import {
+  Activity,
   Bot,
   ClipboardList,
   FileText,
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
   { href: "/governance", label: "Governance", icon: ShieldAlert },
   { href: "/reviews", label: "Reviews", icon: ShieldCheck },
+  { href: "/activity", label: "Activity", icon: Activity },
   { href: "/assistant", label: "Assistant", icon: Bot },
   { href: "/automations", label: "Automations", icon: Repeat },
   { href: "/docs", label: "AI Docs", icon: FileText }
