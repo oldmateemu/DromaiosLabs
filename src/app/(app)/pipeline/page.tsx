@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSalesPipelineData } from "@/lib/services";
-import { priorityLabel, statusLabel } from "@/lib/domain";
+import { dateKey, priorityLabel, statusLabel } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ export default async function PipelinePage() {
                   {followUp.overdue ? (
                     <span className="status-pill status-high">Overdue</span>
                   ) : followUp.dueAt ? (
-                    <span className="meta-pill">Due {new Date(followUp.dueAt).toISOString().slice(0, 10)}</span>
+                    <span className="meta-pill">Due {dateKey(new Date(followUp.dueAt))}</span>
                   ) : null}
                 </div>
               </article>

@@ -1,6 +1,7 @@
 import { CheckSquare2, Square } from "lucide-react";
 import { setSetupItemStatusAction } from "@/app/actions";
 import { getCompanySetupData } from "@/lib/services";
+import { dateKey } from "@/lib/domain";
 import { buildSetupReadiness, setupItemStatusLabel, SETUP_BAND_PILL_CLASS } from "@/lib/company-setup-checklist";
 import type { SetupItemStatus, SetupItemView, SetupPriority } from "@/lib/company-setup-checklist";
 
@@ -85,7 +86,7 @@ function SetupItemRow({ item }: { item: SetupItemView }) {
             {!item.done && item.overdue ? <span className="status-pill status-high">Overdue</span> : null}
             {!item.done && !item.overdue && item.dueSoon ? <span className="status-pill status-draft">Due soon</span> : null}
             {!item.done && item.dueAt ? (
-              <span className="meta-pill">Due {new Date(item.dueAt).toISOString().slice(0, 10)}</span>
+              <span className="meta-pill">Due {dateKey(new Date(item.dueAt))}</span>
             ) : null}
           </div>
           {!item.done ? (

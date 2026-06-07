@@ -485,15 +485,18 @@ export async function getCompanySetupData() {
   const titles = COMPANY_SETUP_CHECKLIST.map((item) => item.title);
   const actions = await prisma.action.findMany({
     where: { title: { in: titles } },
+    // Oldest first so that if a title is ever duplicated, this view and
+    // setSetupItemStatus deterministically resolve to the same row.
+    orderBy: { createdAt: "asc" },
     select: { id: true, title: true, status: true, dueAt: true }
   });
 
-  const stateByTitle = new Map<string, SetupActionState>(
-    actions.map((action) => [
-      normaliseSetupTitle(action.title),
-      { status: action.status as SetupActionState["status"], dueAt: action.dueAt }
-    ])
-  );
+  const stateByTitle = new Map<string, SetupActionState>();
+  for (const action of actions) {
+    const key = normaliseSetupTitle(action.title);
+    if (stateByTitle.has(key)) continue;
+    stateByTitle.set(key, { status: action.status as SetupActionState["status"], dueAt: action.dueAt });
+  }
 
   return summariseSetupChecklist(COMPANY_SETUP_CHECKLIST, stateByTitle);
 }
@@ -502,7 +505,11 @@ export async function setSetupItemStatus(itemKey: string, status: ActionStatus, 
   const item = COMPANY_SETUP_CHECKLIST.find((entry) => entry.key === itemKey);
   if (!item) throw new Error("Unknown setup checklist item.");
 
-  const existing = await prisma.action.findFirst({ where: { title: item.title } });
+  // Oldest first, matching getCompanySetupData, so both resolve the same row.
+  const existing = await prisma.action.findFirst({
+    where: { title: item.title },
+    orderBy: { createdAt: "asc" }
+  });
 
   if (existing) {
     // Refresh the due date when reopening a completed item (or when one is
@@ -529,6 +536,8 @@ export async function setSetupItemStatus(itemKey: string, status: ActionStatus, 
       prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } }),
       prisma.companyFunction.findUnique({ where: { name: item.companyFunction } })
     ]);
+    if (!stream) throw new Error(`Missing setup stream: ${SETUP_CHECKLIST_STREAM}.`);
+    if (!companyFunction) throw new Error(`Missing company function: ${item.companyFunction}.`);
 
     await prisma.action.create({
       data: {
@@ -541,8 +550,8 @@ export async function setSetupItemStatus(itemKey: string, status: ActionStatus, 
         dueAt: setupDueDate(item),
         completedAt: status === ActionStatus.DONE ? new Date() : null,
         source: ActionSource.USER,
-        streamId: stream?.id,
-        companyFunctionId: companyFunction?.id,
+        streamId: stream.id,
+        companyFunctionId: companyFunction.id,
         createdById: userId
       }
     });

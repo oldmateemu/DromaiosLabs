@@ -200,6 +200,25 @@ describe("selectOutstandingSetupItems", () => {
 });
 
 describe("buildSetupReadiness", () => {
+  it("does not penalise readiness for cancelled items", () => {
+    const items: SetupChecklistItem[] = [
+      item({ key: "cancelled-critical", title: "Cancelled critical", priority: "CRITICAL" }),
+      item({ key: "done-high", title: "Done high", priority: "HIGH" })
+    ];
+    const summary = summariseSetupChecklist(
+      items,
+      stateMap([
+        ["Cancelled critical", state("CANCELLED")],
+        ["Done high", state("DONE")]
+      ]),
+      NOW
+    );
+    const readiness = buildSetupReadiness(summary);
+    expect(readiness.score).toBe(100);
+    expect(readiness.criticalOutstanding).toBe(0);
+    expect(readiness.blockingOutstanding).toBe(0);
+  });
+
   it("weights completion by priority and bands a critical gap as foundational", () => {
     const items: SetupChecklistItem[] = [
       item({ key: "crit", title: "Critical item", priority: "CRITICAL" }),

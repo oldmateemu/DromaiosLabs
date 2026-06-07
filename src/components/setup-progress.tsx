@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dateKey } from "@/lib/domain";
 import {
   setupItemStatusLabel,
   SETUP_BAND_PILL_CLASS,
@@ -9,7 +10,7 @@ import {
 function dueLabel(item: OutstandingSetupItem) {
   if (item.overdue) return "Overdue";
   if (!item.dueAt) return null;
-  return `Due ${new Date(item.dueAt).toISOString().slice(0, 10)}`;
+  return `Due ${dateKey(new Date(item.dueAt))}`;
 }
 
 export function SetupProgressPanel({

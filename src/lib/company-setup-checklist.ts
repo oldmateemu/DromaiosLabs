@@ -696,13 +696,15 @@ export function buildSetupReadiness(summary: SetupChecklistSummary): SetupReadin
   let blockingOutstanding = 0;
 
   for (const item of items) {
+    // Cancelled items are a deliberate decision, not a gap: exclude them from
+    // the score entirely (both numerator and denominator).
+    if (item.status === "CANCELLED") continue;
     const weight = PRIORITY_SCORE_WEIGHT[item.priority];
     weightedTotal += weight;
     if (item.done) {
       weightedDone += weight;
       continue;
     }
-    if (item.status === "CANCELLED") continue;
     if (item.priority === "CRITICAL" || item.priority === "HIGH") criticalOutstanding += 1;
     if (item.priority === "CRITICAL") blockingOutstanding += 1;
   }

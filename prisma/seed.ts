@@ -84,6 +84,9 @@ async function main() {
 
 async function seedCompanySetupChecklist(adminId: string) {
   const stream = await prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } });
+  if (!stream) {
+    throw new Error(`Missing setup stream: ${SETUP_CHECKLIST_STREAM}. Seed streams before the checklist.`);
+  }
   const functions = await prisma.companyFunction.findMany();
   const functionIdByName = new Map(functions.map((fn) => [fn.name, fn.id]));
   const seededAt = new Date();
@@ -93,6 +96,11 @@ async function seedCompanySetupChecklist(adminId: string) {
     // Idempotent: never overwrite a tracked action's status, dates, or notes.
     if (existing) continue;
 
+    const companyFunctionId = functionIdByName.get(item.companyFunction);
+    if (!companyFunctionId) {
+      throw new Error(`Missing company function "${item.companyFunction}" for setup item "${item.title}".`);
+    }
+
     await prisma.action.create({
       data: {
         title: item.title,
@@ -101,8 +109,8 @@ async function seedCompanySetupChecklist(adminId: string) {
         nextStep: item.nextStep,
         sensitive: item.sensitive,
         dueAt: setupDueDate(item, seededAt),
-        streamId: stream?.id,
-        companyFunctionId: functionIdByName.get(item.companyFunction),
+        streamId: stream.id,
+        companyFunctionId,
         createdById: adminId
       }
     });

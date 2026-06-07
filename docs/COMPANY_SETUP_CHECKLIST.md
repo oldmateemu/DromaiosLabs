@@ -12,7 +12,7 @@ flows into the Today board, the Actions register, and the weekly review. The
 weekly review page and the local "weekly review prep" draft both surface the
 highest-priority outstanding setup items so nothing critical drifts.
 
-### How progress is measured
+## How progress is measured
 
 - **Recommended due dates.** Each item is seeded with a due date based on a
   priority-driven horizon (critical 14 days, high 30, medium 45, low 60), so the
@@ -57,6 +57,7 @@ education delivery and ClinicBoss pilots.
 ## Full checklist by area
 
 ### Legal & structure
+
 - Confirm ASIC company details are current (ACN, registered office, directors,
   shares).
 - Confirm the Director Identification Number (DIN) is held.
@@ -66,6 +67,7 @@ education delivery and ClinicBoss pilots.
 - Core contract templates ready: services, education, NDA, contractor.
 
 ### Finance & tax
+
 - Confirm GST registration and BAS cadence in Xero.
 - Airwallex reconciled into Xero with a live bank feed.
 - Bookkeeping and tax/BAS accountant engaged.
@@ -74,39 +76,46 @@ education delivery and ClinicBoss pilots.
 - Pricing and packaging defined for live revenue streams.
 
 ### Insurance & risk
+
 - Professional indemnity insurance in force.
 - Public liability insurance for in-person delivery.
 - Cyber insurance assessed against the data you actually hold.
 
 ### Privacy & data protection
+
 - Privacy policy + Australian Privacy Principles compliance.
 - Data handling and security register (where data lives, access, retention).
 - Notifiable Data Breach response plan.
 - Website terms of use and analytics consent.
 
 ### Compliance & claims
+
 - Public-claims guardrail operationalised (use the cockpit posting guardrail).
 - TGA / SaMD boundary documented for ClinicBoss and medtech.
 - Clinical accuracy review process for education content.
 
 ### Brand, web & marketing
+
 - Primary domain and email hardened (SPF/DKIM/DMARC).
 - Public website live with approved positioning (see
   `Dromaios_Labs_company_statements.md`).
 - LinkedIn company page and founder profile aligned.
 
 ### Sales & partnerships
+
 - Set up the HubSpot CRM pipeline and stages (HubSpot is the CRM system of
   record; the cockpit `/pipeline` page is the command view that links to it).
 - Define HubSpot deal properties and a weekly pipeline-hygiene habit.
 - Discovery → pilot → proposal flow documented, mapped onto the HubSpot stages.
 
 ### Product & delivery
+
 - ClinicBoss roadmap and pilot readiness defined.
 - DromaiosEd delivery checklist (venue, materials, feedback).
 - Cockpit and infrastructure backups + hardening (restore-tested).
 
 ### Governance & founder operations
+
 - Weekly review rhythm running consistently.
 - Risk register populated and reviewed.
 - Founder operating cadence and capacity guardrails.
