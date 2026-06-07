@@ -36,6 +36,16 @@ Strategy, research, and content drafts live in `docs/strategy/` (with public-rea
 content under `docs/strategy/content/`). Items there flagged Amber/Red are
 internal ammunition only until reviewed.
 
+Before posting anything externally, run the publish gate and work through
+`docs/strategy/content/PUBLISH_CHECKLIST.md`:
+
+```bash
+pnpm check:publish path/to/draft.md   # external drafts must be GREEN to pass
+```
+
+Drafts declare `<!-- publish-intent: external|internal -->` on their first lines;
+the gate fails (non-zero exit) on any AMBER/RED in an external draft.
+
 ## Verify before claiming done
 
 - `pnpm lint` (zero warnings) · `pnpm test` (vitest) · `pnpm build` ·

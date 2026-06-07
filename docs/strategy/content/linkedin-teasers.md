@@ -1,3 +1,5 @@
+<!-- publish-intent: external -->
+
 # LinkedIn teaser posts — de-escalation evidence article
 
 > **Status:** DRAFT for review. Founder-voice teasers to seed the article

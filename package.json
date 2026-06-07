@@ -16,6 +16,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:roadmap": "tsx prisma/seed-roadmap.ts",
+    "check:publish": "tsx scripts/check-publish.ts",
     "deploy:preflight": "node scripts/deployment-preflight.mjs",
     "smoke:compose": "docker compose config"
   },

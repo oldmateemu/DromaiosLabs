@@ -1,3 +1,5 @@
+<!-- publish-intent: internal -->
+
 # ClinicBoss — competitor comparison page (content draft)
 
 > **Status:** DRAFT for review. **AMBER under the public-posting guardrail** — this names competitors and quotes pricing. Per `Dromaios_Labs_public_posting_guardrail.md`, named-competitor comparisons and pricing require review before posting, and "ClinicBoss" must be treated as a working name (use sparingly, keep backup-name flexibility) until trademark clearance.

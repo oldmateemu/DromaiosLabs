@@ -1,3 +1,5 @@
+<!-- publish-intent: internal -->
+
 # What the evidence actually says about de-escalation training
 
 > **Status:** DRAFT for review. Public-facing owned article (DromaiosEd / founder voice).

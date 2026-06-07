@@ -1,3 +1,5 @@
+<!-- publish-intent: external -->
+
 # What the evidence actually says about de-escalation training
 
 *An evidence review from Dromaios Education.*
