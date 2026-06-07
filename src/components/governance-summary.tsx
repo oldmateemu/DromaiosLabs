@@ -33,7 +33,7 @@ export function GovernanceSummaryPanel({ summary }: { summary: GovernanceSummary
           <h3 className="text-sm font-semibold text-command-ink">Recent decisions</h3>
           <div className="mt-2 space-y-2">
             {summary.recentDecisions.length === 0 ? (
-              <p className="empty-state">No decisions recorded yet. Use reviews to keep important calls durable.</p>
+              <p className="empty-state">No decisions recorded yet. Use governance to keep important calls durable.</p>
             ) : (
               summary.recentDecisions.map((decision) => (
                 <article className="action-row" key={decision.id}>

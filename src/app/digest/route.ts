@@ -11,7 +11,8 @@ export async function GET() {
   return new Response(markdown, {
     headers: {
       "content-type": "text/markdown; charset=utf-8",
-      "content-disposition": `attachment; filename="dromaios-operating-digest-${stamp}.md"`
+      "content-disposition": `attachment; filename="dromaios-operating-digest-${stamp}.md"`,
+      "cache-control": "private, no-store, max-age=0"
     }
   });
 }

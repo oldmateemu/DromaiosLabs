@@ -69,7 +69,6 @@ export default async function GovernancePage() {
                   <td>
                     <form action={closeRiskAction}>
                       <input name="riskId" type="hidden" value={risk.id} />
-                      <input name="status" type="hidden" value="CLOSED" />
                       <button className="button button-secondary" type="submit">Close</button>
                     </form>
                   </td>

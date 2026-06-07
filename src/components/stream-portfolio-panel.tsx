@@ -16,7 +16,8 @@ const TONE_PILL: Record<PortfolioTone, string> = {
 };
 
 function actionsHref(stream: StreamHealth) {
-  return stream.id === "__unassigned__" ? "/actions" : `/actions?streamId=${stream.id}`;
+  if (stream.id === "__unassigned__") return "/actions";
+  return `/actions?${new URLSearchParams({ streamId: stream.id }).toString()}`;
 }
 
 export function StreamPortfolioPanel({

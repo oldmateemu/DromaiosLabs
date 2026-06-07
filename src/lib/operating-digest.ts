@@ -135,7 +135,8 @@ export function buildOperatingDigest({
   } else {
     for (const decision of recentDecisions) {
       const when = decision.decidedAt instanceof Date ? decision.decidedAt : new Date(decision.decidedAt);
-      lines.push(`- ${decision.decision} (${when.toISOString().slice(0, 10)})`);
+      const whenKey = Number.isNaN(when.getTime()) ? "unknown date" : when.toISOString().slice(0, 10);
+      lines.push(`- ${decision.decision} (${whenKey})`);
     }
   }
   lines.push("");

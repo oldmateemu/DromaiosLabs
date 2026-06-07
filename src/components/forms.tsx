@@ -357,8 +357,8 @@ export function InlineRiskForm({ actionId, action }: { actionId: string; action:
   return (
     <form action={action} className="mt-3 space-y-2 rounded-md border border-command-line bg-command-panel p-3">
       <input name="actionId" type="hidden" value={actionId} />
-      <p className="field-label">Log a risk for this action</p>
-      <input className="input" name="issue" placeholder="What could go wrong" required type="text" />
+      <label className="field-label" htmlFor={`risk-issue-${actionId}`}>Log a risk for this action</label>
+      <input className="input" id={`risk-issue-${actionId}`} name="issue" placeholder="What could go wrong" required type="text" />
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-36 flex-1">
           <Select name="severity" label="Severity" values={Object.values(RiskLevel)} defaultValue={RiskLevel.MEDIUM} />
@@ -373,8 +373,8 @@ export function InlineDecisionForm({ actionId, action }: { actionId: string; act
   return (
     <form action={action} className="mt-3 space-y-2 rounded-md border border-command-line bg-command-panel p-3">
       <input name="followUpActionId" type="hidden" value={actionId} />
-      <p className="field-label">Record a decision from this action</p>
-      <input className="input" name="decision" placeholder="The call that was made" required type="text" />
+      <label className="field-label" htmlFor={`decision-${actionId}`}>Record a decision from this action</label>
+      <input className="input" id={`decision-${actionId}`} name="decision" placeholder="The call that was made" required type="text" />
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-36 flex-1">
           <label className="field-label" htmlFor="rationale">Rationale</label>

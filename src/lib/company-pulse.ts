@@ -198,16 +198,14 @@ function toDate(value: Date | string | null | undefined): Date | null {
 
 function addDays(date: Date, days: number) {
   const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
+  copy.setUTCDate(copy.getUTCDate() + days);
   return copy;
 }
 
 function startOfWeek(date: Date) {
-  const copy = new Date(date);
-  const day = copy.getDay();
-  const diff = copy.getDate() - day + (day === 0 ? -6 : 1);
-  copy.setDate(diff);
-  copy.setHours(0, 0, 0, 0);
+  const copy = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = copy.getUTCDay();
+  copy.setUTCDate(copy.getUTCDate() + (day === 0 ? -6 : 1 - day));
   return copy;
 }
 

@@ -100,8 +100,7 @@ export async function createRiskAction(formData: FormData) {
 export async function closeRiskAction(formData: FormData) {
   await requireUser();
   const riskId = String(formData.get("riskId") ?? "");
-  const status = String(formData.get("status") ?? "CLOSED");
-  await updateRiskStatus(riskId, status);
+  await updateRiskStatus(riskId, "CLOSED");
   redirect("/governance");
 }
 
@@ -114,15 +113,17 @@ export async function createDecisionAction(formData: FormData) {
 export async function addRiskToActionAction(formData: FormData) {
   await requireUser();
   const actionId = String(formData.get("actionId") ?? "");
+  if (!actionId) throw new Error("Action id is required.");
   await createRisk(formData);
-  redirect(`/actions/${actionId}`);
+  redirect(`/actions/${encodeURIComponent(actionId)}`);
 }
 
 export async function addDecisionToActionAction(formData: FormData) {
   await requireUser();
   const actionId = String(formData.get("followUpActionId") ?? "");
+  if (!actionId) throw new Error("Action id is required.");
   await createDecision(formData);
-  redirect(`/actions/${actionId}`);
+  redirect(`/actions/${encodeURIComponent(actionId)}`);
 }
 
 export async function prepareDraftAutomationAction(formData: FormData) {

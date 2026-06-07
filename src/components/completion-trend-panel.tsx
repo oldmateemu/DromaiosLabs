@@ -29,7 +29,7 @@ export function CompletionTrendPanel({ trend }: { trend: CompletionTrend }) {
         </article>
       </div>
 
-      <div className="mt-4 flex items-end gap-2" style={{ height: "140px" }} role="img" aria-label="Weekly completion bar chart">
+      <div className="mt-4 flex items-end gap-2" style={{ height: "140px" }}>
         {trend.weeks.map((week) => (
           <div className="flex h-full flex-1 flex-col items-center justify-end gap-1" key={week.weekStart}>
             <span className="text-xs font-semibold text-command-muted">{week.count}</span>

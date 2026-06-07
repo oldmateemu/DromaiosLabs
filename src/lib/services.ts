@@ -58,7 +58,7 @@ export async function getTodayData() {
 
   const weekStart = startOfWeek(now);
   const pulseSince = new Date(weekStart);
-  pulseSince.setDate(pulseSince.getDate() - 7);
+  pulseSince.setUTCDate(pulseSince.getUTCDate() - 7);
   const todayStart = startOfDay(now);
 
   const [pulseActions, pulseRuns, pulseLinks, streamRefs, portfolioActions, portfolioRisks] = await Promise.all([
@@ -741,6 +741,9 @@ export async function getOperatingDigest() {
 
 export async function getActivityData() {
   const now = new Date();
+  const trendWeeks = 8;
+  const trendWindowStart = startOfWeek(now);
+  trendWindowStart.setUTCDate(trendWindowStart.getUTCDate() - 7 * (trendWeeks - 1));
   const [completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews, completedForTrend] =
     await Promise.all([
       prisma.action.findMany({
@@ -763,11 +766,11 @@ export async function getActivityData() {
       }),
       prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, sourceSummary: true, state: true, createdAt: true } }),
       prisma.review.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { id: true, type: true, createdAt: true } }),
-      prisma.action.findMany({ where: { completedAt: { not: null } }, orderBy: { completedAt: "desc" }, take: 400, select: { completedAt: true } })
+      prisma.action.findMany({ where: { completedAt: { gte: trendWindowStart } }, orderBy: { completedAt: "desc" }, select: { completedAt: true } })
     ]);
 
   const feed = buildActivityFeed({ completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews }, 40);
-  const trend = buildCompletionTrend({ now, completedAts: completedForTrend.map((action) => action.completedAt), weeks: 8 });
+  const trend = buildCompletionTrend({ now, completedAts: completedForTrend.map((action) => action.completedAt), weeks: trendWeeks });
   return { feed, trend };
 }
 
@@ -818,17 +821,13 @@ function enumValue<T extends Record<string, string>>(formData: FormData, key: st
 }
 
 function startOfDay(date: Date) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 function startOfWeek(date: Date) {
-  const copy = new Date(date);
-  const day = copy.getDay();
-  const diff = copy.getDate() - day + (day === 0 ? -6 : 1);
-  copy.setDate(diff);
-  copy.setHours(0, 0, 0, 0);
+  const copy = startOfDay(date);
+  const day = copy.getUTCDay();
+  copy.setUTCDate(copy.getUTCDate() + (day === 0 ? -6 : 1 - day));
   return copy;
 }
 

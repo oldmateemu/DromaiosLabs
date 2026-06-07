@@ -80,6 +80,10 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
   }
 
   function onListKeyDown(event: React.KeyboardEvent) {
+    if (filtered.length === 0) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter") event.preventDefault();
+      return;
+    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActiveIndex((index) => Math.min(index + 1, filtered.length - 1));

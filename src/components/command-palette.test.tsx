@@ -43,4 +43,15 @@ describe("CommandPalette", () => {
 
     expect(push).toHaveBeenCalledWith("/actions");
   });
+
+  it("opens external items in a new tab with safety flags", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(<CommandPalette items={items} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.click(screen.getByText("Xero"));
+
+    expect(openSpy).toHaveBeenCalledWith("https://xero.com", "_blank", "noopener,noreferrer");
+    expect(push).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
 });
