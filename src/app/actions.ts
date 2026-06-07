@@ -8,11 +8,14 @@ import {
   completeWeeklyReview,
   createActionFromForm,
   createAutomation,
+  createDecision,
   createLaunchpadLink,
   createQuickCaptureDraft,
+  createRisk,
   prepareDraftAutomation,
   runAutomation,
-  updateActionStatus
+  updateActionStatus,
+  updateRiskStatus
 } from "@/lib/services";
 
 export async function loginAction(formData: FormData) {
@@ -78,6 +81,26 @@ export async function runAutomationAction(formData: FormData) {
   const approved = formData.get("approved") === "true";
   await runAutomation(automationId, approved, user.id);
   redirect("/automations");
+}
+
+export async function createRiskAction(formData: FormData) {
+  await requireUser();
+  await createRisk(formData);
+  redirect("/governance");
+}
+
+export async function closeRiskAction(formData: FormData) {
+  await requireUser();
+  const riskId = String(formData.get("riskId") ?? "");
+  const status = String(formData.get("status") ?? "CLOSED");
+  await updateRiskStatus(riskId, status);
+  redirect("/governance");
+}
+
+export async function createDecisionAction(formData: FormData) {
+  await requireUser();
+  await createDecision(formData);
+  redirect("/governance");
 }
 
 export async function prepareDraftAutomationAction(formData: FormData) {

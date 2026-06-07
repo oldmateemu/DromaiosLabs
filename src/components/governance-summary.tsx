@@ -45,7 +45,7 @@ export function GovernanceSummaryPanel({ summary }: { summary: GovernanceSummary
         </div>
       </div>
       <div className="mt-4">
-        <Link className="button button-secondary" href="/reviews">Open reviews</Link>
+        <Link className="button button-secondary" href="/governance">Open governance</Link>
       </div>
     </section>
   );

@@ -6,22 +6,33 @@ import {
   Link as LinkIcon,
   LogOut,
   Repeat,
+  ShieldAlert,
   ShieldCheck
 } from "lucide-react";
 import { logoutAction } from "@/app/actions";
+import { CommandPalette, type CommandItem } from "@/components/command-palette";
 import { AppNavLink } from "@/components/nav-link";
 
 const navItems = [
   { href: "/", label: "Today", icon: Gauge },
   { href: "/actions", label: "Actions", icon: ClipboardList },
   { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
+  { href: "/governance", label: "Governance", icon: ShieldAlert },
   { href: "/reviews", label: "Reviews", icon: ShieldCheck },
   { href: "/assistant", label: "Assistant", icon: Bot },
   { href: "/automations", label: "Automations", icon: Repeat },
   { href: "/docs", label: "AI Docs", icon: FileText }
 ];
 
-export function AppShell({ children, userName }: { children: React.ReactNode; userName: string }) {
+export function AppShell({
+  children,
+  userName,
+  commandItems
+}: {
+  children: React.ReactNode;
+  userName: string;
+  commandItems: CommandItem[];
+}) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -59,9 +70,12 @@ export function AppShell({ children, userName }: { children: React.ReactNode; us
                 <p className="eyebrow">Private operations workspace</p>
                 <p className="text-sm font-medium text-command-ink">Dromaios Cockpit</p>
               </div>
-              <div className="hidden items-center gap-2 md:flex">
-                <span className="meta-pill">Local/VPN first</span>
-                <span className="meta-pill">Ollama ready</span>
+              <div className="flex items-center gap-3">
+                <CommandPalette items={commandItems} />
+                <div className="hidden items-center gap-2 md:flex">
+                  <span className="meta-pill">Local/VPN first</span>
+                  <span className="meta-pill">Ollama ready</span>
+                </div>
               </div>
             </div>
             <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Compact navigation">

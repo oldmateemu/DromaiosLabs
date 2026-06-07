@@ -1,4 +1,4 @@
-import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel } from "@prisma/client";
+import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel, RiskLevel } from "@prisma/client";
 import Link from "next/link";
 
 type ReferenceItem = { id: string; name: string };
@@ -217,6 +217,68 @@ export function AutomationForm({ action }: { action: (formData: FormData) => Pro
       </div>
       <div className="flex justify-end md:col-span-2">
         <button className="button button-primary" type="submit">Register automation</button>
+      </div>
+    </form>
+  );
+}
+
+export function RiskForm({
+  streams,
+  companyFunctions,
+  action
+}: {
+  streams: ReferenceItem[];
+  companyFunctions: ReferenceItem[];
+  action: (formData: FormData) => Promise<void>;
+}) {
+  return (
+    <form action={action} className="grid gap-4 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <p className="eyebrow">Governance</p>
+        <h2>Log Risk</h2>
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="issue">Risk</label>
+        <input className="input" id="issue" name="issue" placeholder="What could go wrong, and why it matters" required type="text" />
+      </div>
+      <Select name="severity" label="Severity" values={Object.values(RiskLevel)} defaultValue={RiskLevel.MEDIUM} />
+      <Field name="nextReviewAt" label="Next review date" type="date" />
+      <SelectItems name="streamId" label="Stream" items={streams} emptyLabel="No stream" />
+      <SelectItems name="companyFunctionId" label="Company function" items={companyFunctions} emptyLabel="No function" />
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="mitigation">Mitigation</label>
+        <textarea className="text-area" id="mitigation" name="mitigation" rows={3} placeholder="How the risk is being reduced or contained" />
+      </div>
+      <div className="flex justify-end md:col-span-2">
+        <button className="button button-primary" type="submit">Log risk</button>
+      </div>
+    </form>
+  );
+}
+
+export function DecisionForm({ action }: { action: (formData: FormData) => Promise<void> }) {
+  return (
+    <form action={action} className="grid gap-4 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <p className="eyebrow">Governance</p>
+        <h2>Record Decision</h2>
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="decision">Decision</label>
+        <input className="input" id="decision" name="decision" placeholder="The call that was made" required type="text" />
+      </div>
+      <Field name="affectedArea" label="Affected area" placeholder="Finance, Product, Legal..." />
+      <Field name="decidedAt" label="Decided on" type="date" />
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="rationale">Rationale</label>
+        <textarea className="text-area" id="rationale" name="rationale" rows={3} placeholder="Why this was the right call" />
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="relatedDocs">Related docs</label>
+        <input className="input" id="relatedDocs" name="relatedDocs" placeholder="Links or references" type="text" />
+      </div>
+      <div className="flex justify-end md:col-span-2">
+        <button className="button button-primary" type="submit">Record decision</button>
       </div>
     </form>
   );

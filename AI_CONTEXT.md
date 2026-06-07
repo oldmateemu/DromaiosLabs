@@ -6,6 +6,13 @@ Start here before changing the cockpit.
 
 Dromaios Cockpit is the private operating dashboard for Dromaios Labs. It keeps daily actions, weekly company reviews, software links, assistant drafts, and approval-gated automations in one command-and-control workspace.
 
+Operating surfaces:
+
+- Today shows the command brief, focus set, and a Company Pulse (weekly completions, overdue load, open risks, automation success rate, tracked spend).
+- Governance (`/governance`) manages the risk register and decision log directly.
+- Automations include a cross-loop run history with success/failure/blocked counts.
+- A command palette (Cmd/Ctrl+K) jumps to any page, open action, or launchpad system.
+
 ## Read First
 
 1. `docs/superpowers/specs/2026-05-29-dromaios-company-cockpit-design.md` for the approved product design.

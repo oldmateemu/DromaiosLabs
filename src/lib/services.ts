@@ -12,6 +12,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
 import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
+import { summariseAutomationRuns } from "./automation-history";
+import { buildCompanyPulse } from "./company-pulse";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
@@ -47,7 +49,36 @@ export async function getTodayData() {
   const buckets = bucketActionsForToday(actions);
   const draftsNeedingReview = drafts.filter((draft) => draft.state !== AssistantDraftState.APPROVED).length;
 
+  const weekStart = startOfWeek(now);
+  const pulseSince = new Date(weekStart);
+  pulseSince.setDate(pulseSince.getDate() - 7);
+  const todayStart = startOfDay(now);
+
+  const [pulseActions, pulseRuns, pulseLinks, openRiskCount] = await Promise.all([
+    prisma.action.findMany({
+      where: {
+        OR: [
+          { completedAt: { gte: pulseSince } },
+          { createdAt: { gte: weekStart } },
+          {
+            AND: [
+              { status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
+              { dueAt: { lt: todayStart } }
+            ]
+          }
+        ]
+      },
+      select: { status: true, createdAt: true, completedAt: true, dueAt: true }
+    }),
+    prisma.automationRun.findMany({ orderBy: { createdAt: "desc" }, take: 50, select: { status: true } }),
+    prisma.launchpadLink.findMany({ select: { cost: true } }),
+    prisma.risk.count({ where: { status: { notIn: ["CLOSED", "RESOLVED", "DONE"] } } })
+  ]);
+
+  const pulse = buildCompanyPulse({ now, actions: pulseActions, automationRuns: pulseRuns, links: pulseLinks, openRiskCount });
+
   return {
+    pulse,
     actions,
     buckets,
     nextAction: buildNextBestAction({
@@ -472,6 +503,92 @@ export async function getAutomationData() {
   return prisma.automation.findMany({ include: { runs: { orderBy: { createdAt: "desc" }, take: 5 } }, orderBy: { createdAt: "desc" } });
 }
 
+export async function getAutomationRunHistory(limit = 40) {
+  const runs = await prisma.automationRun.findMany({
+    include: {
+      automation: { select: { name: true, targetTool: true } },
+      triggeredBy: { select: { name: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit
+  });
+  return { runs, summary: summariseAutomationRuns(runs) };
+}
+
+export async function createRisk(formData: FormData) {
+  const issue = stringValue(formData, "issue");
+  if (!issue) throw new Error("Risk issue is required.");
+
+  await prisma.risk.create({
+    data: {
+      issue,
+      severity: enumValue(formData, "severity", RiskLevel, RiskLevel.MEDIUM),
+      status: stringValue(formData, "status") || "OPEN",
+      mitigation: optionalString(formData, "mitigation"),
+      nextReviewAt: dateValue(formData, "nextReviewAt"),
+      streamId: optionalString(formData, "streamId"),
+      companyFunctionId: optionalString(formData, "companyFunctionId")
+    }
+  });
+
+  revalidatePath("/governance");
+  revalidatePath("/");
+}
+
+export async function updateRiskStatus(riskId: string, status: string) {
+  if (!riskId) throw new Error("Risk id is required.");
+  await prisma.risk.update({ where: { id: riskId }, data: { status } });
+  revalidatePath("/governance");
+  revalidatePath("/");
+}
+
+export async function createDecision(formData: FormData) {
+  const decision = stringValue(formData, "decision");
+  if (!decision) throw new Error("Decision text is required.");
+
+  await prisma.decision.create({
+    data: {
+      decision,
+      rationale: optionalString(formData, "rationale"),
+      affectedArea: optionalString(formData, "affectedArea"),
+      relatedDocs: optionalString(formData, "relatedDocs"),
+      decidedAt: dateValue(formData, "decidedAt") ?? new Date()
+    }
+  });
+
+  revalidatePath("/governance");
+  revalidatePath("/");
+}
+
+export async function getGovernanceData() {
+  const [risks, decisions, reference] = await Promise.all([
+    prisma.risk.findMany({
+      include: { stream: true, companyFunction: true },
+      orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { createdAt: "desc" }]
+    }),
+    prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 50 }),
+    getReferenceData()
+  ]);
+  return { risks, decisions, ...reference };
+}
+
+export async function getCommandPaletteItems() {
+  const [actions, links] = await Promise.all([
+    prisma.action.findMany({
+      where: { status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
+      orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { updatedAt: "desc" }],
+      take: 50,
+      select: { id: true, title: true, status: true }
+    }),
+    prisma.launchpadLink.findMany({
+      orderBy: [{ group: "asc" }, { name: "asc" }],
+      take: 60,
+      select: { id: true, name: true, url: true, group: true }
+    })
+  ]);
+  return { actions, links };
+}
+
 function stringValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
@@ -499,6 +616,12 @@ function dateFromKey(value: string) {
 function enumValue<T extends Record<string, string>>(formData: FormData, key: string, values: T, fallback: T[keyof T]) {
   const value = stringValue(formData, key);
   return Object.values(values).includes(value) ? (value as T[keyof T]) : fallback;
+}
+
+function startOfDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
 }
 
 function startOfWeek(date: Date) {
