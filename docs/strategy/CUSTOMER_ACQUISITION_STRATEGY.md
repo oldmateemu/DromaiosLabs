@@ -261,9 +261,8 @@ These turn the strategy into action. All written to the guardrail.
 
 - **Lead magnet:** `lead-magnet-safety-compliance-self-assessment.md` — the free, email-gated
   self-assessment (rung 0) that also frames the discovery conversation.
-- **LinkedIn posts:** `linkedin-posts-batch-1.md`, `linkedin-posts-batch-2.md`, and
-  `linkedin-posts-batch-3.md` — weeks 1–12 (36 posts) for the authority engine, shifting from
-  awareness toward conversion across the batches.
+- **LinkedIn posts:** `linkedin-posts-batch-1.md` through `linkedin-posts-batch-4.md` — weeks 1–16
+  (48 posts) for the authority engine, shifting from awareness toward conversion across the batches.
 - **Outreach templates:** `outreach-templates-tier1.md` — LinkedIn, email, partnership, and
   follow-up scripts for Tier-1 warm outreach, plus discovery-call prep.
 - **Email nurture sequence:** `email-nurture-sequence.md` — 6-email post-download sequence + the
@@ -272,6 +271,10 @@ These turn the strategy into action. All written to the guardrail.
   content the posts and emails orbit, each with a repurposing checklist.
 - **Rung-1 workshop package:** `workshop-package-rung1.md` — the first paid offer ("The First 30
   Seconds"): run sheet, pricing posture, sell sheet, and proposal template.
+- **Rung-2 team program:** `offer-rung2-team-program.md` — the recurring-revenue offer ("Safer Teams
+  Program"): 12-week Set→Practise→Embed→Lock-in structure, pricing posture, sell sheet, proposal.
+- **Testimonial & case-note template:** `testimonial-and-case-note-template.md` — careful-claims-safe
+  social proof: consent, collection questions, Green/Amber/Red claims guide, and a pre-publish check.
 - **Partnership & webinar kit:** `webinar-partnership-kit.md` — the volume play: partner pitch,
   webinar slide outline + speaker notes, registration/follow-up flow, and run-of-show checklist.
 - **Operating cadence checklist:** `operating-cadence-checklist.md` — daily/weekly/monthly actions
