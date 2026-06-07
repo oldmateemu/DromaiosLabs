@@ -341,14 +341,25 @@ export const COMPANY_SETUP_CHECKLIST: SetupChecklistItem[] = [
 
   // --- Sales & partnerships ---------------------------------------------
   {
-    key: "sales-pipeline",
-    title: "Lead and partnership pipeline tracked",
+    key: "sales-hubspot-pipeline",
+    title: "Set up HubSpot CRM pipeline and stages",
     category: "Sales & partnerships",
     companyFunction: "sales",
     priority: "MEDIUM",
     description:
-      "Keep a simple pipeline of leads, pilots, and partnership conversations with next steps and owners so nothing goes cold.",
-    nextStep: "Set up a lightweight pipeline (even a board in the cockpit) and add current conversations.",
+      "Configure the HubSpot deal pipeline (lead → qualified → discovery → pilot → proposal → won) and import current leads and partnership conversations so the pipeline has one source of truth.",
+    nextStep: "Create the HubSpot pipeline stages and add every current conversation.",
+    sensitive: true
+  },
+  {
+    key: "sales-hubspot-hygiene",
+    title: "Define HubSpot deal properties and pipeline hygiene",
+    category: "Sales & partnerships",
+    companyFunction: "sales",
+    priority: "LOW",
+    description:
+      "Decide the required HubSpot deal properties (value, owner, next step, expected close), and a weekly hygiene habit so the pipeline stays trustworthy.",
+    nextStep: "Set required deal fields in HubSpot and add a weekly pipeline review to the rhythm.",
     sensitive: false
   },
   {
@@ -358,7 +369,7 @@ export const COMPANY_SETUP_CHECKLIST: SetupChecklistItem[] = [
     companyFunction: "sales",
     priority: "LOW",
     description:
-      "Document the standard path from discovery call to a narrow, testable pilot to a proposal, using the pilot framing from the company statements.",
+      "Document the standard path from discovery call to a narrow, testable pilot to a proposal, using the pilot framing from the company statements, mapped onto the HubSpot stages.",
     nextStep: "Write the three-step flow and what 'better' looks like for a first pilot.",
     sensitive: false
   },

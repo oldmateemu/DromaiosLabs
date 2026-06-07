@@ -96,8 +96,10 @@ education delivery and ClinicBoss pilots.
 - LinkedIn company page and founder profile aligned.
 
 ### Sales & partnerships
-- Lead and partnership pipeline tracked.
-- Discovery → pilot → proposal flow documented.
+- Set up the HubSpot CRM pipeline and stages (HubSpot is the CRM system of
+  record; the cockpit `/pipeline` page is the command view that links to it).
+- Define HubSpot deal properties and a weekly pipeline-hygiene habit.
+- Discovery → pilot → proposal flow documented, mapped onto the HubSpot stages.
 
 ### Product & delivery
 - ClinicBoss roadmap and pilot readiness defined.

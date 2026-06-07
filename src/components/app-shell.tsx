@@ -7,7 +7,8 @@ import {
   ListChecks,
   LogOut,
   Repeat,
-  ShieldCheck
+  ShieldCheck,
+  Target
 } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 import { AppNavLink } from "@/components/nav-link";
@@ -16,6 +17,7 @@ const navItems = [
   { href: "/", label: "Today", icon: Gauge },
   { href: "/setup", label: "Setup", icon: ListChecks },
   { href: "/actions", label: "Actions", icon: ClipboardList },
+  { href: "/pipeline", label: "Pipeline", icon: Target },
   { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
   { href: "/reviews", label: "Reviews", icon: ShieldCheck },
   { href: "/assistant", label: "Assistant", icon: Bot },

@@ -13,6 +13,7 @@ describe("CORE_LAUNCHPAD_SYSTEMS", () => {
       "Airwallex",
       "Lawpath",
       "Skool",
+      "HubSpot",
       "ChatGPT",
       "Ollama",
       "GitHub",

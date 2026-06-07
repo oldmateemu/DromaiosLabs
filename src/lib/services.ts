@@ -30,6 +30,7 @@ import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
 import { buildRenewalReminderRun, getLocalApprovalAutomationKind } from "./renewal-reminders";
+import { SALES_PIPELINE_STAGES, summariseSalesPipeline } from "./sales-pipeline";
 
 export async function getReferenceData() {
   const [streams, companyFunctions] = await Promise.all([
@@ -59,16 +60,25 @@ export async function getTodayData() {
   const buckets = bucketActionsForToday(actions);
   const draftsNeedingReview = drafts.filter((draft) => draft.state !== AssistantDraftState.APPROVED).length;
 
+  const setupReadiness = buildSetupReadiness(setupSummary);
+  const setupOutstanding = selectOutstandingSetupItems(setupSummary, 3);
+  const overdueFoundational = setupOutstanding.find(
+    (item) => item.overdue && (item.priority === "CRITICAL" || item.priority === "HIGH")
+  );
+
   return {
     actions,
     buckets,
-    setupReadiness: buildSetupReadiness(setupSummary),
-    setupOutstanding: selectOutstandingSetupItems(setupSummary, 3),
+    setupReadiness,
+    setupOutstanding,
     nextAction: buildNextBestAction({
       buckets,
       today,
       draftCount: draftsNeedingReview,
-      automationCount: automations.length
+      automationCount: automations.length,
+      setupAlert: overdueFoundational
+        ? { title: overdueFoundational.title, overdueCritical: true }
+        : undefined
     }),
     focusSet: buildFocusSet(buckets),
     brief: buildOperatingBrief({
@@ -542,6 +552,29 @@ export async function setSetupItemStatus(itemKey: string, status: ActionStatus, 
   revalidatePath("/");
   revalidatePath("/actions");
   revalidatePath("/reviews");
+}
+
+const HUBSPOT_DEFAULT_URL = "https://app.hubspot.com/";
+
+export async function getSalesPipelineData() {
+  const [salesActions, hubspot] = await Promise.all([
+    prisma.action.findMany({
+      where: {
+        companyFunction: { name: { equals: "sales", mode: "insensitive" } },
+        status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
+      },
+      include: { stream: true },
+      orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+      take: 50
+    }),
+    prisma.launchpadLink.findFirst({ where: { name: "HubSpot" } })
+  ]);
+
+  return {
+    stages: SALES_PIPELINE_STAGES,
+    summary: summariseSalesPipeline(salesActions),
+    hubspotUrl: hubspot?.url ?? HUBSPOT_DEFAULT_URL
+  };
 }
 
 export async function getLaunchpadData() {
