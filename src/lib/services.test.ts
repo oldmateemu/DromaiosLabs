@@ -473,7 +473,7 @@ describe("prepareDraftAutomation", () => {
 
     const run = prismaMock.automationRun.create.mock.calls[0][0].data;
     expect(run.status).toBe(AutomationRunStatus.BLOCKED);
-    expect(run.error).toBe("Paused automations cannot prepare drafts.");
+    expect(run.error).toBe("Inactive automations cannot prepare drafts.");
   });
 
   it("records a BLOCKED run when the safety level is not draft-only", async () => {

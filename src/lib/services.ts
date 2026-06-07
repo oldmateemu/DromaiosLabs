@@ -385,7 +385,7 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
   try {
     assertAutomationCanPrepareDraft(automation.safetyLevel);
     if (automation.status !== "ACTIVE") {
-      throw new AutomationBlockedError("Paused automations cannot prepare drafts.");
+      throw new AutomationBlockedError("Inactive automations cannot prepare drafts.");
     }
     if (!kind) {
       throw new Error("No local draft runner is registered for this automation.");

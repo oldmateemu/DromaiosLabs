@@ -1,8 +1,14 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PostingGuardrailChecker } from "./posting-guardrail-checker";
 
 describe("PostingGuardrailChecker", () => {
+  // Always restore globals so a stubbed navigator can't leak into later tests
+  // if an assertion throws mid-test.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("checks pasted public copy without exposing a publish action", () => {
     render(<PostingGuardrailChecker />);
 
@@ -48,11 +54,12 @@ describe("PostingGuardrailChecker", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Check draft" }));
 
+    const rewrite = screen.getByTestId("softened-rewrite").textContent;
     const copyButton = screen.getByRole("button", { name: "Copy rewrite" });
     fireEvent.click(copyButton);
     await screen.findByRole("button", { name: "Rewrite copied" });
 
     expect(writeText).toHaveBeenCalledTimes(1);
-    vi.unstubAllGlobals();
+    expect(writeText).toHaveBeenCalledWith(rewrite);
   });
 });
