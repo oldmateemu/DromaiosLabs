@@ -29,7 +29,25 @@ export type SetupChecklistItem = {
   description: string;
   nextStep: string;
   sensitive: boolean;
+  /** Optional override for the recommended days-to-complete horizon. */
+  horizonDays?: number;
 };
+
+// Recommended time-to-complete by priority. Higher-priority setup work gets a
+// tighter horizon so the seeded due dates create a realistic, staggered
+// schedule rather than every item being due at once.
+const DEFAULT_HORIZON_DAYS: Record<SetupPriority, number> = {
+  CRITICAL: 14,
+  HIGH: 30,
+  MEDIUM: 45,
+  LOW: 60
+};
+
+const DUE_SOON_DAYS = 14;
+
+// The stream that seeded/self-healed setup actions attach to. Must match a
+// seeded Stream.name in prisma/seed.ts.
+export const SETUP_CHECKLIST_STREAM = "Company Core";
 
 // Tailored for an Australia-first healthcare company that is registered and
 // early-operating (ABN/company exists; Xero, Airwallex, and Lawpath in use).
@@ -420,9 +438,28 @@ export function normaliseSetupTitle(title: string) {
   return title.trim().toLowerCase();
 }
 
+export function setupHorizonDays(item: Pick<SetupChecklistItem, "priority" | "horizonDays">) {
+  return item.horizonDays ?? DEFAULT_HORIZON_DAYS[item.priority];
+}
+
+/** Recommended due date for a setup item, measured from `from` (default now). */
+export function setupDueDate(item: Pick<SetupChecklistItem, "priority" | "horizonDays">, from: Date = new Date()) {
+  const due = new Date(from);
+  due.setDate(due.getDate() + setupHorizonDays(item));
+  return due;
+}
+
+export type SetupActionState = {
+  status: SetupItemStatus;
+  dueAt?: Date | string | null;
+};
+
 export type SetupItemView = SetupChecklistItem & {
   status: SetupItemStatus;
   done: boolean;
+  dueAt: Date | string | null;
+  overdue: boolean;
+  dueSoon: boolean;
 };
 
 export type SetupCategoryView = {
@@ -432,6 +469,8 @@ export type SetupCategoryView = {
   done: number;
   inProgress: number;
   notStarted: number;
+  overdue: number;
+  dueSoon: number;
   percentComplete: number;
 };
 
@@ -441,6 +480,8 @@ export type SetupChecklistSummary = {
   done: number;
   inProgress: number;
   notStarted: number;
+  overdue: number;
+  dueSoon: number;
   percentComplete: number;
 };
 
@@ -451,21 +492,33 @@ const IN_PROGRESS_STATUSES: ReadonlySet<SetupItemStatus> = new Set([
 ]);
 
 /**
- * Builds a grouped progress view of the setup checklist. `statusByTitle` maps a
- * normalised action title to its current status; titles with no matching action
- * are treated as NOT_STARTED.
+ * Builds a grouped progress view of the setup checklist. `stateByTitle` maps a
+ * normalised action title to its current status and due date; titles with no
+ * matching action are treated as NOT_STARTED. Overdue and due-soon are computed
+ * against `now`.
  */
 export function summariseSetupChecklist(
   items: SetupChecklistItem[],
-  statusByTitle: Map<string, SetupItemStatus>
+  stateByTitle: Map<string, SetupActionState>,
+  now: Date = new Date()
 ): SetupChecklistSummary {
+  const todayKey = dateKey(now);
+  const dueSoonKey = dateKey(addDays(now, DUE_SOON_DAYS));
   const categories: SetupCategoryView[] = [];
   const categoryIndex = new Map<string, SetupCategoryView>();
 
   for (const item of items) {
-    const status = statusByTitle.get(normaliseSetupTitle(item.title)) ?? "NOT_STARTED";
+    const state = stateByTitle.get(normaliseSetupTitle(item.title));
+    const status = state?.status ?? "NOT_STARTED";
     const done = status === "DONE";
-    const view: SetupItemView = { ...item, status, done };
+    const dueAt = state?.dueAt ?? null;
+    const dueKey = dueAt ? dateKey(new Date(dueAt)) : null;
+    // Only actionable work counts as overdue/due-soon, matching the Today board:
+    // items parked as WAITING or BLOCKED are surfaced through their own signal.
+    const active = status === "OPEN" || status === "IN_PROGRESS";
+    const overdue = active && dueKey !== null && dueKey < todayKey;
+    const dueSoon = active && !overdue && dueKey !== null && dueKey <= dueSoonKey;
+    const view: SetupItemView = { ...item, status, done, dueAt, overdue, dueSoon };
 
     let category = categoryIndex.get(item.category);
     if (!category) {
@@ -476,6 +529,8 @@ export function summariseSetupChecklist(
         done: 0,
         inProgress: 0,
         notStarted: 0,
+        overdue: 0,
+        dueSoon: 0,
         percentComplete: 0
       };
       categoryIndex.set(item.category, category);
@@ -487,12 +542,16 @@ export function summariseSetupChecklist(
     if (done) category.done += 1;
     else if (IN_PROGRESS_STATUSES.has(status)) category.inProgress += 1;
     else category.notStarted += 1;
+    if (overdue) category.overdue += 1;
+    if (dueSoon) category.dueSoon += 1;
   }
 
   let total = 0;
   let done = 0;
   let inProgress = 0;
   let notStarted = 0;
+  let overdue = 0;
+  let dueSoon = 0;
 
   for (const category of categories) {
     category.percentComplete = category.total === 0 ? 0 : Math.round((category.done / category.total) * 100);
@@ -500,6 +559,8 @@ export function summariseSetupChecklist(
     done += category.done;
     inProgress += category.inProgress;
     notStarted += category.notStarted;
+    overdue += category.overdue;
+    dueSoon += category.dueSoon;
   }
 
   return {
@@ -508,6 +569,8 @@ export function summariseSetupChecklist(
     done,
     inProgress,
     notStarted,
+    overdue,
+    dueSoon,
     percentComplete: total === 0 ? 0 : Math.round((done / total) * 100)
   };
 }
@@ -519,6 +582,9 @@ export type OutstandingSetupItem = {
   companyFunction: string;
   priority: SetupPriority;
   status: SetupItemStatus;
+  dueAt: Date | string | null;
+  overdue: boolean;
+  dueSoon: boolean;
 };
 
 const PRIORITY_WEIGHT: Record<SetupPriority, number> = {
@@ -526,6 +592,16 @@ const PRIORITY_WEIGHT: Record<SetupPriority, number> = {
   HIGH: 1,
   MEDIUM: 2,
   LOW: 3
+};
+
+// Higher weight = more readiness credit when complete. Weighting the readiness
+// score by priority means clearing one critical obligation moves the needle
+// more than ticking several low-priority items.
+const PRIORITY_SCORE_WEIGHT: Record<SetupPriority, number> = {
+  CRITICAL: 8,
+  HIGH: 4,
+  MEDIUM: 2,
+  LOW: 1
 };
 
 // Untouched items surface before ones already in flight at the same priority,
@@ -541,7 +617,8 @@ const STATUS_WEIGHT: Record<SetupItemStatus, number> = {
 };
 
 /**
- * Highest-priority items that are not yet done, ordered for review attention.
+ * Items that are not yet done, ordered for review attention: overdue first,
+ * then by priority, then by soonest due date, then by how untouched they are.
  * Cancelled items are excluded; they were a deliberate decision, not a gap.
  */
 export function selectOutstandingSetupItems(
@@ -557,39 +634,127 @@ export function selectOutstandingSetupItems(
       category: item.category,
       companyFunction: item.companyFunction,
       priority: item.priority,
-      status: item.status
+      status: item.status,
+      dueAt: item.dueAt,
+      overdue: item.overdue,
+      dueSoon: item.dueSoon
     }))
     .sort(
       (a, b) =>
+        Number(b.overdue) - Number(a.overdue) ||
         PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority] ||
+        dueValue(a.dueAt) - dueValue(b.dueAt) ||
         STATUS_WEIGHT[a.status] - STATUS_WEIGHT[b.status] ||
         a.title.localeCompare(b.title)
     )
     .slice(0, limit);
 }
 
+export type SetupReadinessBand = "Foundational gaps" | "Operating" | "Scale-ready";
+
+// Shared status-pill styling for a readiness band, reused by every view that
+// renders the band so colours never drift between pages.
+export const SETUP_BAND_PILL_CLASS: Record<SetupReadinessBand, string> = {
+  "Foundational gaps": "status-pill status-high",
+  Operating: "status-pill status-draft",
+  "Scale-ready": "status-pill status-approved"
+};
+
+export type SetupReadiness = {
+  /** Priority-weighted completion (0-100). */
+  score: number;
+  /** Raw item completion (0-100). */
+  percentComplete: number;
+  band: SetupReadinessBand;
+  headline: string;
+  done: number;
+  total: number;
+  overdue: number;
+  dueSoon: number;
+  /** Critical or high-priority items not yet done. */
+  criticalOutstanding: number;
+  /** Critical-only items not yet done. */
+  blockingOutstanding: number;
+};
+
+/**
+ * Priority-weighted, date-aware readiness for the company setup checklist. The
+ * band reflects risk, not just raw count: any unfinished critical obligation or
+ * a weighted score under 50 is a "Foundational gaps" state.
+ */
+export function buildSetupReadiness(summary: SetupChecklistSummary): SetupReadiness {
+  const items = summary.categories.flatMap((category) => category.items);
+  let weightedTotal = 0;
+  let weightedDone = 0;
+  let criticalOutstanding = 0;
+  let blockingOutstanding = 0;
+
+  for (const item of items) {
+    const weight = PRIORITY_SCORE_WEIGHT[item.priority];
+    weightedTotal += weight;
+    if (item.done) {
+      weightedDone += weight;
+      continue;
+    }
+    if (item.status === "CANCELLED") continue;
+    if (item.priority === "CRITICAL" || item.priority === "HIGH") criticalOutstanding += 1;
+    if (item.priority === "CRITICAL") blockingOutstanding += 1;
+  }
+
+  const score = weightedTotal === 0 ? 0 : Math.round((weightedDone / weightedTotal) * 100);
+  const band: SetupReadinessBand =
+    blockingOutstanding > 0 || score < 50
+      ? "Foundational gaps"
+      : score >= 85 && summary.overdue === 0 && criticalOutstanding === 0
+        ? "Scale-ready"
+        : "Operating";
+
+  const overduePart = summary.overdue > 0 ? `, ${summary.overdue} overdue` : "";
+  const headline = `${band} — ${score}% readiness${overduePart}`;
+
+  return {
+    score,
+    percentComplete: summary.percentComplete,
+    band,
+    headline,
+    done: summary.done,
+    total: summary.total,
+    overdue: summary.overdue,
+    dueSoon: summary.dueSoon,
+    criticalOutstanding,
+    blockingOutstanding
+  };
+}
+
 export type SetupDraftContext = {
   percentComplete: number;
+  score: number;
+  band: SetupReadinessBand;
   done: number;
   total: number;
   inProgress: number;
   notStarted: number;
+  overdue: number;
+  dueSoon: number;
   criticalOutstanding: number;
   outstanding: OutstandingSetupItem[];
 };
 
 /** Condensed setup snapshot for embedding in the weekly review prep draft. */
 export function buildSetupDraftContext(summary: SetupChecklistSummary, limit = 6): SetupDraftContext {
+  const readiness = buildSetupReadiness(summary);
   const allOutstanding = selectOutstandingSetupItems(summary, Number.MAX_SAFE_INTEGER);
   return {
     percentComplete: summary.percentComplete,
+    score: readiness.score,
+    band: readiness.band,
     done: summary.done,
     total: summary.total,
     inProgress: summary.inProgress,
     notStarted: summary.notStarted,
-    criticalOutstanding: allOutstanding.filter(
-      (item) => item.priority === "CRITICAL" || item.priority === "HIGH"
-    ).length,
+    overdue: summary.overdue,
+    dueSoon: summary.dueSoon,
+    criticalOutstanding: readiness.criticalOutstanding,
     outstanding: allOutstanding.slice(0, limit)
   };
 }
@@ -597,4 +762,18 @@ export function buildSetupDraftContext(summary: SetupChecklistSummary, limit = 6
 export function setupItemStatusLabel(status: SetupItemStatus) {
   const text = status.replace(/_/g, " ").toLowerCase();
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function dueValue(dueAt: Date | string | null) {
+  return dueAt ? new Date(dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function addDays(date: Date, days: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function dateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
 }

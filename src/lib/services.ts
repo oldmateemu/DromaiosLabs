@@ -16,10 +16,14 @@ import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextB
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import {
   buildSetupDraftContext,
+  buildSetupReadiness,
   COMPANY_SETUP_CHECKLIST,
   normaliseSetupTitle,
+  selectOutstandingSetupItems,
+  SETUP_CHECKLIST_STREAM,
+  setupDueDate,
   summariseSetupChecklist,
-  type SetupItemStatus
+  type SetupActionState
 } from "./company-setup-checklist";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { prisma } from "./db";
@@ -36,7 +40,7 @@ export async function getReferenceData() {
 }
 
 export async function getTodayData() {
-  const [actions, links, automations, drafts, risks, decisions] = await Promise.all([
+  const [actions, links, automations, drafts, risks, decisions, setupSummary] = await Promise.all([
     prisma.action.findMany({
       orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
       include: { stream: true, companyFunction: true },
@@ -46,7 +50,8 @@ export async function getTodayData() {
     prisma.automation.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
     prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
     prisma.risk.findMany({ orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { createdAt: "desc" }], take: 5 }),
-    prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 5 })
+    prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 5 }),
+    getCompanySetupData()
   ]);
 
   const now = new Date();
@@ -57,6 +62,8 @@ export async function getTodayData() {
   return {
     actions,
     buckets,
+    setupReadiness: buildSetupReadiness(setupSummary),
+    setupOutstanding: selectOutstandingSetupItems(setupSummary, 3),
     nextAction: buildNextBestAction({
       buckets,
       today,
@@ -468,17 +475,18 @@ export async function getCompanySetupData() {
   const titles = COMPANY_SETUP_CHECKLIST.map((item) => item.title);
   const actions = await prisma.action.findMany({
     where: { title: { in: titles } },
-    select: { id: true, title: true, status: true }
+    select: { id: true, title: true, status: true, dueAt: true }
   });
 
-  const statusByTitle = new Map<string, SetupItemStatus>(
-    actions.map((action) => [normaliseSetupTitle(action.title), action.status as SetupItemStatus])
+  const stateByTitle = new Map<string, SetupActionState>(
+    actions.map((action) => [
+      normaliseSetupTitle(action.title),
+      { status: action.status as SetupActionState["status"], dueAt: action.dueAt }
+    ])
   );
 
-  return summariseSetupChecklist(COMPANY_SETUP_CHECKLIST, statusByTitle);
+  return summariseSetupChecklist(COMPANY_SETUP_CHECKLIST, stateByTitle);
 }
-
-const SETUP_CHECKLIST_STREAM = "Company Core";
 
 export async function setSetupItemStatus(itemKey: string, status: ActionStatus, userId: string) {
   const item = COMPANY_SETUP_CHECKLIST.find((entry) => entry.key === itemKey);
@@ -487,10 +495,20 @@ export async function setSetupItemStatus(itemKey: string, status: ActionStatus, 
   const existing = await prisma.action.findFirst({ where: { title: item.title } });
 
   if (existing) {
+    // Refresh the due date when reopening a completed item (or when one is
+    // missing) so it lands back on a fresh horizon rather than instantly overdue.
+    const reopening = existing.status === ActionStatus.DONE && status !== ActionStatus.DONE;
+    const dueAt = status === ActionStatus.DONE
+      ? existing.dueAt
+      : reopening || !existing.dueAt
+        ? setupDueDate(item)
+        : existing.dueAt;
+
     await prisma.action.update({
       where: { id: existing.id },
       data: {
         status,
+        dueAt,
         completedAt: status === ActionStatus.DONE ? new Date() : null
       }
     });
@@ -510,6 +528,7 @@ export async function setSetupItemStatus(itemKey: string, status: ActionStatus, 
         sensitive: item.sensitive,
         priority: item.priority as Priority,
         status,
+        dueAt: setupDueDate(item),
         completedAt: status === ActionStatus.DONE ? new Date() : null,
         source: ActionSource.USER,
         streamId: stream?.id,

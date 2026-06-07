@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { weeklyReviewAction } from "@/app/actions";
 import { WeeklyReviewForm } from "@/components/forms";
-import { selectOutstandingSetupItems, setupItemStatusLabel } from "@/lib/company-setup-checklist";
+import { buildSetupReadiness, selectOutstandingSetupItems, setupItemStatusLabel } from "@/lib/company-setup-checklist";
 import { getCompanySetupData, getReviewData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReviewsPage() {
   const [reviews, setup] = await Promise.all([getReviewData(), getCompanySetupData()]);
+  const setupReadiness = buildSetupReadiness(setup);
   const outstandingSetup = selectOutstandingSetupItems(setup, 6);
 
   return (
@@ -24,12 +25,18 @@ export default async function ReviewsPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="eyebrow">Company setup this week</p>
-            <h2>
-              {setup.percentComplete}% complete &middot; {setup.notStarted} not started
-            </h2>
+            <h2>{setupReadiness.headline}</h2>
             <p className="muted mt-1">
               Carry the highest-priority outstanding setup items into this review before taking on new work.
             </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="meta-pill">
+                {setup.done}/{setup.total} done
+              </span>
+              {setup.overdue > 0 ? <span className="status-pill status-high">{setup.overdue} overdue</span> : null}
+              {setup.dueSoon > 0 ? <span className="status-pill status-draft">{setup.dueSoon} due soon</span> : null}
+              {setup.notStarted > 0 ? <span className="meta-pill">{setup.notStarted} not started</span> : null}
+            </div>
           </div>
           <Link className="button button-secondary" href="/setup">
             Open setup checklist

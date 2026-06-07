@@ -1,19 +1,10 @@
 import { CheckSquare2, Square } from "lucide-react";
 import { setSetupItemStatusAction } from "@/app/actions";
 import { getCompanySetupData } from "@/lib/services";
+import { buildSetupReadiness, setupItemStatusLabel, SETUP_BAND_PILL_CLASS } from "@/lib/company-setup-checklist";
 import type { SetupItemStatus, SetupItemView, SetupPriority } from "@/lib/company-setup-checklist";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_LABEL: Record<SetupItemStatus, string> = {
-  OPEN: "Open",
-  IN_PROGRESS: "In progress",
-  BLOCKED: "Blocked",
-  WAITING: "Waiting",
-  DONE: "Done",
-  CANCELLED: "Cancelled",
-  NOT_STARTED: "Not started"
-};
 
 // Secondary one-click transitions offered for an item that is not yet done.
 const SECONDARY_STATUSES: { status: SetupItemStatus; label: string }[] = [
@@ -79,7 +70,7 @@ function SetupItemRow({ item }: { item: SetupItemView }) {
             <p className={`font-semibold ${item.done ? "text-command-muted line-through" : "text-command-ink"}`}>
               {item.title}
             </p>
-            <span className={statusPillClass(item.status)}>{STATUS_LABEL[item.status]}</span>
+            <span className={statusPillClass(item.status)}>{setupItemStatusLabel(item.status)}</span>
           </div>
           <p className="muted mt-1">{item.description}</p>
           {!item.done ? (
@@ -91,6 +82,11 @@ function SetupItemRow({ item }: { item: SetupItemView }) {
             <span className={priorityPillClass(item.priority)}>{item.priority}</span>
             <span className="meta-pill">{item.companyFunction}</span>
             {item.sensitive ? <span className="meta-pill">Sensitive</span> : null}
+            {!item.done && item.overdue ? <span className="status-pill status-high">Overdue</span> : null}
+            {!item.done && !item.overdue && item.dueSoon ? <span className="status-pill status-draft">Due soon</span> : null}
+            {!item.done && item.dueAt ? (
+              <span className="meta-pill">Due {new Date(item.dueAt).toISOString().slice(0, 10)}</span>
+            ) : null}
           </div>
           {!item.done ? (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -99,7 +95,7 @@ function SetupItemRow({ item }: { item: SetupItemView }) {
                   className="button button-secondary px-3 py-1 text-xs"
                   itemKey={item.key}
                   key={option.status}
-                  label={`Set ${item.title} to ${STATUS_LABEL[option.status]}`}
+                  label={`Set ${item.title} to ${setupItemStatusLabel(option.status)}`}
                   status={option.status}
                 >
                   {option.label}
@@ -115,6 +111,7 @@ function SetupItemRow({ item }: { item: SetupItemView }) {
 
 export default async function SetupPage() {
   const summary = await getCompanySetupData();
+  const readiness = buildSetupReadiness(summary);
 
   return (
     <div className="space-y-6">
@@ -136,14 +133,20 @@ export default async function SetupPage() {
             <h2>
               {summary.done} of {summary.total} done
             </h2>
-            <p className="muted mt-1">
-              {summary.inProgress} in progress &middot; {summary.notStarted} not started
-            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="meta-pill">{summary.inProgress} in progress</span>
+              <span className="meta-pill">{summary.notStarted} not started</span>
+              {summary.overdue > 0 ? <span className="status-pill status-high">{summary.overdue} overdue</span> : null}
+              {summary.dueSoon > 0 ? <span className="status-pill status-draft">{summary.dueSoon} due soon</span> : null}
+            </div>
           </div>
-          <span className="status-pill status-approved text-base">{summary.percentComplete}%</span>
+          <div className="text-right">
+            <span className={`${SETUP_BAND_PILL_CLASS[readiness.band]} text-base`}>{readiness.score}% ready</span>
+            <p className="muted mt-1 text-xs">{readiness.band}</p>
+          </div>
         </div>
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${summary.percentComplete}%` }} />
+          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${readiness.score}%` }} />
         </div>
       </section>
 

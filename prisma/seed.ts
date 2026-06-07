@@ -1,13 +1,11 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient, Priority, UserRole } from "@prisma/client";
-import { COMPANY_SETUP_CHECKLIST } from "../src/lib/company-setup-checklist";
+import { COMPANY_SETUP_CHECKLIST, SETUP_CHECKLIST_STREAM, setupDueDate } from "../src/lib/company-setup-checklist";
 import {
   launchpadSystemKey,
   loadLaunchpadSystemMetadata,
   type LaunchpadSystemMetadata
 } from "../src/lib/launchpad-system-metadata";
-
-const SETUP_CHECKLIST_STREAM = "Company Core";
 
 const prisma = new PrismaClient();
 
@@ -88,6 +86,7 @@ async function seedCompanySetupChecklist(adminId: string) {
   const stream = await prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } });
   const functions = await prisma.companyFunction.findMany();
   const functionIdByName = new Map(functions.map((fn) => [fn.name, fn.id]));
+  const seededAt = new Date();
 
   for (const item of COMPANY_SETUP_CHECKLIST) {
     const existing = await prisma.action.findFirst({ where: { title: item.title } });
@@ -101,6 +100,7 @@ async function seedCompanySetupChecklist(adminId: string) {
         priority: item.priority as Priority,
         nextStep: item.nextStep,
         sensitive: item.sensitive,
+        dueAt: setupDueDate(item, seededAt),
         streamId: stream?.id,
         companyFunctionId: functionIdByName.get(item.companyFunction),
         createdById: adminId

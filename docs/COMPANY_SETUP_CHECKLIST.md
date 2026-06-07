@@ -12,6 +12,20 @@ flows into the Today board, the Actions register, and the weekly review. The
 weekly review page and the local "weekly review prep" draft both surface the
 highest-priority outstanding setup items so nothing critical drifts.
 
+### How progress is measured
+
+- **Recommended due dates.** Each item is seeded with a due date based on a
+  priority-driven horizon (critical 14 days, high 30, medium 45, low 60), so the
+  work lands as a realistic staggered schedule. Due dates flow into the Today
+  board's overdue / due-today / upcoming lanes, and items can go **overdue** or
+  **due soon** (within 14 days).
+- **Weighted readiness score.** The headline `/setup` and Today-board number is
+  priority-weighted (critical counts 8x a low item), so clearing one critical
+  obligation moves the needle more than ticking several minor items.
+- **Readiness band.** *Foundational gaps* (any unfinished critical item or
+  weighted score under 50), *Operating*, or *Scale-ready* (85%+ weighted, no
+  overdue, no critical/high gaps).
+
 > **Not formal advice.** This is operational scaffolding to help you track
 > setup, not legal, tax, insurance, or regulatory advice. Confirm specifics with
 > your accountant, your solicitor (or Lawpath), and your insurer.
@@ -101,3 +115,8 @@ The cockpit `/setup` page is generated from the checklist definition. To add,
 remove, or reword an item, edit `src/lib/company-setup-checklist.ts` and re-run
 `pnpm db:seed` (seeding is idempotent and never overwrites a tracked action's
 status). Update this document to match.
+
+Checklist items are linked to their tracked Actions **by title**. Do not rename
+a seeded setup action from the generic Actions screen: the `/setup` page would
+no longer recognise it (showing the item as not started) and a later seed or
+tick could create a duplicate. Reword items in the checklist definition instead.

@@ -84,12 +84,13 @@ export function buildWeeklyReviewPrepDraft({
     `- Stale open actions: ${staleActions.length}`,
     `- Open risks in review window: ${dueRisks.length}`,
     `- Renewals due or missing owner/cost: ${launchpadHealth.renewalsDue.length + launchpadHealth.missingOwners + launchpadHealth.missingCosts}`,
-    ...(setup ? [`- Company setup complete: ${setup.percentComplete}% (${setup.criticalOutstanding} high-priority items outstanding)`] : []),
+    ...(setup ? [`- Company setup readiness: ${setup.score}% (${setup.band}, ${setup.overdue} overdue, ${setup.criticalOutstanding} high-priority outstanding)`] : []),
     "",
     ...(setup
       ? [
         "Company setup",
-        `- Progress: ${setup.percentComplete}% (${setup.done}/${setup.total} done, ${setup.inProgress} in progress, ${setup.notStarted} not started).`,
+        `- Readiness: ${setup.score}% weighted (${setup.band}).`,
+        `- Progress: ${setup.percentComplete}% (${setup.done}/${setup.total} done, ${setup.inProgress} in progress, ${setup.notStarted} not started, ${setup.overdue} overdue, ${setup.dueSoon} due soon).`,
         "Outstanding setup items",
         ...formatSetupList(setup.outstanding),
         ""
@@ -205,10 +206,14 @@ function buildSuggestedDraftActions({
 
 function formatSetupList(items: OutstandingSetupItem[]) {
   if (items.length === 0) return ["- None outstanding. Company setup checklist is complete."];
-  return items.map(
-    (item) =>
-      `- ${item.title} (${priorityLabel(item.priority)}, ${setupItemStatusLabel(item.status)}, ${item.category}).`
-  );
+  return items.map((item) => {
+    const timing = item.overdue
+      ? "overdue"
+      : item.dueAt
+        ? `due ${dateKey(new Date(item.dueAt))}`
+        : "no due date";
+    return `- ${item.title} (${priorityLabel(item.priority)}, ${setupItemStatusLabel(item.status)}, ${timing}, ${item.category}).`;
+  });
 }
 
 function formatActionList(actions: WeeklyReviewPrepAction[]) {
