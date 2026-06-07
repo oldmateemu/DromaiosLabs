@@ -3,9 +3,12 @@
 12 posts, ~3/week, written to the guardrail's Default Posting Formula: start with a real
 operational problem → connect to practical infrastructure → keep claims close to evidence.
 
+<!-- guardrail:ignore-start -->
 **Compliance check applied to every post:** no clinical/outcome/TGA claims, no unmeasured
 savings, no ClinicBoss feature detail, no "trusted by clinics," no final-brand certainty.
 ClinicBoss appears only as "a working product stream." All sit in the guardrail's Green zone.
+Verified by `scripts/strategy-guardrail-check.mjs`.
+<!-- guardrail:ignore-end -->
 
 Voice: founder-led, human, specific, never inflated. Each post ends with a light engagement
 prompt, not a hard sell. Rotate post types so the feed doesn't feel repetitive.

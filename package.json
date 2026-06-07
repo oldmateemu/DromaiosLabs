@@ -16,7 +16,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "deploy:preflight": "node scripts/deployment-preflight.mjs",
-    "smoke:compose": "docker compose config"
+    "smoke:compose": "docker compose config",
+    "check:strategy": "node scripts/strategy-guardrail-check.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

@@ -261,7 +261,8 @@ These turn the strategy into action. All written to the guardrail.
 
 - **Lead magnet:** `lead-magnet-safety-compliance-self-assessment.md` — the free, email-gated
   self-assessment (rung 0) that also frames the discovery conversation.
-- **LinkedIn posts:** `linkedin-posts-batch-1.md` — first 4 weeks (12 posts) for the authority engine.
+- **LinkedIn posts:** `linkedin-posts-batch-1.md` and `linkedin-posts-batch-2.md` — weeks 1–8
+  (24 posts) for the authority engine.
 - **Outreach templates:** `outreach-templates-tier1.md` — LinkedIn, email, partnership, and
   follow-up scripts for Tier-1 warm outreach, plus discovery-call prep.
 - **Email nurture sequence:** `email-nurture-sequence.md` — 6-email post-download sequence + the
@@ -270,3 +271,20 @@ These turn the strategy into action. All written to the guardrail.
   with a repurposing checklist.
 - **Rung-1 workshop package:** `workshop-package-rung1.md` — the first paid offer ("The First 30
   Seconds"): run sheet, pricing posture, sell sheet, and proposal template.
+- **Partnership & webinar kit:** `webinar-partnership-kit.md` — the volume play: partner pitch,
+  webinar slide outline + speaker notes, registration/follow-up flow, and run-of-show checklist.
+- **Operating cadence checklist:** `operating-cadence-checklist.md` — daily/weekly/monthly actions
+  mapped to the cockpit, the scoreboard, and a Friday self-check.
+
+### Guardrail enforcement (tested)
+
+Public-facing copy is checked mechanically against `Dromaios_Labs_public_posting_guardrail.md`:
+
+- **Linter:** `scripts/strategy-guardrail-check.mjs` — fails on Red-list claims (clinical, outcome,
+  TGA/SaMD, quantified savings, overclaim) and surfaces Amber language for review. Meta passages
+  that quote the avoid-lists are exempted with `<!-- guardrail:ignore-start/-end -->` markers.
+- **Run it:** `pnpm check:strategy` (or `node scripts/strategy-guardrail-check.mjs`).
+- **Tests:** `scripts/strategy-guardrail-check.test.mjs` (run via `pnpm test:run-flow`) — 9 tests
+  covering Red detection, Amber surfacing, ignore markers, line accuracy, and a scan of every
+  shipped public-content file.
+- **Cadence:** run the linter before any public content ships (see the operating cadence checklist).
