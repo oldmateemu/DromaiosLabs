@@ -267,12 +267,18 @@ These turn the strategy into action. All written to the guardrail.
   follow-up scripts for Tier-1 warm outreach, plus discovery-call prep.
 - **Email nurture sequence:** `email-nurture-sequence.md` — 6-email post-download sequence + the
   ongoing fortnightly list email.
-- **Owned articles:** `article-first-30-seconds.md` and `article-documentation-lottery.md` — pillar
-  content the posts and emails orbit, each with a repurposing checklist.
+- **Owned articles:** `article-first-30-seconds.md`, `article-documentation-lottery.md`, and
+  `article-consistency-across-sites.md` — pillar content the posts and emails orbit, each with a
+  repurposing checklist.
 - **Rung-1 workshop package:** `workshop-package-rung1.md` — the first paid offer ("The First 30
   Seconds"): run sheet, pricing posture, sell sheet, and proposal template.
 - **Rung-2 team program:** `offer-rung2-team-program.md` — the recurring-revenue offer ("Safer Teams
   Program"): 12-week Set→Practise→Embed→Lock-in structure, pricing posture, sell sheet, proposal.
+- **Rung-3 annual partnership:** `offer-rung3-annual-partnership.md` — the annual anchor ("Safer Care
+  Partnership"): quarterly refreshers, onboarding-into-the-standard, standard upkeep, sell sheet,
+  proposal.
+- **Content calendar:** `content-calendar.md` — a 16-week run sheet sequencing all 48 posts, 3
+  articles, the email sequence, the webinar, and the three offer rungs into a weekly schedule.
 - **Testimonial & case-note template:** `testimonial-and-case-note-template.md` — careful-claims-safe
   social proof: consent, collection questions, Green/Amber/Red claims guide, and a pre-publish check.
 - **Partnership & webinar kit:** `webinar-partnership-kit.md` — the volume play: partner pitch,
