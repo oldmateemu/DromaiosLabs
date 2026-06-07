@@ -564,7 +564,9 @@ export async function getSalesPipelineData() {
         status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
       },
       include: { stream: true },
-      orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+      // priority desc so the take limit keeps the highest-priority deals: the
+      // Priority enum is declared LOW..CRITICAL, so desc returns CRITICAL first.
+      orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
       take: 50
     }),
     prisma.launchpadLink.findFirst({ where: { name: "HubSpot" } })

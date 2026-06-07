@@ -1,3 +1,5 @@
+import { dateKey, dueValue, priorityWeight } from "./domain";
+
 // Lightweight sales pipeline command-view for the cockpit.
 //
 // HubSpot is the CRM system of record for leads, deals, and contacts. The
@@ -87,13 +89,6 @@ export type SalesPipelineSummary = {
   followUps: SalesFollowUp[];
 };
 
-const PRIORITY_WEIGHT: Record<SalesActionLike["priority"], number> = {
-  CRITICAL: 0,
-  HIGH: 1,
-  MEDIUM: 2,
-  LOW: 3
-};
-
 /**
  * Summarises the cockpit's active sales follow-up actions. Done/cancelled work
  * is excluded; the remaining items are sorted by priority then soonest due, and
@@ -121,7 +116,7 @@ export function summariseSalesPipeline(actions: SalesActionLike[], now: Date = n
     })
     .sort(
       (a, b) =>
-        PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority] ||
+        priorityWeight[a.priority] - priorityWeight[b.priority] ||
         dueValue(a.dueAt) - dueValue(b.dueAt) ||
         a.title.localeCompare(b.title)
     );
@@ -135,12 +130,4 @@ export function summariseSalesPipeline(actions: SalesActionLike[], now: Date = n
     overdue: followUps.filter((followUp) => followUp.overdue).length,
     followUps
   };
-}
-
-function dueValue(dueAt: Date | string | null) {
-  return dueAt ? new Date(dueAt).getTime() : Number.MAX_SAFE_INTEGER;
-}
-
-function dateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
 }

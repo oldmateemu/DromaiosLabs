@@ -1,3 +1,5 @@
+import { addDays, dateKey, dueValue, priorityWeight } from "./domain";
+
 // Company setup checklist definition for Dromaios Labs.
 //
 // This is the source of truth for "what does the company still need to set up".
@@ -598,13 +600,6 @@ export type OutstandingSetupItem = {
   dueSoon: boolean;
 };
 
-const PRIORITY_WEIGHT: Record<SetupPriority, number> = {
-  CRITICAL: 0,
-  HIGH: 1,
-  MEDIUM: 2,
-  LOW: 3
-};
-
 // Higher weight = more readiness credit when complete. Weighting the readiness
 // score by priority means clearing one critical obligation moves the needle
 // more than ticking several low-priority items.
@@ -653,7 +648,7 @@ export function selectOutstandingSetupItems(
     .sort(
       (a, b) =>
         Number(b.overdue) - Number(a.overdue) ||
-        PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority] ||
+        priorityWeight[a.priority] - priorityWeight[b.priority] ||
         dueValue(a.dueAt) - dueValue(b.dueAt) ||
         STATUS_WEIGHT[a.status] - STATUS_WEIGHT[b.status] ||
         a.title.localeCompare(b.title)
@@ -773,18 +768,4 @@ export function buildSetupDraftContext(summary: SetupChecklistSummary, limit = 6
 export function setupItemStatusLabel(status: SetupItemStatus) {
   const text = status.replace(/_/g, " ").toLowerCase();
   return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function dueValue(dueAt: Date | string | null) {
-  return dueAt ? new Date(dueAt).getTime() : Number.MAX_SAFE_INTEGER;
-}
-
-function addDays(date: Date, days: number) {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function dateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
 }
