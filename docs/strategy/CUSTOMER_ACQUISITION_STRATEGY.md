@@ -252,3 +252,15 @@ turning, measure conversion, then scale the channels that convert.
   long-term medtech direction.
 - **Never overclaim.** In healthcare, credibility is part of the product — and it's also the
   acquisition strategy.
+
+---
+
+## 12. Ready-to-use assets
+
+These turn the strategy into action. All written to the guardrail.
+
+- **Lead magnet:** `lead-magnet-safety-compliance-self-assessment.md` — the free, email-gated
+  self-assessment (rung 0) that also frames the discovery conversation.
+- **LinkedIn posts:** `linkedin-posts-batch-1.md` — first 4 weeks (12 posts) for the authority engine.
+- **Outreach templates:** `outreach-templates-tier1.md` — LinkedIn, email, partnership, and
+  follow-up scripts for Tier-1 warm outreach, plus discovery-call prep.
