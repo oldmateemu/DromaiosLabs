@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    env:
+      # next build / prisma generate don't connect to a DB, but some modules
+      # read env at import time. Provide safe non-secret placeholders for CI.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      SESSION_SECRET: ci-placeholder-session-secret-not-real-value
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Flow tests
+        run: pnpm test:run-flow
+
+      - name: Build
+        run: pnpm build
+
+      - name: Deployment preflight (local mode)
+        run: pnpm deploy:preflight
