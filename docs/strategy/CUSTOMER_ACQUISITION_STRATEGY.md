@@ -264,3 +264,9 @@ These turn the strategy into action. All written to the guardrail.
 - **LinkedIn posts:** `linkedin-posts-batch-1.md` — first 4 weeks (12 posts) for the authority engine.
 - **Outreach templates:** `outreach-templates-tier1.md` — LinkedIn, email, partnership, and
   follow-up scripts for Tier-1 warm outreach, plus discovery-call prep.
+- **Email nurture sequence:** `email-nurture-sequence.md` — 6-email post-download sequence + the
+  ongoing fortnightly list email.
+- **Owned article #1:** `article-first-30-seconds.md` — pillar content the posts and emails orbit,
+  with a repurposing checklist.
+- **Rung-1 workshop package:** `workshop-package-rung1.md` — the first paid offer ("The First 30
+  Seconds"): run sheet, pricing posture, sell sheet, and proposal template.
