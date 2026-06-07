@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   checkContent,
   checkFiles,
-  PUBLIC_CONTENT_FILES,
+  listPublicFiles,
+  INTERNAL_FILES,
   RED_RULES,
   AMBER_RULES
 } from "./strategy-guardrail-check.mjs";
@@ -104,8 +105,19 @@ test("rule tables are well-formed (unique ids, real regexes)", () => {
   }
 });
 
+test("file discovery is fail-closed (scans all copy, excludes internal docs)", () => {
+  const files = listPublicFiles();
+  // Known public copy is included.
+  assert.ok(files.includes("article-first-30-seconds.md"));
+  assert.ok(files.includes("linkedin-posts-batch-1.md"));
+  // Internal planning docs are excluded (they quote the avoid-lists).
+  for (const internal of INTERNAL_FILES) {
+    assert.ok(!files.includes(internal), `${internal} must not be scanned`);
+  }
+});
+
 test("all shipped public-content files pass the Red-list check", () => {
   const { ok, red, scanned } = checkFiles();
-  assert.equal(scanned.length, PUBLIC_CONTENT_FILES.length);
+  assert.ok(scanned.length >= 8, `expected to scan the public copy, scanned ${scanned.length}`);
   assert.equal(ok, true, `Red-list violations found:\n${JSON.stringify(red, null, 2)}`);
 });

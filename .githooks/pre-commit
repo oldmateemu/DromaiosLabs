@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#
+# Dromaios Labs pre-commit hook.
+# Enforces the public-posting guardrail on outward-facing acquisition copy before
+# it can be committed. Version-controlled and activated via:
+#
+#   git config core.hooksPath .githooks
+#
+# (run once per clone; see docs/strategy/operating-cadence-checklist.md).
+#
+# Behaviour: if any strategy copy or the guardrail tooling is staged, run the
+# guardrail linter. A Red-list violation blocks the commit. Bypass in a genuine
+# emergency with `git commit --no-verify`.
+
+set -euo pipefail
+
+# Only run when relevant files are staged, so unrelated commits stay fast.
+staged=$(git diff --cached --name-only --diff-filter=ACM || true)
+
+needs_check=false
+while IFS= read -r file; do
+  case "$file" in
+    docs/strategy/*.md|scripts/strategy-guardrail-check.mjs|scripts/strategy-guardrail-check.test.mjs)
+      needs_check=true
+      ;;
+  esac
+done <<< "$staged"
+
+if [ "$needs_check" = false ]; then
+  exit 0
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "pre-commit: node not found; skipping guardrail check." >&2
+  exit 0
+fi
+
+echo "pre-commit: running guardrail check on strategy copy..."
+if ! node scripts/strategy-guardrail-check.mjs; then
+  echo "" >&2
+  echo "pre-commit: guardrail check FAILED — commit blocked." >&2
+  echo "Fix the Red-list items above, or wrap quoted avoid-lists in" >&2
+  echo "<!-- guardrail:ignore-start --> ... <!-- guardrail:ignore-end --> markers." >&2
+  echo "Emergency bypass (discouraged): git commit --no-verify" >&2
+  exit 1
+fi
+
+# If the tooling itself changed, also run its tests.
+if echo "$staged" | grep -q "scripts/strategy-guardrail-check"; then
+  echo "pre-commit: guardrail tooling changed — running its tests..."
+  node --test scripts/strategy-guardrail-check.test.mjs
+fi
+
+exit 0

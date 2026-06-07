@@ -261,8 +261,9 @@ These turn the strategy into action. All written to the guardrail.
 
 - **Lead magnet:** `lead-magnet-safety-compliance-self-assessment.md` — the free, email-gated
   self-assessment (rung 0) that also frames the discovery conversation.
-- **LinkedIn posts:** `linkedin-posts-batch-1.md` and `linkedin-posts-batch-2.md` — weeks 1–8
-  (24 posts) for the authority engine.
+- **LinkedIn posts:** `linkedin-posts-batch-1.md`, `linkedin-posts-batch-2.md`, and
+  `linkedin-posts-batch-3.md` — weeks 1–12 (36 posts) for the authority engine, shifting from
+  awareness toward conversion across the batches.
 - **Outreach templates:** `outreach-templates-tier1.md` — LinkedIn, email, partnership, and
   follow-up scripts for Tier-1 warm outreach, plus discovery-call prep.
 - **Email nurture sequence:** `email-nurture-sequence.md` — 6-email post-download sequence + the
@@ -284,6 +285,10 @@ Public-facing copy is checked mechanically against `Dromaios_Labs_public_posting
   TGA/SaMD, quantified savings, overclaim) and surfaces Amber language for review. Meta passages
   that quote the avoid-lists are exempted with `<!-- guardrail:ignore-start/-end -->` markers.
 - **Run it:** `pnpm check:strategy` (or `node scripts/strategy-guardrail-check.mjs`).
+- **Pre-commit hook:** `.githooks/pre-commit` runs the linter automatically when strategy copy is
+  staged and blocks the commit on a Red-list violation. Activate once per clone with
+  `git config core.hooksPath .githooks`. The linter is **fail-closed** — every new `docs/strategy`
+  copy file is scanned by default (only the internal planning docs are excluded).
 - **Tests:** `scripts/strategy-guardrail-check.test.mjs` (run via `pnpm test:run-flow`) — 9 tests
   covering Red detection, Amber surfacing, ignore markers, line accuracy, and a scan of every
   shipped public-content file.

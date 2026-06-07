@@ -13,25 +13,28 @@
 //   <!-- guardrail:ignore-start --> ... <!-- guardrail:ignore-end -->   (block)
 //   <anything> <!-- guardrail:allow --></anything>                       (single line)
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STRATEGY_DIR = resolve(HERE, "..", "docs", "strategy");
 
-// Outward-facing copy only. Internal docs (the strategy itself, the operating
-// cadence checklist) are intentionally not scanned: they quote the avoid-lists.
-export const PUBLIC_CONTENT_FILES = [
-  "lead-magnet-safety-compliance-self-assessment.md",
-  "linkedin-posts-batch-1.md",
-  "linkedin-posts-batch-2.md",
-  "email-nurture-sequence.md",
-  "article-first-30-seconds.md",
-  "workshop-package-rung1.md",
-  "outreach-templates-tier1.md",
-  "webinar-partnership-kit.md"
-];
+// Fail-closed: every markdown file in docs/strategy is treated as outward-facing
+// copy and scanned, EXCEPT these internal planning docs, which legitimately quote
+// the avoid-lists. Adding a new copy file requires no config change — it is checked
+// automatically. Adding a new INTERNAL doc here is a deliberate, reviewable act.
+export const INTERNAL_FILES = new Set([
+  "CUSTOMER_ACQUISITION_STRATEGY.md",
+  "operating-cadence-checklist.md"
+]);
+
+/** Discover the public-content files to scan (all *.md minus INTERNAL_FILES). */
+export function listPublicFiles(baseDir = STRATEGY_DIR) {
+  return readdirSync(baseDir)
+    .filter((name) => name.endsWith(".md") && !INTERNAL_FILES.has(name))
+    .sort();
+}
 
 // RED: must never appear in published copy (guardrail "Red" + "Avoid unless approved").
 export const RED_RULES = [
@@ -121,7 +124,7 @@ function makeFinding(fileName, lineNumber, rule, matchText, line) {
  * Scan the configured public-content files (or an explicit list).
  * @returns {{ok: boolean, red: Finding[], amber: Finding[], scanned: string[]}}
  */
-export function checkFiles(files = PUBLIC_CONTENT_FILES, baseDir = STRATEGY_DIR) {
+export function checkFiles(files = listPublicFiles(), baseDir = STRATEGY_DIR) {
   const red = [];
   const amber = [];
   const scanned = [];

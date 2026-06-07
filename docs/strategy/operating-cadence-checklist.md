@@ -7,6 +7,10 @@ is the "make it actually happen" layer — the strategy is only worth what gets 
 Each item is phrased as a checkable action so it can be pasted straight into the cockpit's
 sales/marketing functions as recurring tasks.
 
+> **One-time setup (per clone):** activate the guardrail pre-commit hook with
+> `git config core.hooksPath .githooks`. After that, any commit touching strategy copy is checked
+> automatically and blocked on a Red-list violation.
+
 ---
 
 ## Daily (≈30–45 min, on the Today Command Board)
