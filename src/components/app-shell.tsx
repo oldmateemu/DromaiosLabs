@@ -6,6 +6,7 @@ import {
   Link as LinkIcon,
   LogOut,
   Repeat,
+  Scale,
   ShieldCheck
 } from "lucide-react";
 import { logoutAction } from "@/app/actions";
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/reviews", label: "Reviews", icon: ShieldCheck },
   { href: "/assistant", label: "Assistant", icon: Bot },
   { href: "/automations", label: "Automations", icon: Repeat },
+  { href: "/comparison", label: "Comparison", icon: Scale },
   { href: "/docs", label: "AI Docs", icon: FileText }
 ];
 
