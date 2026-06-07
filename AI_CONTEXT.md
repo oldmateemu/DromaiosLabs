@@ -11,12 +11,13 @@ Operating surfaces:
 - Today shows the command brief, focus set, a Company Pulse (weekly completions, overdue load, open risks, automation success rate, tracked spend), the top streams needing attention, and a one-click operating digest download.
 - Portfolio (`/portfolio`) rolls every stream up into an attention-ranked operating-health view; cards link to that stream's filtered actions.
 - Actions have detail pages (`/actions/[id]`) for inline editing and to see linked risks, decisions, and the action's origin (draft, automation, review, launchpad).
+- Launchpad (`/launchpad`) includes a renewals + spend forecast: upcoming renewals grouped by month with cost totals, overdue renewals, and untracked-cost gaps.
 - Governance (`/governance`) manages the risk register and decision log directly.
 - Automations include a cross-loop run history with success/failure/blocked counts.
 - A command palette (Cmd/Ctrl+K) jumps to any page, open action, or launchpad system.
 - `/digest` returns a board/records-ready Markdown operating digest (auth-gated download).
 
-Pure, unit-tested operating-intelligence helpers live in `src/lib`: `company-pulse`, `stream-portfolio`, `automation-history`, and `operating-digest`. Keep new aggregation logic in pure helpers with tests, and assemble data in `src/lib/services.ts`.
+Pure, unit-tested operating-intelligence helpers live in `src/lib`: `company-pulse`, `stream-portfolio`, `automation-history`, `renewal-calendar`, and `operating-digest`. Keep new aggregation logic in pure helpers with tests, and assemble data in `src/lib/services.ts`.
 
 ## Read First
 

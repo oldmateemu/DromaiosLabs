@@ -25,6 +25,12 @@ export type DigestRenewal = {
   renewalKey?: string | null;
 };
 
+export type DigestRenewalForecast = {
+  total: number;
+  count: number;
+  monthsAhead: number;
+};
+
 export type OperatingDigestInput = {
   generatedAt?: Date;
   pulse: CompanyPulse;
@@ -33,6 +39,7 @@ export type OperatingDigestInput = {
   openRisks: DigestRisk[];
   recentDecisions: DigestDecision[];
   renewalsDue: DigestRenewal[];
+  renewalForecast?: DigestRenewalForecast;
 };
 
 /**
@@ -46,7 +53,8 @@ export function buildOperatingDigest({
   topActions,
   openRisks,
   recentDecisions,
-  renewalsDue
+  renewalsDue,
+  renewalForecast
 }: OperatingDigestInput): string {
   const lines: string[] = [];
   const stamp = generatedAt.toISOString().slice(0, 10);
@@ -104,6 +112,13 @@ export function buildOperatingDigest({
 
   lines.push("## Upcoming renewals");
   lines.push("");
+  if (renewalForecast && renewalForecast.count > 0) {
+    lines.push(
+      `_Forecast: $${formatAmount(renewalForecast.total)} across ${renewalForecast.count} ` +
+        `${renewalForecast.count === 1 ? "renewal" : "renewals"} in the next ${renewalForecast.monthsAhead} months._`
+    );
+    lines.push("");
+  }
   if (renewalsDue.length === 0) {
     lines.push("_No renewals need attention._");
   } else {
@@ -126,4 +141,8 @@ export function buildOperatingDigest({
   lines.push("");
 
   return lines.join("\n");
+}
+
+function formatAmount(value: number) {
+  return value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }

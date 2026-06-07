@@ -16,6 +16,7 @@ import { summariseAutomationRuns } from "./automation-history";
 import { buildCompanyPulse } from "./company-pulse";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import { buildOperatingDigest } from "./operating-digest";
+import { buildRenewalCalendar } from "./renewal-calendar";
 import { buildStreamPortfolio } from "./stream-portfolio";
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
@@ -663,8 +664,12 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
 }
 
 export async function getOperatingDigest() {
-  const data = await getTodayData();
+  const [data, renewalLinks] = await Promise.all([
+    getTodayData(),
+    prisma.launchpadLink.findMany({ select: { id: true, name: true, group: true, cost: true, renewalAt: true, riskLevel: true } })
+  ]);
   const closed = new Set(["CLOSED", "RESOLVED", "DONE"]);
+  const calendar = buildRenewalCalendar({ links: renewalLinks });
 
   const active = [
     ...data.buckets.overdue,
@@ -688,9 +693,9 @@ export async function getOperatingDigest() {
 
   const recentDecisions = data.decisions.map((decision) => ({ decision: decision.decision, decidedAt: decision.decidedAt }));
 
-  const renewalsDue = [...data.launchpadHealth.renewalsDue, ...data.launchpadHealth.renewalsSoon].map((link) => ({
-    name: link.name
-  }));
+  const renewalsDue = [...calendar.overdue, ...calendar.months.flatMap((month) => month.items)]
+    .slice(0, 12)
+    .map((item) => ({ name: item.name, renewalKey: item.renewalKey }));
 
   return buildOperatingDigest({
     generatedAt: new Date(),
@@ -699,7 +704,8 @@ export async function getOperatingDigest() {
     topActions,
     openRisks,
     recentDecisions,
-    renewalsDue
+    renewalsDue,
+    renewalForecast: { total: calendar.windowTotal, count: calendar.windowCount, monthsAhead: calendar.monthsAhead }
   });
 }
 

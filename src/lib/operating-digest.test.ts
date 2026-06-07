@@ -43,7 +43,8 @@ describe("buildOperatingDigest", () => {
       topActions: [{ title: "Renew domain", status: "OPEN", priority: "HIGH", streamName: "Company Core", dueKey: "2026-06-05" }],
       openRisks: [{ issue: "Renewal lapse", severity: "HIGH", status: "OPEN" }],
       recentDecisions: [{ decision: "Stay local-first", decidedAt: "2026-05-29T00:00:00.000Z" }],
-      renewalsDue: [{ name: "Xero", renewalKey: "2026-06-10" }]
+      renewalsDue: [{ name: "Xero", renewalKey: "2026-06-10" }],
+      renewalForecast: { total: 1200, count: 5, monthsAhead: 6 }
     });
 
     expect(digest).toContain("# Dromaios Labs — Operating Digest");
@@ -53,6 +54,7 @@ describe("buildOperatingDigest", () => {
     expect(digest).toContain("- [ ] Renew domain (HIGH · Company Core · due 2026-06-05)");
     expect(digest).toContain("**HIGH** — Renewal lapse (OPEN)");
     expect(digest).toContain("Xero — 2026-06-10");
+    expect(digest).toContain("Forecast: $1,200 across 5 renewals in the next 6 months.");
     expect(digest).toContain("Stay local-first (2026-05-29)");
   });
 
