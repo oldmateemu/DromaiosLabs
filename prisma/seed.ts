@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient, UserRole } from "@prisma/client";
+import { ActionSource, ActionStatus, PrismaClient, Priority, UserRole } from "@prisma/client";
 import {
   launchpadSystemKey,
   loadLaunchpadSystemMetadata,
   type LaunchpadSystemMetadata
 } from "../src/lib/launchpad-system-metadata";
+import { phase0AuthorityTrustChecklist } from "../src/lib/strategy-checklist";
 
 const prisma = new PrismaClient();
 
@@ -39,7 +40,7 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-  await prisma.user.upsert({
+  const adminUser = await prisma.user.upsert({
     where: { email: adminEmail },
     update: { name: adminName, passwordHash, role: UserRole.ADMIN },
     create: { email: adminEmail, name: adminName, passwordHash, role: UserRole.ADMIN }
@@ -76,6 +77,38 @@ async function main() {
     } else {
       await prisma.launchpadLink.create({ data: metadataForCreate(system) });
     }
+  }
+
+  await seedStrategyChecklist(adminUser.id);
+}
+
+async function seedStrategyChecklist(adminUserId: string) {
+  const [streamRecords, functionRecords] = await Promise.all([
+    prisma.stream.findMany(),
+    prisma.companyFunction.findMany()
+  ]);
+  const streamByName = new Map(streamRecords.map((stream) => [stream.name, stream.id]));
+  const functionByName = new Map(functionRecords.map((fn) => [fn.name, fn.id]));
+
+  for (const item of phase0AuthorityTrustChecklist) {
+    const existing = await prisma.action.findFirst({
+      where: { title: item.title, source: ActionSource.USER }
+    });
+    if (existing) continue;
+
+    await prisma.action.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        nextStep: item.nextStep,
+        priority: item.priority as Priority,
+        status: ActionStatus.OPEN,
+        source: ActionSource.USER,
+        streamId: streamByName.get(item.stream) ?? null,
+        companyFunctionId: functionByName.get(item.companyFunction) ?? null,
+        createdById: adminUserId
+      }
+    });
   }
 }
 

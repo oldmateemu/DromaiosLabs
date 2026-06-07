@@ -222,6 +222,11 @@ up only when the prior rung's proof exists.
 Leading indicators: consistent posting streak; first advisor confirmed; first inbound
 "tell me more" from a healthcare leader.
 
+Phase 0 is operationalised in the cockpit: it is seeded as tracked `Action` records
+(source USER, status OPEN) from `src/lib/strategy-checklist.ts`, so each item appears on
+the Today board and Actions register and moves through the normal action lifecycle and
+weekly governance review. Re-seeding is idempotent and will not duplicate items.
+
 ### Phase 1 - Credible presence (recognised as serious)
 
 - Membership in 1-2 industry bodies; visible participation.
