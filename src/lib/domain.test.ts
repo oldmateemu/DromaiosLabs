@@ -3,6 +3,8 @@ import {
   bucketActionsForToday,
   mapReviewAnswersToDraftActions,
   normaliseQuickCaptureDraft,
+  priorityLabel,
+  statusLabel,
   type ActionLike
 } from "./domain";
 
@@ -26,6 +28,46 @@ describe("bucketActionsForToday", () => {
     expect(buckets.waiting.map((action) => action.title)).toEqual(["Waiting on lawpath"]);
     expect(buckets.blocked.map((action) => action.title)).toEqual(["Blocked product task"]);
     expect(buckets.completed.map((action) => action.title)).toEqual(["Finished weekly review"]);
+  });
+
+  it("treats active actions without a due date as upcoming", () => {
+    const buckets = bucketActionsForToday(
+      [{ id: "1", title: "Someday research", status: "OPEN", priority: "LOW", dueAt: null }],
+      new Date("2026-05-29T09:00:00+08:00")
+    );
+
+    expect(buckets.upcoming.map((action) => action.title)).toEqual(["Someday research"]);
+  });
+
+  it("sorts each bucket by priority, then due date, with undated work last", () => {
+    const now = new Date("2026-05-29T09:00:00+08:00");
+    const actions: ActionLike[] = [
+      { id: "1", title: "Low soon", status: "OPEN", priority: "LOW", dueAt: new Date("2026-06-02") },
+      { id: "2", title: "Critical later", status: "OPEN", priority: "CRITICAL", dueAt: new Date("2026-06-10") },
+      { id: "3", title: "Critical no date", status: "OPEN", priority: "CRITICAL", dueAt: null },
+      { id: "4", title: "Critical soon", status: "OPEN", priority: "CRITICAL", dueAt: new Date("2026-06-01") }
+    ];
+
+    const buckets = bucketActionsForToday(actions, now);
+
+    expect(buckets.upcoming.map((action) => action.title)).toEqual([
+      "Critical soon",
+      "Critical later",
+      "Critical no date",
+      "Low soon"
+    ]);
+  });
+});
+
+describe("priorityLabel and statusLabel", () => {
+  it("renders human-friendly priority labels", () => {
+    expect(priorityLabel("CRITICAL")).toBe("Critical");
+    expect(priorityLabel("LOW")).toBe("Low");
+  });
+
+  it("renders human-friendly status labels including multi-word statuses", () => {
+    expect(statusLabel("OPEN")).toBe("Open");
+    expect(statusLabel("IN_PROGRESS")).toBe("In Progress");
   });
 });
 
