@@ -1,4 +1,9 @@
 import { buildLaunchpadHealth, type LaunchpadHealthLink } from "./cockpit-insights";
+import {
+  setupItemStatusLabel,
+  type OutstandingSetupItem,
+  type SetupDraftContext
+} from "./company-setup-checklist";
 import { bucketActionsForToday, priorityLabel, statusLabel, type ActionLike } from "./domain";
 
 export type LocalDraftAutomationKind = "WEEKLY_REVIEW_PREP" | "STALE_TASK_SUMMARY";
@@ -29,6 +34,7 @@ export type WeeklyReviewPrepContext = {
   risks: WeeklyReviewPrepRisk[];
   links: LaunchpadHealthLink[];
   draftsNeedingReview: number;
+  setup?: SetupDraftContext;
 };
 
 export type StaleTaskSummaryContext = {
@@ -50,7 +56,8 @@ export function buildWeeklyReviewPrepDraft({
   actions,
   risks,
   links,
-  draftsNeedingReview
+  draftsNeedingReview,
+  setup
 }: WeeklyReviewPrepContext) {
   const buckets = bucketActionsForToday(actions, now);
   const staleActions = actions
@@ -77,7 +84,17 @@ export function buildWeeklyReviewPrepDraft({
     `- Stale open actions: ${staleActions.length}`,
     `- Open risks in review window: ${dueRisks.length}`,
     `- Renewals due or missing owner/cost: ${launchpadHealth.renewalsDue.length + launchpadHealth.missingOwners + launchpadHealth.missingCosts}`,
+    ...(setup ? [`- Company setup complete: ${setup.percentComplete}% (${setup.criticalOutstanding} high-priority items outstanding)`] : []),
     "",
+    ...(setup
+      ? [
+        "Company setup",
+        `- Progress: ${setup.percentComplete}% (${setup.done}/${setup.total} done, ${setup.inProgress} in progress, ${setup.notStarted} not started).`,
+        "Outstanding setup items",
+        ...formatSetupList(setup.outstanding),
+        ""
+      ]
+      : []),
     "Priority review queue",
     ...formatActionList([...buckets.overdue, ...buckets.dueToday, ...buckets.blocked, ...buckets.waiting].slice(0, 8)),
     "",
@@ -97,6 +114,9 @@ export function buildWeeklyReviewPrepDraft({
     "Review prompts",
     "- What should be completed, deferred, cancelled, or moved into waiting before new work is started?",
     "- Which public claims, IP boundaries, or legal/trademark risks need a human check this week?",
+    ...(setup && setup.criticalOutstanding > 0
+      ? ["- Which outstanding company setup items (insurance, privacy, legal, tax) must move this week?"]
+      : []),
     "- Which assistant drafts are ready to become approved actions, and which should be rejected?",
     "",
     "Draft actions to consider",
@@ -106,7 +126,8 @@ export function buildWeeklyReviewPrepDraft({
       waitingCount: buckets.waiting.length,
       staleCount: staleActions.length,
       dueRiskCount: dueRisks.length,
-      draftsNeedingReview
+      draftsNeedingReview,
+      setupCriticalOutstanding: setup?.criticalOutstanding ?? 0
     })
   ].join("\n");
 }
@@ -160,7 +181,8 @@ function buildSuggestedDraftActions({
   waitingCount,
   staleCount,
   dueRiskCount,
-  draftsNeedingReview
+  draftsNeedingReview,
+  setupCriticalOutstanding
 }: {
   overdueCount: number;
   blockedCount: number;
@@ -168,8 +190,10 @@ function buildSuggestedDraftActions({
   staleCount: number;
   dueRiskCount: number;
   draftsNeedingReview: number;
+  setupCriticalOutstanding: number;
 }) {
   const suggestions: string[] = [];
+  if (setupCriticalOutstanding > 0) suggestions.push("- Schedule the highest-priority company setup items (e.g. insurance, privacy, tax) before new public commitments.");
   if (overdueCount > 0) suggestions.push("- Decide whether to complete, defer, or cancel overdue work.");
   if (blockedCount > 0) suggestions.push("- Pick one blocked item and name the dependency or next human decision.");
   if (waitingCount > 0) suggestions.push("- Review waiting items and capture the next follow-up date.");
@@ -177,6 +201,14 @@ function buildSuggestedDraftActions({
   if (dueRiskCount > 0) suggestions.push("- Review due risks before approving new public or operational commitments.");
   if (draftsNeedingReview > 0) suggestions.push("- Approve, reject, or rewrite pending assistant drafts.");
   return suggestions.length > 0 ? suggestions : ["- Capture one focused control, revenue, or strategy action for the week."];
+}
+
+function formatSetupList(items: OutstandingSetupItem[]) {
+  if (items.length === 0) return ["- None outstanding. Company setup checklist is complete."];
+  return items.map(
+    (item) =>
+      `- ${item.title} (${priorityLabel(item.priority)}, ${setupItemStatusLabel(item.status)}, ${item.category}).`
+  );
 }
 
 function formatActionList(actions: WeeklyReviewPrepAction[]) {

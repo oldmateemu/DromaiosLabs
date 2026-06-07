@@ -1,5 +1,7 @@
+import { CheckSquare2, Square } from "lucide-react";
+import { setSetupItemStatusAction } from "@/app/actions";
 import { getCompanySetupData } from "@/lib/services";
-import type { SetupItemStatus, SetupPriority } from "@/lib/company-setup-checklist";
+import type { SetupItemStatus, SetupItemView, SetupPriority } from "@/lib/company-setup-checklist";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,14 @@ const STATUS_LABEL: Record<SetupItemStatus, string> = {
   NOT_STARTED: "Not started"
 };
 
+// Secondary one-click transitions offered for an item that is not yet done.
+const SECONDARY_STATUSES: { status: SetupItemStatus; label: string }[] = [
+  { status: "IN_PROGRESS", label: "Start" },
+  { status: "WAITING", label: "Waiting" },
+  { status: "BLOCKED", label: "Block" },
+  { status: "OPEN", label: "Reset" }
+];
+
 function statusPillClass(status: SetupItemStatus) {
   if (status === "DONE") return "status-pill status-approved";
   if (status === "BLOCKED") return "status-pill status-high";
@@ -22,6 +32,85 @@ function statusPillClass(status: SetupItemStatus) {
 
 function priorityPillClass(priority: SetupPriority) {
   return priority === "HIGH" || priority === "CRITICAL" ? "status-pill status-high" : "meta-pill";
+}
+
+function StatusForm({
+  itemKey,
+  status,
+  className,
+  children,
+  label
+}: {
+  itemKey: string;
+  status: SetupItemStatus;
+  className: string;
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <form action={setSetupItemStatusAction}>
+      <input name="itemKey" type="hidden" value={itemKey} />
+      <input name="status" type="hidden" value={status} />
+      <button aria-label={label} className={className} title={label} type="submit">
+        {children}
+      </button>
+    </form>
+  );
+}
+
+function SetupItemRow({ item }: { item: SetupItemView }) {
+  return (
+    <article className="action-row">
+      <div className="flex items-start gap-3">
+        <StatusForm
+          className="mt-0.5 text-command-muted transition hover:text-command-green"
+          itemKey={item.key}
+          label={item.done ? `Reopen ${item.title}` : `Mark ${item.title} done`}
+          status={item.done ? "OPEN" : "DONE"}
+        >
+          {item.done ? (
+            <CheckSquare2 aria-hidden="true" className="text-command-green" size={20} />
+          ) : (
+            <Square aria-hidden="true" size={20} />
+          )}
+        </StatusForm>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <p className={`font-semibold ${item.done ? "text-command-muted line-through" : "text-command-ink"}`}>
+              {item.title}
+            </p>
+            <span className={statusPillClass(item.status)}>{STATUS_LABEL[item.status]}</span>
+          </div>
+          <p className="muted mt-1">{item.description}</p>
+          {!item.done ? (
+            <p className="mt-2 text-sm text-command-ink">
+              <span className="font-medium">Next:</span> {item.nextStep}
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className={priorityPillClass(item.priority)}>{item.priority}</span>
+            <span className="meta-pill">{item.companyFunction}</span>
+            {item.sensitive ? <span className="meta-pill">Sensitive</span> : null}
+          </div>
+          {!item.done ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {SECONDARY_STATUSES.filter((option) => option.status !== item.status).map((option) => (
+                <StatusForm
+                  className="button button-secondary px-3 py-1 text-xs"
+                  itemKey={item.key}
+                  key={option.status}
+                  label={`Set ${item.title} to ${STATUS_LABEL[option.status]}`}
+                  status={option.status}
+                >
+                  {option.label}
+                </StatusForm>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default async function SetupPage() {
@@ -35,8 +124,8 @@ export default async function SetupPage() {
           <h1>Build-Out Checklist</h1>
         </div>
         <p className="muted max-w-2xl">
-          What Dromaios Labs still needs to be legally sound, financially clean, and safely operating. Each item is a
-          tracked action &mdash; update its status from the Actions page and progress here updates automatically.
+          What Dromaios Labs still needs to be legally sound, financially clean, and safely operating. Tick items off
+          here &mdash; each one is a tracked action, so progress flows into the Today board and weekly review.
         </p>
       </div>
 
@@ -54,10 +143,7 @@ export default async function SetupPage() {
           <span className="status-pill status-approved text-base">{summary.percentComplete}%</span>
         </div>
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-emerald-500"
-            style={{ width: `${summary.percentComplete}%` }}
-          />
+          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${summary.percentComplete}%` }} />
         </div>
       </section>
 
@@ -76,28 +162,11 @@ export default async function SetupPage() {
               </span>
             </div>
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-emerald-500"
-                style={{ width: `${category.percentComplete}%` }}
-              />
+              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${category.percentComplete}%` }} />
             </div>
             <div className="mt-4 space-y-3">
               {category.items.map((item) => (
-                <article className="action-row" key={item.key}>
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-semibold text-command-ink">{item.title}</p>
-                    <span className={statusPillClass(item.status)}>{STATUS_LABEL[item.status]}</span>
-                  </div>
-                  <p className="muted mt-1">{item.description}</p>
-                  <p className="mt-2 text-sm text-command-ink">
-                    <span className="font-medium">Next:</span> {item.nextStep}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className={priorityPillClass(item.priority)}>{item.priority}</span>
-                    <span className="meta-pill">{item.companyFunction}</span>
-                    {item.sensitive ? <span className="meta-pill">Sensitive</span> : null}
-                  </div>
-                </article>
+                <SetupItemRow item={item} key={item.key} />
               ))}
             </div>
           </div>

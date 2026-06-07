@@ -12,6 +12,7 @@ import {
   createQuickCaptureDraft,
   prepareDraftAutomation,
   runAutomation,
+  setSetupItemStatus,
   updateActionStatus
 } from "@/lib/services";
 
@@ -52,6 +53,17 @@ export async function approveDraftAction(formData: FormData) {
   const user = await requireUser();
   await approveAssistantDraft(formData, user.id);
   redirect("/actions");
+}
+
+export async function setSetupItemStatusAction(formData: FormData) {
+  const user = await requireUser();
+  const itemKey = String(formData.get("itemKey") ?? "");
+  const requested = String(formData.get("status") ?? "");
+  const status = (Object.values(ActionStatus) as string[]).includes(requested)
+    ? (requested as ActionStatus)
+    : ActionStatus.OPEN;
+  await setSetupItemStatus(itemKey, status, user.id);
+  redirect("/setup");
 }
 
 export async function createLaunchpadLinkAction(formData: FormData) {

@@ -511,3 +511,90 @@ export function summariseSetupChecklist(
     percentComplete: total === 0 ? 0 : Math.round((done / total) * 100)
   };
 }
+
+export type OutstandingSetupItem = {
+  key: string;
+  title: string;
+  category: string;
+  companyFunction: string;
+  priority: SetupPriority;
+  status: SetupItemStatus;
+};
+
+const PRIORITY_WEIGHT: Record<SetupPriority, number> = {
+  CRITICAL: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3
+};
+
+// Untouched items surface before ones already in flight at the same priority,
+// because a not-started high-priority obligation is the bigger gap in a review.
+const STATUS_WEIGHT: Record<SetupItemStatus, number> = {
+  NOT_STARTED: 0,
+  BLOCKED: 1,
+  OPEN: 2,
+  WAITING: 3,
+  IN_PROGRESS: 4,
+  DONE: 5,
+  CANCELLED: 6
+};
+
+/**
+ * Highest-priority items that are not yet done, ordered for review attention.
+ * Cancelled items are excluded; they were a deliberate decision, not a gap.
+ */
+export function selectOutstandingSetupItems(
+  summary: SetupChecklistSummary,
+  limit = 6
+): OutstandingSetupItem[] {
+  return summary.categories
+    .flatMap((category) => category.items)
+    .filter((item) => !item.done && item.status !== "CANCELLED")
+    .map((item) => ({
+      key: item.key,
+      title: item.title,
+      category: item.category,
+      companyFunction: item.companyFunction,
+      priority: item.priority,
+      status: item.status
+    }))
+    .sort(
+      (a, b) =>
+        PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority] ||
+        STATUS_WEIGHT[a.status] - STATUS_WEIGHT[b.status] ||
+        a.title.localeCompare(b.title)
+    )
+    .slice(0, limit);
+}
+
+export type SetupDraftContext = {
+  percentComplete: number;
+  done: number;
+  total: number;
+  inProgress: number;
+  notStarted: number;
+  criticalOutstanding: number;
+  outstanding: OutstandingSetupItem[];
+};
+
+/** Condensed setup snapshot for embedding in the weekly review prep draft. */
+export function buildSetupDraftContext(summary: SetupChecklistSummary, limit = 6): SetupDraftContext {
+  const allOutstanding = selectOutstandingSetupItems(summary, Number.MAX_SAFE_INTEGER);
+  return {
+    percentComplete: summary.percentComplete,
+    done: summary.done,
+    total: summary.total,
+    inProgress: summary.inProgress,
+    notStarted: summary.notStarted,
+    criticalOutstanding: allOutstanding.filter(
+      (item) => item.priority === "CRITICAL" || item.priority === "HIGH"
+    ).length,
+    outstanding: allOutstanding.slice(0, limit)
+  };
+}
+
+export function setupItemStatusLabel(status: SetupItemStatus) {
+  const text = status.replace(/_/g, " ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

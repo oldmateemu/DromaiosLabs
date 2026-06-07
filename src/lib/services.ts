@@ -15,6 +15,7 @@ import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./autom
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
 import {
+  buildSetupDraftContext,
   COMPANY_SETUP_CHECKLIST,
   normaliseSetupTitle,
   summariseSetupChecklist,
@@ -413,7 +414,8 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
           take: 50
         }),
         links: await prisma.launchpadLink.findMany({ orderBy: [{ riskLevel: "desc" }, { renewalAt: "asc" }, { name: "asc" }], take: 80 }),
-        draftsNeedingReview: await prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } })
+        draftsNeedingReview: await prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } }),
+        setup: buildSetupDraftContext(await getCompanySetupData())
       })
       : buildStaleTaskSummaryDraft({
         now,
@@ -474,6 +476,53 @@ export async function getCompanySetupData() {
   );
 
   return summariseSetupChecklist(COMPANY_SETUP_CHECKLIST, statusByTitle);
+}
+
+const SETUP_CHECKLIST_STREAM = "Company Core";
+
+export async function setSetupItemStatus(itemKey: string, status: ActionStatus, userId: string) {
+  const item = COMPANY_SETUP_CHECKLIST.find((entry) => entry.key === itemKey);
+  if (!item) throw new Error("Unknown setup checklist item.");
+
+  const existing = await prisma.action.findFirst({ where: { title: item.title } });
+
+  if (existing) {
+    await prisma.action.update({
+      where: { id: existing.id },
+      data: {
+        status,
+        completedAt: status === ActionStatus.DONE ? new Date() : null
+      }
+    });
+  } else {
+    // Self-healing: if the action was never seeded (or was deleted), recreate it
+    // from the checklist definition so the cockpit stays consistent.
+    const [stream, companyFunction] = await Promise.all([
+      prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } }),
+      prisma.companyFunction.findUnique({ where: { name: item.companyFunction } })
+    ]);
+
+    await prisma.action.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        nextStep: item.nextStep,
+        sensitive: item.sensitive,
+        priority: item.priority as Priority,
+        status,
+        completedAt: status === ActionStatus.DONE ? new Date() : null,
+        source: ActionSource.USER,
+        streamId: stream?.id,
+        companyFunctionId: companyFunction?.id,
+        createdById: userId
+      }
+    });
+  }
+
+  revalidatePath("/setup");
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath("/reviews");
 }
 
 export async function getLaunchpadData() {

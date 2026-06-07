@@ -85,6 +85,47 @@ describe("buildWeeklyReviewPrepDraft", () => {
     expect(draft).toContain("Lawpath");
     expect(draft).toContain("Draft actions to consider");
   });
+
+  it("includes a company setup section when setup context is provided", () => {
+    const draft = buildWeeklyReviewPrepDraft({
+      now: new Date("2026-05-31T01:00:00.000Z"),
+      draftsNeedingReview: 0,
+      actions: [],
+      risks: [],
+      links: [],
+      setup: {
+        percentComplete: 40,
+        done: 4,
+        total: 10,
+        inProgress: 1,
+        notStarted: 5,
+        criticalOutstanding: 2,
+        outstanding: [
+          { key: "pi", title: "Professional indemnity insurance in force", category: "Insurance & risk", companyFunction: "risk", priority: "CRITICAL", status: "NOT_STARTED" },
+          { key: "privacy", title: "Privacy policy and Australian Privacy Principles compliance", category: "Privacy & data protection", companyFunction: "compliance", priority: "HIGH", status: "IN_PROGRESS" }
+        ]
+      }
+    });
+
+    expect(draft).toContain("Company setup complete: 40%");
+    expect(draft).toContain("Company setup");
+    expect(draft).toContain("Progress: 40% (4/10 done, 1 in progress, 5 not started).");
+    expect(draft).toContain("Professional indemnity insurance in force");
+    expect(draft).toContain("Which outstanding company setup items");
+    expect(draft).toContain("Schedule the highest-priority company setup items");
+  });
+
+  it("omits the company setup section when no setup context is provided", () => {
+    const draft = buildWeeklyReviewPrepDraft({
+      now: new Date("2026-05-31T01:00:00.000Z"),
+      draftsNeedingReview: 0,
+      actions: [],
+      risks: [],
+      links: []
+    });
+
+    expect(draft).not.toContain("Company setup");
+  });
 });
 
 describe("buildStaleTaskSummaryDraft", () => {

@@ -6,8 +6,11 @@ company.
 
 This is the human-readable companion to the live checklist in the cockpit
 (`/setup`). The cockpit version is seeded from
-`src/lib/company-setup-checklist.ts` and tracked as Actions, so status updates
-flow into the Today board and weekly review.
+`src/lib/company-setup-checklist.ts` and tracked as Actions. Tick items off
+directly on the `/setup` page (one-click Done/Start/Waiting/Block/Reset); status
+flows into the Today board, the Actions register, and the weekly review. The
+weekly review page and the local "weekly review prep" draft both surface the
+highest-priority outstanding setup items so nothing critical drifts.
 
 > **Not formal advice.** This is operational scaffolding to help you track
 > setup, not legal, tax, insurance, or regulatory advice. Confirm specifics with
