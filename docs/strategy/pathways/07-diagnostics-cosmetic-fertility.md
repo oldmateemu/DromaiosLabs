@@ -64,6 +64,30 @@ pathology and IVF.**
   Dept of Health regulator from 1 Jan 2025; QLD ART Act 2024 from Sep 2025; WA Bill 2025, regime
   ~mid-2027).
 
+> **ART is a durable DUAL-LAYER market (state registration + national accreditation).** Every state
+> retains its own **provider registration + statutory registers/reporting**, which the Wallace Review
+> recommended *keeping* alongside the new ACSQHC accreditation — so clinics will manage **two**
+> compliance reference points, not one. Confirmed detail in the two licensing states we'd target
+> first:
+> - **SA** — *Assisted Reproductive Treatment Act 1988* + **Regulations 2024** (commenced 26 Feb
+>   2025); SA Health registers providers on the Minister's behalf (unregistered operation penalty up
+>   to A$120,000); RTAC accreditation is a registration precondition. New **retrospective
+>   identity-release** regime on the **Donor Conception Register** (donor-conceived 18+, donors,
+>   parents — even over historical anonymity promises) + **posthumous-use consent** rules → strong
+>   demand for **consent-management + donor-tracking/identity-release** modules. **State rebate:**
+>   A$18.5m scheme, A$2,000 × up to 2 cycles + A$250 pre-IVF testing.
+> - **NSW** — *Assisted Reproductive Technology Act 2007* + **Regulation 2024** (commenced 1 Sep
+>   2024); NSW Health maintains the **Central Register** (offspring access at 18) + Voluntary
+>   Register; record-keeping under **s 30/s 31**, data-accuracy offence **s 62**. The 2024 Regulation
+>   added a **pregnancy/birth-outcome follow-up duty (reasonable steps 1–4 months post-treatment)** —
+>   a defined, recurring, auditable workflow ideal for ClinicBoss reminders/tracking — plus
+>   **strengthened donor-recipient counselling** requirements. **State rebate:** Fertility Treatment
+>   Rebate-2 (Service NSW, from Feb 2025), A$2,000, income-tested, to Aug 2028.
+> - Neither SA nor NSW has (as at Jun 2026) announced a *standalone post-Monash* Bill — both move via
+>   the national process; their 2024–25 reforms predate Monash. **Near-term certain lever = ACSQHC
+>   2027 accreditation + existing state registers**; a *second wave* of state registration/reporting
+>   harmonisation is likely but unconfirmed — monitor SA Health / NSW Health / ACSQHC through 2026.
+
 ---
 
 ## C. Funding levers
@@ -75,20 +99,35 @@ pathology and IVF.**
 - **Cosmetic:** **private out-of-pocket**, high-margin/discretionary → strong ability to fund
   compliance; regulation is now a non-optional cost of doing business.
 - **IVF/ART:** **MBS-subsidised** (items 13200/13201/13218; no federal cycle cap; Safety Net ~A$2,615)
-  + ~A$5–6.7k out-of-pocket/cycle + state rebates (NSW/ACT ~A$2,000). Profitable corporatised groups.
+  + ~A$5–6.7k out-of-pocket/cycle + state rebates (NSW, SA, ACT ~A$2,000/cycle). Profitable
+  corporatised groups.
 
 ---
 
 ## D. Market fit — why Dromaios wins here
 
-Each niche has **entrenched clinical systems** we will *not* fight — RIS/PACS (Karisma/Comrad/
-Intelerad/Sectra) and LIS (AUSLAB/Cerner/Delphic) in diagnostics; aesthetic EMRs (Aesthetic Record,
-Pabau, Consentz) in cosmetic; ART EMRs (MedITEX, Baby Sentry, eIVF) and electronic-witnessing
-(RI Witness) in IVF. The **white space is the compliance/QMS/accreditation-evidence + training
-layer** — and notably **no dominant AU compliance/LMS/incident vendor surfaced in cosmetic or IVF**.
-The incumbent QMS comparators (Logiqc, Ideagen Q-Pulse, RLDatix) are beatable on a healthcare-
-specific, accreditation-mapped, AI-evidence-assisted offering — *especially* during the live
-re-accreditation/transition shocks. We integrate with the clinical systems; we own the audit.
+Each niche has **entrenched clinical/operational systems** we will *not* fight (we integrate, then
+own the audit layer). Confirmed AU deployments:
+- **Pathology LIS:** Sonic runs proprietary **"Apollo"** (in-house); **ACL** completed a national
+  **Cirdan ULTRA** consolidation (29 yrs / 10bn+ rows migrated); **Healius** linked to **Kestral PLS**
+  (inferred); public: **Pathology QLD AUSLAB/Citadel** (→ "Evolution", extended to 2029), **PathWest
+  SCC SoftLab**, **SA Pathology Oracle/Cerner EPLIS** (cloud move), **NSW Health Pathology → Epic**
+  (statewide LIMS under the Single Digital Patient Record).
+- **Imaging RIS/PACS:** **Sectra** (NSW Health enterprise imaging, ~A$94m/13-yr), **Kestral Karisma**,
+  **Comrad + Intelerad**, **Pro Medicus/Visage**; I-MED/Lumus/IDX run integrated stacks.
+- **Cosmetic:** aesthetic EMRs (Aesthetic Record, Pabau, Consentz). **IVF:** ART EMRs (MedITEX, Baby
+  Sentry, eIVF) + electronic-witnessing (**RI Witness**, IMT Matcher).
+
+**The white space is the compliance/QMS/accreditation-evidence + training layer**, which sits
+*above* every one of those systems. Crucially, **none of the LIS/RIS own the ISO 15189 / NPAAC /
+DIAS accreditation-evidence layer** (document control, controlled SOPs, internal audit, CAPA,
+equipment/competency records, training/LMS). Incumbent QMS comparators: **Ideagen Q-Pulse** (the
+international ISO 15189 pathology-eQMS leader — beatable on AU-native NATA/RCPA/NPAAC/SPIA mapping +
+AI evidence), **Logiqc** (AU/NZ leader but **NSQHS/primary-care-oriented, not ISO 15189-specific** —
+our wedge), **RLDatix** (hospital risk, not lab QMS). And **no dominant AU compliance/LMS/incident
+vendor surfaced in cosmetic or IVF at all** — greenfield. Watch one buy-vs-build signal: **NSW Health
+Pathology built its QMS in-house on Microsoft Power Platform** — so target the **private groups +
+smaller/mid public services** first and position against in-house TCO.
 
 ---
 
@@ -123,6 +162,20 @@ C7 Calendar, plus the niche pack:
 **Phase 3 (multi-site harmonisation):** flat-unlimited enterprise rollout across the group's network;
 **post-M&A QMS harmonisation** is a live, fundable pain (I-MED/Jardine, IDX/Capitol, Lumus/Affinity
 all just merged — disparate QMS across merged sites needs unifying).
+
+> **Ride the LIS/EMR platform-churn windows — every migration forces SOP/document/competency
+> re-baselining, the prime moment to land a QMS layer the new LIS doesn't provide:** NSW Health
+> Pathology **Epic SDPR** (Hunter New England live May 2026 → statewide to 2028), **Pathology QLD
+> AUSLAB→Evolution** (to 2029), **SA Pathology EPLIS** cloud move, **ACL** national ULTRA
+> consolidation, **PathWest SoftLab**. Epic/Cerner/Citadel own the LIS but **not** the accreditation
+> evidence layer — that gap is the wedge.
+>
+> **Digital pathology / AI is a new, greenfield compliance surface.** Confirmed AU WSI rollouts
+> (Sonic/Sullivan Nicolaides & Healius on **Philips IntelliSite**; Southern Sun on **Sectra**) create
+> net-new obligations — **WSI validation, scanner QC, AI model governance / algorithm versioning, and
+> pathologist competency on digital read** — that no incumbent QMS handles natively. A pack for
+> digital-pathology validation + competency is differentiated and defensible (and stays non-SaMD: we
+> govern *the validation/competency process*, not the diagnostic algorithm).
 
 **Required net-new functions:** DIAS + ISO 15189 crosswalks; dose-monitoring/NDRL benchmarking;
 advertising-compliance scanner; aesthetic consent engine; electronic-witnessing integration;
@@ -222,13 +275,21 @@ ACCC (Integral–Capitol), ACL Annual Report 2024, Logiqc, TGA/OAIC (AI). Cosmet
 surgery standards & A$1.4bn/500k figure), AHPRA/MBA (2023 surgery reforms; Sep-2023 title; 2025
 non-surgical guidelines), TGA (injectables advertising; OPRED 98/100), SILK/Wesfarmers, Laser
 Clinics/KKR. IVF: ANZARD/UNSW NPESU 2023 (~104,000 cycles), health.gov.au (ART Rapid Review; ACSQHC
-2027), FSANZ/RTAC, state ART reforms (VIC/QLD/WA), Services Australia (MBS items), Monash IVF/Virtus/
-Genea/City Fertility, RI Witness/CooperSurgical, TGA AI-SaMD.
+2027), FSANZ/RTAC/Wallace Rapid Review (Sep 2025), state ART reforms — **SA** (ART Act 1988 + Regs
+2024, legislation.sa.gov.au; SA Health licensing; A$18.5m rebate), **NSW** (ART Act 2007 + Reg 2024
+SL 2024-373, legislation.nsw.gov.au; NSW Health Central Register; Service NSW Rebate-2), VIC/QLD/WA,
+Services Australia (MBS items), Monash IVF/Virtus/Genea/City Fertility, RI Witness/CooperSurgical, TGA
+AI-SaMD. **LIS/RIS/QMS landscape** (gap-closed): iTnews/Pulse+IT/Healthcare IT News ANZ (NSW Epic
+SDPR; QLD AUSLAB; SA EPLIS; PathWest SoftLab), Cirdan (ACL ULTRA), Philips/Sectra (digital pathology),
+Sectra (NSW imaging), Ideagen Q-Pulse & Logiqc (QMS), Microsoft (NSW Health Pathology Power Platform).
 **Confidence flags:** Medicare spend figures are 2022–23 (latest consolidated); radiologist (2020)/
 pathologist (2018) workforce counts dated; market-share %s (Sonic/Healius/ACL ~31/30/20; Monash+
 Virtus >70%) are commercial/pre-2023 estimates (directional); market *values* from research
 aggregators vary widely and don't reconcile with government figures — indicative only; **no public
 QMS/LMS/compliance software pricing benchmarks** surfaced for any of the four niches; no authoritative
-count of cosmetic nurses/clinics; AU-specific LIS deployments and ART/witnessing pricing
-unconfirmed. SA/NSW ART legislative detail incomplete. Verify all accreditation-standard versions and
-commencement dates before campaigns.
+count of cosmetic nurses/clinics; ART/witnessing software pricing not public. **Now closed:** SA/NSW
+ART legislative detail confirmed (dual-layer state registration + national accreditation persists);
+key AU LIS deployments confirmed (Sonic Apollo [secondary], ACL Cirdan ULTRA, public LIS by state,
+NSW→Epic) — *still inferred/unverified:* Healius=Kestral PLS, which QMS Sonic/Healius/ACL run
+internally, Sysmex Delphic AU anchor, and AU clinical use of Paige/Ibex/Proscia. Verify all
+accreditation-standard versions and commencement dates before campaigns.
