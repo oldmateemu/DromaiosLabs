@@ -33,6 +33,7 @@ entry stays cheap and fast; medtech remains a deliberately-later, evidence-led c
    | 04 | [Hospitals & Health Services](pathways/04-hospitals-health-services.md) | Public LHDs/HHSs; private hospitals; **day surgeries** | 3 | Education (OVA) → day-surgery NSQHS pack |
    | 05 | [Mining / Occupational Health](pathways/05-mining-occupational-health.md) | Mine-site/FIFO/occupational & remote health | 2 | Education (safety training) |
    | 06 | [Outliers](pathways/06-outliers.md) | Dental, pharmacy, optometry, justice, defence, telehealth, niches | 3 | Mixed (pharmacy compliance-led; dental/optometry CPD-led) |
+   | 07 | [Corporatised High-Compliance Niches](pathways/07-diagnostics-cosmetic-fertility.md) | Diagnostic imaging, pathology, cosmetic/aesthetic, IVF/ART | 3 | Win-the-HQ: accreditation/QMS-led (+ advertising-compliance for cosmetic) |
 
 ## Grouping rationale
 
@@ -41,6 +42,9 @@ entry stays cheap and fast; medtech remains a deliberately-later, evidence-led c
 - **Aged care + NDIS** share a regulator-driven compliance posture (SIRS, restrictive practices,
   worker screening, per-bed/per-participant pricing) — wedge differs, engine is shared.
 - **Day surgeries** sit with **hospitals** (shared NSQHS), not with outliers.
+- **Imaging, pathology, cosmetic & IVF** are split into their own **Pathway 07** because they share a
+  distinct shape — consolidated corporate-HQ buyers, mandatory-accreditation/QMS hooks, and live
+  2024–27 regulatory shocks — different enough from the fragmented "outliers" to warrant one plan.
 
 ## Each pathway answers your four asks
 

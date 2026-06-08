@@ -56,6 +56,9 @@
 | **V-AH** | **Allied Health Pack** | CPD logbook, clinical-supervision logs (provisional psychologists/new grads/students), NDIS/aged-care documentation helpers. | Allied health |
 | **V-PHARM** | **Pharmacy Pack** | QCPP→QSPP accreditation crosswalk, professional-service program documentation (MedsChecks, DAAs, vax), cold-chain/SOP. | Community pharmacy |
 | **V-DENT** | **Dental Pack** | IPC/sterilisation reprocessing logs, radiation-apparatus licensing, NSQHS day-procedure crosswalk (sedation/surgical). | Dental |
+| **V-DIAG** | **Diagnostics QMS Pack** | DIAS crosswalk (imaging) + NATA/RCPA **ISO 15189:2022** crosswalk (pathology); radiation dose monitoring vs NDRLs; QMS (document control, internal audit, CAPA/nonconformance, management review); equipment QA/calibration logs; **My Health Record upload assurance** (1 Jul 2026). | Diagnostic imaging, pathology |
+| **V-COSMETIC** | **Cosmetic / Aesthetic Pack** | **Advertising-compliance monitoring** (TGA injectables + AHPRA rules); aesthetic **digital consent** (two-consult rule, BDD screening, cooling-off); injection-mapping & before/after photo governance; NSQHS Cosmetic Surgery Standards crosswalk; scope-of-practice/CPD under the 2025 non-surgical guidelines. | Cosmetic surgery & non-surgical/injectables |
+| **V-ART** | **Fertility / ART Pack** | **Chain-of-custody / electronic-witnessing** integration (RI Witness/IMT Matcher); incident management & transparency; **RTAC → ACSQHC (2027) accreditation** crosswalk; embryologist/nurse/counsellor credentialing & CPD; donor-conception registry integration. | IVF / ART clinics |
 
 ---
 

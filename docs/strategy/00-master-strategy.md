@@ -78,7 +78,7 @@ team and a care-sector clinician network × revenue speed.
 |------|--------|----------|-----------|
 | **Wave 1** | 0–9 mo | **NDIS**, **Aged Care**, **Allied Health** | Sharpest cliffs (NDIS mandatory registration 1 Jul 2026; new Aged Care Act + strengthened Standards live since 1 Nov 2025). Huge price-sensitive long tail hungry for cheap training + compliance. Allied health is self-serve and overlaps NDIS/aged-care revenue. Best fit for a care-sector clinician network. |
 | **Wave 2** | 6–18 mo | **GP / community clinics**, **AMS/ACCHO**, **Mining** | Accreditation is the gate to funding (GP/AMS) with dedicated grant budgets and PHN/NACCHO channels. Mining has the highest willingness-to-pay; enter via safety training (OVA/fatigue/D&A). |
-| **Wave 3** | 12–30 mo | **Hospitals & day surgeries**, **Outliers** (dental, pharmacy, optometry, justice, defence) | Longest cycles / entrenched incumbents (RLDatix in hospitals). Enter hospitals via OVA training + day-surgery accreditation packs; outliers via banner/franchise + peak-body channels and the QCPP→QSPP (pharmacy) deadline. |
+| **Wave 3** | 12–30 mo | **Hospitals & day surgeries**, **Outliers** (dental, pharmacy, optometry, justice, defence), **Corporatised high-compliance niches** (imaging, pathology, cosmetic, IVF) | Longest cycles / entrenched incumbents (RLDatix in hospitals). Enter hospitals via OVA training + day-surgery accreditation packs; outliers via banner/franchise + peak-body channels and the QCPP→QSPP (pharmacy) deadline; imaging/pathology/cosmetic/IVF via the **win-the-HQ** accreditation/QMS wedge timed to their live regulatory shocks (ISO 15189 Feb 2026, MHR Jul 2026, ACSQHC ART 2027, cosmetic advertising crackdown). |
 
 > Sequencing is about *emphasis*, not exclusion. Because the engine is horizontal, an inbound
 > lead from any segment can be served from day one — we just don't *spend* ahead of the waves.
@@ -110,10 +110,13 @@ High-confidence dates (cross-corroborated across multiple authoritative sources)
 | FY2025–26 | Externally-audited **Care Minutes Performance Statement** required | ClinicBoss V-CM |
 | **Feb 2026** | First wave of 5-year **NDIS worker-screening** checks expire | Credentialing (C5) renewal spike |
 | **1 Jul 2026** | **NDIS mandatory registration** for SIL & platform providers (intent to extend) | Registration/audit-readiness packs + training |
-| **1 Jul 2026** | **My Health Record "sharing by default"** for path/imaging reports | Privacy training; interoperability positioning |
+| **2 Sep 2025** | **AHPRA non-surgical cosmetic guidelines** + **TGA injectables advertising crackdown** (penalties to A$16.5m/breach; 98/100 clinics non-compliant) | Cosmetic advertising-compliance + consent + CPD (Pathway 07) |
+| **Feb 2026** | **ISO 15189:2022** pathology accreditation transition (application doc effective) | Pathology QMS/document-control re-tooling (V-DIAG) |
+| **1 Jul 2026** | **My Health Record "sharing by default"** for path/imaging reports | Privacy training; interoperability positioning; MHR upload assurance |
 | **1 Jul 2026** | Mining **QLD RSHLA Act 2024** compliance deadline | Mining competency/induction + V-MINE |
 | ~2026 | **QCPP → QSPP** pharmacy accreditation transition (QCPP elements phased out by 2029) | V-PHARM + F03 |
 | **10 Dec 2026** | Privacy Act: automated-decision-making **disclosure** obligation | Our own AI governance posture (table stakes) |
+| **Jan 2027** | **ACSQHC national ART accreditation** replaces RTAC self-regulation (post-Monash reforms; standards project began Apr 2026) | IVF/ART accreditation-transition + chain-of-custody + embryologist CPD (Pathway 07) |
 | **2027** | **CHSP** transitions into Support at Home (no earlier than 1 Jul 2027); **ADF Health Services Contract** re-tender (1 Jul 2027) | Aged-care home-care expansion; defence subcontracting opportunity |
 | 2028+ | **NSQHS 3rd edition** released (assessment ~2030) | Hospital slow-burn; not an immediate trigger |
 
@@ -243,3 +246,4 @@ This directly answers the founder's stated posture.
 4. `pathways/04-hospitals-health-services.md` — Hospitals & day surgeries
 5. `pathways/05-mining-occupational-health.md` — Mining / remote / occupational health
 6. `pathways/06-outliers.md` — Dental, pharmacy, optometry, justice, defence, telehealth & niches
+7. `pathways/07-diagnostics-cosmetic-fertility.md` — Diagnostic imaging, pathology, cosmetic/aesthetic, IVF/ART (corporatised, win-the-HQ)

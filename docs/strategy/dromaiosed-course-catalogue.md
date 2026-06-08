@@ -71,6 +71,11 @@ Bolt-ons that complete a segment's required stack.
 | S12 | QCPP/QSPP & Professional Services | Pharmacy |
 | S13 | CPD Planning & Reflective Practice | Allied health, GP, all AHPRA professions |
 | S14 | Clinical Supervision (supervisor & supervisee) | Allied health, psychology |
+| S15 | Cosmetic Procedure Safety & Consent (BDD screening, AHPRA 2025 non-surgical guidelines, scope of practice) | Cosmetic / aesthetic |
+| S16 | Healthcare Advertising Compliance (TGA injectables + AHPRA advertising rules) | Cosmetic, all advertised health services |
+| S17 | ART / Embryology Quality & Chain-of-Custody (witnessing, identification, incident transparency) | IVF / ART |
+| S18 | Laboratory Quality & ISO 15189 (QMS, CAPA, internal audit) | Pathology |
+| S19 | Radiation Safety & Dose Optimisation (NDRLs, ARPANSA 2024 standard) | Diagnostic imaging, dental |
 
 ### Tier 3 — Credentialed / premium (clinician-network era)
 Higher-margin, delivered/badged by the clinician network once revenue allows.

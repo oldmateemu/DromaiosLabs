@@ -21,7 +21,7 @@
 | **Correctional / justice health** | State-run (Justice Health NSW, etc.) | State justice-health director; corrections procurement | **RACGP prison-health standards** + NSQHS | **OVA** (verbal abuse dominant; nurses main victims) |
 | **Defence / veteran health** | Bupa holds ADF HSC (85,000 personnel; ~A$3.4–6bn); **re-tender 1 Jul 2027** | Defence health contracting (prime); DVA | Defence health contracts; ANAO audits; Open Arms | **2027 ADF HSC re-tender** subcontracting |
 | **Telehealth** | Cross-cutting | Provider/practice | **MBS telehealth rules** + AHPRA telehealth guidance | Compliance + privacy training |
-| **Adjacent (cosmetic, IVF, imaging, pathology)** | Large, consolidated (Sonic/Healius path; I-MED imaging) | Group ops | NSQHS/radiation/TGA-SaMD; AHPRA cosmetic reforms | NSQHS/radiation packs (follow-up research) |
+| **Cosmetic, IVF, imaging, pathology** | Large, consolidated corporates | Group HQ ops/governance | DIAS / NATA-RCPA (mandatory for Medicare); NSQHS Cosmetic; RTAC→ACSQHC; TGA-SaMD | **Now covered in full in [Pathway 07](07-diagnostics-cosmetic-fertility.md)** |
 
 ---
 
@@ -74,6 +74,9 @@
   and DVA-network training (Open Arms-adjacent). Pursue via partnership, not direct.
 - **Telehealth — attach.** Sell privacy/telehealth-compliance training + policy templates as an
   attach to any other pathway's customers using telehealth.
+- **Cosmetic / IVF / imaging / pathology** — these consolidated, high-compliance niches have their
+  own dedicated plan in **[Pathway 07](07-diagnostics-cosmetic-fertility.md)** (win-the-HQ channel +
+  mandatory-accreditation/QMS wedge + 2024–27 regulatory shocks). Not duplicated here.
 
 ---
 
@@ -156,8 +159,8 @@ relevant board/college per niche.
   independent-practice self-serve alive.
 - **Government procurement** (justice/defence) is slow and relationship-heavy — treat as long-horizon
   optionality, funded by the faster niches.
-- **Data freshness** — day-hospital/private data stale; cosmetic/IVF/imaging/pathology need a
-  follow-up research pass before a serious push.
+- **Data freshness** — day-hospital/private data stale. (Cosmetic/IVF/imaging/pathology follow-up
+  research is complete — see Pathway 07.)
 
 ---
 
