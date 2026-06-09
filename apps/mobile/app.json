@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Dromaios Safer Practice",
+    "slug": "dromaios-safer-practice",
+    "scheme": "dromaios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "primaryColor": "#0F6E6E",
+    "splash": {
+      "backgroundColor": "#F7F9F9",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "au.com.dromaios.saferpractice",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "au.com.dromaios.saferpractice",
+      "edgeToEdgeEnabled": true
+    },
+    "extra": {
+      "dataResidency": "AU",
+      "note": "Worker-owned learning record. No employer visibility. Minimal data collection."
+    },
+    "plugins": ["expo-status-bar"]
+  }
+}

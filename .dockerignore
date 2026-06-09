@@ -1,4 +1,6 @@
 node_modules
+apps
+packages
 .next
 .git
 .superpowers
