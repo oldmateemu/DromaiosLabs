@@ -46,6 +46,13 @@ entry stays cheap and fast; medtech remains a deliberately-later, evidence-led c
   distinct shape — consolidated corporate-HQ buyers, mandatory-accreditation/QMS hooks, and live
   2024–27 regulatory shocks — different enough from the fragmented "outliers" to warrant one plan.
 
+## Execution
+
+- **[`launch-plans/90-day-ndis-launch.md`](launch-plans/90-day-ndis-launch.md)** — an executable
+  30/60/90 plan turning the strategy into first paying customers via the NDIS education-led wedge
+  (Wave 1 beachhead), building the horizontal engine that every other pathway reuses. Re-pointable to
+  aged care or allied health.
+
 ## Each pathway answers your four asks
 
 - **ClinicBoss rollout + functions required** — §F (phased, mapped to module IDs).
