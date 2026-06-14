@@ -22,6 +22,7 @@ const DRIVE_FOLDERS = [
   "Company Core/Finance/Invoices/Inbox",
   "Company Core/Admin/Contracts",
   "Company Core/Admin/Insurance",
+  "Company Core/Admin/Renewals",
   "Company Core/Automation Logs"
 ];
 const SHEETS = ["Finance Receipt Log", "Supplier Invoice Review", "Automation Exception Log"];
@@ -64,6 +65,7 @@ export function buildCompanyMailroomFilingRun({ now = new Date() }: { now?: Date
       "- Gmail labels: receipt, invoice, contract, certificate, insurance, venue, course, software.",
       "- Drive receipt quarantine: Company Core/Finance/Receipts/Inbox.",
       "- Drive invoice quarantine: Company Core/Finance/Invoices/Inbox.",
+      "- Admin review folders: Company Core/Admin/Contracts; Company Core/Admin/Insurance; Company Core/Admin/Renewals.",
       "- File naming convention: YYYY-MM-DD_vendor_amount_source.ext when metadata is available; otherwise preserve source filename with message ID context.",
       "- Originals stay in Gmail; filed copies stay reviewable in Drive quarantine before any processed/archive promotion.",
       "",

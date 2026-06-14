@@ -11,3 +11,4 @@ prisma/launchpad-system-metadata.local.json
 coverage/
 test-results/
 playwright-report/
+*.tsbuildinfo

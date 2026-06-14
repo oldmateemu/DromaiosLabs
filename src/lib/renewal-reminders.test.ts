@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildRenewalReminderRun, getLocalApprovalAutomationKind } from "./renewal-reminders";
+import {
+  buildRenewalReminderRun,
+  getLocalApprovalAutomationKind,
+  planRenewalReminderPersistence
+} from "./renewal-reminders";
 
 describe("getLocalApprovalAutomationKind", () => {
   it("recognises the approval-gated renewal reminder runner", () => {
@@ -117,10 +121,18 @@ describe("buildRenewalReminderRun", () => {
     expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "xero")).toMatchObject({
       title: "Review Xero renewal due 2026-07-01",
       priority: "HIGH",
+      nextStep: "Review Xero renewal decision before 2026-07-01: owner Callum; cost 0.00; risk HIGH; credential note Password manager entry name for the Xero admin account.",
       sensitive: true
     });
+    expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "lawpath")?.nextStep).toBe(
+      "Review Lawpath renewal decision before 2026-07-01: owner Callum; cost 0.00; risk HIGH; credential note Password manager entry name for the Lawpath admin account."
+    );
+    expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "skool")?.nextStep).toBe(
+      "Review Skool renewal decision before 2026-07-01: owner Callum; cost 0.00; risk MEDIUM; credential note Password manager entry name for the Skool owner account."
+    );
     expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "chatgpt")).toMatchObject({
-      priority: "MEDIUM"
+      priority: "MEDIUM",
+      nextStep: "Review ChatGPT renewal decision before 2026-07-01: owner Callum; cost 0.00; risk MEDIUM; credential note Password manager entry name for the ChatGPT or OpenAI account."
     });
     expect(run.responseSummary).toContain("Renewal reminder - approved local run");
     expect(run.responseSummary).toContain("Safety: APPROVAL_REQUIRED");
@@ -158,7 +170,7 @@ describe("buildRenewalReminderRun", () => {
     expect(run.actionsToCreate[0]).toMatchObject({
       dueAt: "2026-07-02",
       priority: "CRITICAL",
-      nextStep: "Confirm the renewal decision, payment status, account owner, cost, and credential access for Lawpath."
+      nextStep: "Review Lawpath renewal decision before 2026-07-01: owner Callum; cost 0.00; risk HIGH; credential note Password manager entry name for the Lawpath admin account."
     });
     expect(run.responseSummary).toContain("Renewals due: 1");
   });
@@ -208,5 +220,45 @@ describe("buildRenewalReminderRun", () => {
 
     expect(run.responseSummary).toContain("credential: missing for sensitive system");
     expect(run.actionsToCreate[0].description).toContain("Credential note: missing; add a credential-location note before the renewal decision and keep secrets out of Cockpit.");
+  });
+
+  it("plans existing open renewal reminders for refresh instead of leaving stale action text skipped", () => {
+    const run = buildRenewalReminderRun({
+      now: new Date("2026-06-14T09:00:00+08:00"),
+      links: [
+        {
+          id: "xero",
+          name: "Xero",
+          group: "Money",
+          renewalAt: "2026-07-01",
+          cost: "0.00",
+          owner: "Callum",
+          riskLevel: "HIGH",
+          loginNote: "Password manager entry name for the Xero admin account",
+          sensitive: true
+        },
+        {
+          id: "chatgpt",
+          name: "ChatGPT",
+          group: "AI/Workbench",
+          renewalAt: "2026-07-01",
+          cost: "0.00",
+          owner: "Callum",
+          riskLevel: "MEDIUM",
+          loginNote: "Password manager entry name for the ChatGPT or OpenAI account",
+          sensitive: true
+        }
+      ]
+    });
+
+    const plan = planRenewalReminderPersistence(run, [{ id: "existing-xero-action", launchpadLinkId: "xero" }]);
+
+    expect(plan.actionsToCreate.map((action) => action.launchpadLinkId)).toEqual(["chatgpt"]);
+    expect(plan.actionsToUpdate).toHaveLength(1);
+    expect(plan.actionsToUpdate[0]).toMatchObject({
+      actionId: "existing-xero-action",
+      launchpadLinkId: "xero",
+      nextStep: "Review Xero renewal decision before 2026-07-01: owner Callum; cost 0.00; risk HIGH; credential note Password manager entry name for the Xero admin account."
+    });
   });
 });
