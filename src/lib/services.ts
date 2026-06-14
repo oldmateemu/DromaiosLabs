@@ -13,8 +13,14 @@ import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
 import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
-import { buildStaleTaskSummaryDraft, buildWeeklyReviewPrepDraft, getLocalDraftAutomationKind } from "./draft-automations";
+import {
+  buildDailyInboxTriageDraft,
+  buildStaleTaskSummaryDraft,
+  buildWeeklyReviewPrepDraft,
+  getLocalDraftAutomationKind
+} from "./draft-automations";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
+import { buildCompanyMailroomFilingRun } from "./mailroom-filing";
 import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
@@ -274,6 +280,10 @@ export async function runAutomation(automationId: string, approved: boolean, use
       await runRenewalReminderAutomation(automationId, userId);
       return;
     }
+    if (localApprovalKind === "COMPANY_MAILROOM_FILING") {
+      await runCompanyMailroomFilingAutomation(automationId, userId);
+      return;
+    }
 
     if (!automation.webhookUrl) {
       throw new Error("Automation has no webhook URL configured.");
@@ -308,6 +318,65 @@ export async function runAutomation(automationId: string, approved: boolean, use
     });
   }
 
+  revalidatePath("/automations");
+}
+
+async function runCompanyMailroomFilingAutomation(automationId: string, userId: string) {
+  const run = buildCompanyMailroomFilingRun({ now: new Date() });
+  const [stream, companyFunction, existingReviewAction] = await Promise.all([
+    prisma.stream.findUnique({ where: { name: "Company Core" }, select: { id: true } }),
+    prisma.companyFunction.findUnique({ where: { name: "admin" }, select: { id: true } }),
+    prisma.action.findFirst({
+      where: {
+        automationId,
+        title: run.actionsToCreate[0]?.title,
+        status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
+      },
+      select: { id: true }
+    })
+  ]);
+  const actionsToCreate = existingReviewAction ? [] : run.actionsToCreate;
+
+  await prisma.$transaction(async (tx) => {
+    for (const action of actionsToCreate) {
+      await tx.action.create({
+        data: {
+          title: action.title,
+          description: action.description,
+          status: ActionStatus.OPEN,
+          priority: action.priority,
+          source: ActionSource.AUTOMATION,
+          dueAt: dateFromKey(action.dueAt),
+          reviewAt: dateFromKey(action.reviewAt),
+          nextStep: action.nextStep,
+          sensitive: action.sensitive,
+          createdById: userId,
+          automationId,
+          streamId: stream?.id,
+          companyFunctionId: companyFunction?.id
+        }
+      });
+    }
+
+    await tx.automationRun.create({
+      data: {
+        automationId,
+        triggeredById: userId,
+        status: AutomationRunStatus.SUCCESS,
+        requestSummary: "Approved local company mailroom filing run",
+        responseSummary: [
+          run.responseSummary,
+          "",
+          "Run result",
+          `- Review actions created this run: ${actionsToCreate.length}`,
+          `- Existing open review actions skipped: ${existingReviewAction ? 1 : 0}`
+        ].join("\n")
+      }
+    });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
   revalidatePath("/automations");
 }
 
@@ -409,10 +478,15 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
         links: await prisma.launchpadLink.findMany({ orderBy: [{ riskLevel: "desc" }, { renewalAt: "asc" }, { name: "asc" }], take: 80 }),
         draftsNeedingReview: await prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } })
       })
-      : buildStaleTaskSummaryDraft({
+      : kind === "STALE_TASK_SUMMARY"
+        ? buildStaleTaskSummaryDraft({
         now,
         actions
-      });
+      })
+        : buildDailyInboxTriageDraft({
+          now,
+          actions
+        });
 
     await prisma.automationRun.create({
       data: {

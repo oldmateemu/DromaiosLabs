@@ -1,6 +1,6 @@
 import { buildLaunchpadHealth, type LaunchpadHealthLink } from "./cockpit-insights";
 
-export type LocalApprovalAutomationKind = "RENEWAL_REMINDER";
+export type LocalApprovalAutomationKind = "RENEWAL_REMINDER" | "COMPANY_MAILROOM_FILING";
 
 export type LocalApprovalAutomationRef = {
   name: string;
@@ -32,7 +32,9 @@ export function getLocalApprovalAutomationKind(automation: LocalApprovalAutomati
   if (automation.safetyLevel !== "APPROVAL_REQUIRED") return null;
 
   const text = [automation.name, automation.trigger, automation.targetTool].filter(Boolean).join(" ").toLowerCase();
-  return text.includes("renewal reminder") || text.includes("launchpad renewal check") ? "RENEWAL_REMINDER" : null;
+  if (text.includes("renewal reminder") || text.includes("launchpad renewal check")) return "RENEWAL_REMINDER";
+  if (text.includes("company mailroom filing") || text.includes("gmail/drive/sheets filing")) return "COMPANY_MAILROOM_FILING";
+  return null;
 }
 
 export function buildRenewalReminderRun({
@@ -69,7 +71,7 @@ export function buildRenewalReminderRun({
       "Snapshot",
       `- Renewals due: ${health.renewalsDue.length}`,
       `- Renewals soon: ${health.renewalsSoon.length}`,
-      `- Reminder actions created: ${actionsToCreate.length}`,
+      `- Reminder actions prepared: ${actionsToCreate.length}`,
       "",
       "Renewal reminders",
       ...formatRenewalList(candidates, now),
@@ -89,9 +91,7 @@ function toReminderAction(link: LaunchpadHealthLink, now: Date): RenewalReminder
   const owner = link.owner?.trim() || "owner not recorded";
   const group = link.group?.trim() || "ungrouped";
   const cost = link.cost === null || link.cost === undefined || String(link.cost).trim() === "" ? "cost not recorded" : String(link.cost);
-  const credentialContext = link.loginNote?.trim() || link.sensitive
-    ? "Credential context is recorded in Launchpad or the password manager; verify access without exposing secrets."
-    : "Credential context is missing; add a credential-location note before the renewal decision.";
+  const credentialContext = credentialCheckLine(link);
 
   return {
     launchpadLinkId: link.id,
@@ -103,7 +103,7 @@ function toReminderAction(link: LaunchpadHealthLink, now: Date): RenewalReminder
       `Owner: ${owner}.`,
       `Cost: ${cost}.`,
       `Risk: ${link.riskLevel ?? "not recorded"}.`,
-      credentialContext
+      `Credential note: ${credentialContext}`
     ].join("\n"),
     priority,
     dueAt,
@@ -121,8 +121,23 @@ function formatRenewalList(links: LaunchpadHealthLink[], now: Date) {
     const owner = link.owner?.trim() || "owner missing";
     const risk = link.riskLevel ?? "risk not recorded";
     const group = link.group?.trim() || "ungrouped";
-    return `- ${link.name} renews ${renewalAt} (${group}, ${risk}, owner: ${owner}). Reminder due ${dueAt}.`;
+    const cost = link.cost === null || link.cost === undefined || String(link.cost).trim() === "" ? "cost missing" : String(link.cost);
+    const credential = credentialSummary(link);
+    return `- ${link.name} renews ${renewalAt} (${group}, ${risk}, owner: ${owner}, cost: ${cost}, credential: ${credential}). Reminder due ${dueAt}.`;
   });
+}
+
+function credentialCheckLine(link: LaunchpadHealthLink) {
+  const note = link.loginNote?.trim();
+  if (note) return `${note}. Verify access without exposing secrets.`;
+  if (link.sensitive) return "missing; add a credential-location note before the renewal decision and keep secrets out of Cockpit.";
+  return "not recorded; add one if account access or recovery details matter for renewal.";
+}
+
+function credentialSummary(link: LaunchpadHealthLink) {
+  const note = link.loginNote?.trim();
+  if (note) return note;
+  return link.sensitive ? "missing for sensitive system" : "not recorded";
 }
 
 function reminderDueDate(renewalDate: string, now: Date) {

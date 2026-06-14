@@ -21,6 +21,26 @@ describe("getLocalApprovalAutomationKind", () => {
       })
     ).toBeNull();
   });
+
+  it("recognises the approval-gated company mailroom filing runner", () => {
+    expect(
+      getLocalApprovalAutomationKind({
+        name: "Company mailroom filing",
+        safetyLevel: "APPROVAL_REQUIRED",
+        trigger: "Manual Gmail/Drive/Sheets filing review",
+        targetTool: "Gmail Processor / Apps Script"
+      })
+    ).toBe("COMPANY_MAILROOM_FILING");
+
+    expect(
+      getLocalApprovalAutomationKind({
+        name: "Company mailroom filing",
+        safetyLevel: "TRUSTED_LOOP",
+        trigger: "Manual Gmail/Drive/Sheets filing review",
+        targetTool: "Gmail Processor / Apps Script"
+      })
+    ).toBeNull();
+  });
 });
 
 describe("buildRenewalReminderRun", () => {
@@ -107,7 +127,12 @@ describe("buildRenewalReminderRun", () => {
     expect(run.responseSummary).toContain("No webhook called");
     expect(run.responseSummary).toContain("Renewals due: 0");
     expect(run.responseSummary).toContain("Renewals soon: 4");
-    expect(run.responseSummary).toContain("Xero renews 2026-07-01");
+    expect(run.responseSummary).toContain("Reminder actions prepared: 4");
+    expect(run.responseSummary).toContain("Xero renews 2026-07-01 (Money, HIGH, owner: Callum, cost: 0.00, credential: Password manager entry name for the Xero admin account). Reminder due 2026-06-24.");
+    expect(run.responseSummary).toContain("Lawpath renews 2026-07-01 (Legal/Admin, HIGH, owner: Callum, cost: 0.00, credential: Password manager entry name for the Lawpath admin account). Reminder due 2026-06-24.");
+    expect(run.responseSummary).toContain("Skool renews 2026-07-01 (Community/Sales, MEDIUM, owner: Callum, cost: 0.00, credential: Password manager entry name for the Skool owner account). Reminder due 2026-06-24.");
+    expect(run.responseSummary).toContain("ChatGPT renews 2026-07-01 (AI/Workbench, MEDIUM, owner: Callum, cost: 0.00, credential: Password manager entry name for the ChatGPT or OpenAI account). Reminder due 2026-06-24.");
+    expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "xero")?.description).toContain("Credential note: Password manager entry name for the Xero admin account. Verify access without exposing secrets.");
     expect(run.responseSummary).not.toContain("Airwallex");
   });
 
@@ -161,5 +186,27 @@ describe("buildRenewalReminderRun", () => {
       dueAt: "2026-06-24"
     });
     expect(run.responseSummary).toContain("Xero renews 2026-07-01");
+  });
+
+  it("flags a missing credential note instead of treating sensitivity as recorded context", () => {
+    const run = buildRenewalReminderRun({
+      now: new Date("2026-06-04T09:00:00+08:00"),
+      links: [
+        {
+          id: "xero",
+          name: "Xero",
+          group: "Money",
+          renewalAt: "2026-07-01",
+          cost: "0.00",
+          owner: "Callum",
+          riskLevel: "HIGH",
+          loginNote: "",
+          sensitive: true
+        }
+      ]
+    });
+
+    expect(run.responseSummary).toContain("credential: missing for sensitive system");
+    expect(run.actionsToCreate[0].description).toContain("Credential note: missing; add a credential-location note before the renewal decision and keep secrets out of Cockpit.");
   });
 });

@@ -1,0 +1,176 @@
+{
+  "name": "Company mailroom filing",
+  "owner": "founder/operator",
+  "companyFunction": "admin",
+  "financeReview": true,
+  "trigger": "manual Gmail/Drive/Sheets filing review",
+  "targetTool": "Gmail Processor / Apps Script",
+  "safetyLevel": "APPROVAL_REQUIRED",
+  "sourceWorkflow": "docs/workflows/company-mailroom-filing.md",
+  "machineReadableContract": "docs/workflows/company-mailroom-filing.contract.json",
+  "inputsRead": [
+    "Gmail labels",
+    "Gmail sender",
+    "Gmail subject",
+    "Gmail received date",
+    "Gmail message ID",
+    "Gmail thread ID",
+    "Attachment metadata",
+    "Attachment bytes",
+    "Existing log rows for duplicate detection"
+  ],
+  "blockedInputs": [
+    "Bank feeds",
+    "Payment systems",
+    "Tax lodgement systems",
+    "Xero records"
+  ],
+  "gmailLabels": [
+    "contract",
+    "receipt",
+    "invoice",
+    "certificate",
+    "insurance",
+    "venue",
+    "course",
+    "software"
+  ],
+  "driveFolders": {
+    "receiptInbox": "Company Core/Finance/Receipts/Inbox",
+    "receiptProcessed": "Company Core/Finance/Receipts/Processed",
+    "invoiceInbox": "Company Core/Finance/Invoices/Inbox",
+    "contracts": "Company Core/Admin/Contracts",
+    "insurance": "Company Core/Admin/Insurance",
+    "renewals": "Company Core/Admin/Renewals",
+    "automationLogs": "Company Core/Automation Logs"
+  },
+  "sheets": {
+    "financeReceiptLog": {
+      "requiredColumns": [
+        "received_at",
+        "sender",
+        "subject",
+        "gmail_message_id",
+        "gmail_thread_id",
+        "gmail_label",
+        "attachment_filename",
+        "attachment_hash",
+        "drive_file_id",
+        "drive_file_url",
+        "filing_status",
+        "exception_reason",
+        "reviewer_note"
+      ],
+      "reservedOcrColumns": [
+        "merchant_or_supplier",
+        "document_date",
+        "amount",
+        "tax_or_gst",
+        "currency",
+        "category",
+        "extraction_confidence"
+      ]
+    },
+    "supplierInvoiceReview": {
+      "requiredColumns": [
+        "received_at",
+        "sender",
+        "subject",
+        "gmail_message_id",
+        "gmail_thread_id",
+        "gmail_label",
+        "attachment_filename",
+        "attachment_hash",
+        "drive_file_id",
+        "drive_file_url",
+        "filing_status",
+        "exception_reason",
+        "reviewer_note"
+      ],
+      "reservedOcrColumns": [
+        "supplier",
+        "invoice_number",
+        "document_date",
+        "due_date",
+        "amount",
+        "tax_or_gst",
+        "currency",
+        "category",
+        "extraction_confidence"
+      ]
+    },
+    "automationExceptionLog": {
+      "requiredColumns": [
+        "created_at",
+        "source",
+        "gmail_message_id",
+        "gmail_thread_id",
+        "label",
+        "attachment_filename",
+        "exception_type",
+        "exception_detail",
+        "operator_status",
+        "resolved_at"
+      ]
+    }
+  },
+  "outputsCreated": [
+    "Drive quarantine file copy",
+    "Finance Receipt Log row",
+    "Supplier Invoice Review row",
+    "Automation Exception Log row",
+    "Cockpit run summary",
+    "Cockpit review action"
+  ],
+  "fileNamingConvention": "YYYY-MM-DD_vendor_amount_source.ext",
+  "duplicatePolicy": {
+    "keys": [
+      "gmail_message_id",
+      "attachment_hash"
+    ],
+    "defaultAction": "skip duplicate copy and write or keep a visible exception row"
+  },
+  "ocrFoundation": {
+    "enabledInV1": false,
+    "futureMode": "review fields only",
+    "requiresPrivacyReview": true,
+    "mayWriteFinalAccountingDecision": false
+  },
+  "blockedActions": [
+    "Payment execution",
+    "Bank rule changes",
+    "BAS, tax, legal, or compliance lodgement",
+    "Xero create, update, approve, or submit",
+    "Gmail original deletion",
+    "Permanent Drive quarantine deletion",
+    "External email sending",
+    "Public publishing"
+  ],
+  "rollbackOrDisablePath": [
+    "Stop using trigger labels",
+    "Disable the Apps Script trigger or Gmail Processor schedule",
+    "Move incorrectly filed Drive copies back to quarantine or exception review",
+    "Mark incorrect Sheet rows as needs_review",
+    "Close or cancel related Cockpit review actions once resolved"
+  ],
+  "failureNotificationPath": [
+    "Automation Exception Log row",
+    "Cockpit run summary",
+    "Open Cockpit review action"
+  ],
+  "proofMetrics": [
+    "labelled_messages_reviewed",
+    "attachments_filed",
+    "duplicate_count",
+    "exception_count",
+    "receipt_rows_created",
+    "invoice_rows_created",
+    "sample_retrieval_time",
+    "manual_corrections_per_batch"
+  ],
+  "promotionRule": {
+    "trustedLoopMinimumDays": 30,
+    "trustedLoopMinimumCleanRuns": 20,
+    "requiresWrittenRollbackCheck": true
+  }
+}
