@@ -11,6 +11,7 @@ export type LocalApprovalAutomationRef = {
 
 export type RenewalReminderActionDraft = {
   launchpadLinkId: string;
+  streamId?: string | null;
   title: string;
   description: string;
   priority: "MEDIUM" | "HIGH" | "CRITICAL";
@@ -95,6 +96,7 @@ function toReminderAction(link: LaunchpadHealthLink, now: Date): RenewalReminder
 
   return {
     launchpadLinkId: link.id,
+    streamId: link.streamId ?? null,
     title: `Review ${link.name} renewal due ${renewalAt}`,
     description: [
       `Launchpad renewal check for ${link.name}.`,

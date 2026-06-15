@@ -8,7 +8,7 @@ The central object is `Action`. Other records either create, explain, group, or 
 - `Stream`: strategic area such as DromaiosEd or ClinicBoss.
 - `CompanyFunction`: operational discipline such as finance or sales.
 - `Action`: work item with status, priority, due/review dates, source, and related records.
-- `LaunchpadLink`: external system with group, URL, renewal, cost, risk, and login-location note.
+- `LaunchpadLink`: external system with group, URL, renewal, cost, risk, login-location note, and an optional `streamId` linking the system to the venture it supports (enables spend-by-stream).
 - `Review`: stored daily/weekly/monthly review answers and generated follow-up actions.
 - `AssistantDraft`: AI output before approval.
 - `Automation` and `AutomationRun`: approval-gated automation registry and execution log.

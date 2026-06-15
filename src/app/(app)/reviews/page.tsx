@@ -1,11 +1,12 @@
 import { weeklyReviewAction } from "@/app/actions";
 import { WeeklyReviewForm } from "@/components/forms";
+import { ReviewMomentumPanel } from "@/components/review-momentum-panel";
 import { getReviewData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReviewsPage() {
-  const reviews = await getReviewData();
+  const { reviews, momentum } = await getReviewData();
   return (
     <div className="space-y-6">
       <div className="section-heading">
@@ -15,6 +16,7 @@ export default async function ReviewsPage() {
         </div>
         <p className="muted max-w-2xl">A weekly checkpoint that turns loose company worries into approved actions.</p>
       </div>
+      <ReviewMomentumPanel momentum={momentum} />
       <WeeklyReviewForm action={weeklyReviewAction} />
       <section className="panel space-y-3">
         <h2>Recent reviews</h2>

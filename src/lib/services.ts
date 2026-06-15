@@ -11,7 +11,11 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
+import { buildActivityFeed } from "./activity-feed";
 import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
+import { summariseAutomationRuns } from "./automation-history";
+import { buildCompletionTrend } from "./completion-trend";
+import { buildCompanyPulse } from "./company-pulse";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import {
   buildDailyInboxTriageDraft,
@@ -19,6 +23,11 @@ import {
   buildWeeklyReviewPrepDraft,
   getLocalDraftAutomationKind
 } from "./draft-automations";
+import { buildOperatingDigest } from "./operating-digest";
+import { buildRenewalCalendar } from "./renewal-calendar";
+import { buildReviewMomentum } from "./review-momentum";
+import { buildStreamPortfolio } from "./stream-portfolio";
+import { buildStreamSpend } from "./stream-spend";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { buildCompanyMailroomFilingRun } from "./mailroom-filing";
 import { prisma } from "./db";
@@ -53,7 +62,54 @@ export async function getTodayData() {
   const buckets = bucketActionsForToday(actions);
   const draftsNeedingReview = drafts.filter((draft) => draft.state !== AssistantDraftState.APPROVED).length;
 
+  const weekStart = startOfWeek(now);
+  const pulseSince = new Date(weekStart);
+  pulseSince.setUTCDate(pulseSince.getUTCDate() - 7);
+  const todayStart = startOfDay(now);
+
+  const [pulseActions, pulseRuns, pulseLinks, streamRefs, portfolioActions, portfolioRisks] = await Promise.all([
+    prisma.action.findMany({
+      where: {
+        OR: [
+          { completedAt: { gte: pulseSince } },
+          { createdAt: { gte: weekStart } },
+          {
+            AND: [
+              { status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
+              { dueAt: { lt: todayStart } }
+            ]
+          }
+        ]
+      },
+      select: { status: true, createdAt: true, completedAt: true, dueAt: true }
+    }),
+    prisma.automationRun.findMany({ orderBy: { createdAt: "desc" }, take: 50, select: { status: true } }),
+    prisma.launchpadLink.findMany({ select: { cost: true } }),
+    prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
+    prisma.action.findMany({
+      where: {
+        OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
+      },
+      select: { status: true, streamId: true, dueAt: true, completedAt: true }
+    }),
+    prisma.risk.findMany({
+      where: { status: { notIn: ["CLOSED", "RESOLVED", "DONE"] } },
+      select: { streamId: true, status: true, severity: true }
+    })
+  ]);
+
+  const pulse = buildCompanyPulse({
+    now,
+    actions: pulseActions,
+    automationRuns: pulseRuns,
+    links: pulseLinks,
+    openRiskCount: portfolioRisks.length
+  });
+  const portfolio = buildStreamPortfolio({ now, streams: streamRefs, actions: portfolioActions, risks: portfolioRisks });
+
   return {
+    pulse,
+    portfolio,
     actions,
     buckets,
     nextAction: buildNextBestAction({
@@ -197,11 +253,13 @@ export async function createLaunchpadLink(formData: FormData) {
       loginNote: optionalString(formData, "loginNote"),
       riskLevel: enumValue(formData, "riskLevel", RiskLevel, RiskLevel.LOW),
       owner: optionalString(formData, "owner"),
+      streamId: optionalString(formData, "streamId"),
       sensitive: formData.get("sensitive") === "on"
     }
   });
 
   revalidatePath("/launchpad");
+  revalidatePath("/portfolio");
 }
 
 export async function completeWeeklyReview(formData: FormData, userId: string) {
@@ -416,6 +474,7 @@ async function runRenewalReminderAutomation(automationId: string, userId: string
           sensitive: action.sensitive,
           createdById: userId,
           launchpadLinkId: action.launchpadLinkId,
+          streamId: action.streamId,
           automationId
         }
       });
@@ -535,7 +594,19 @@ export async function getLaunchpadData() {
 }
 
 export async function getReviewData() {
-  return prisma.review.findMany({ include: { actions: true }, orderBy: { createdAt: "desc" }, take: 20 });
+  const reviews = await prisma.review.findMany({ include: { actions: true }, orderBy: { createdAt: "desc" }, take: 20 });
+  const lastReviewAt = reviews[0]?.createdAt ?? null;
+  const sinceFilter = lastReviewAt ? { gte: lastReviewAt } : undefined;
+
+  const [completedCount, createdCount, newRiskCount, decisionCount] = await Promise.all([
+    prisma.action.count({ where: { completedAt: lastReviewAt ? { gte: lastReviewAt } : { not: null } } }),
+    prisma.action.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
+    prisma.risk.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
+    prisma.decision.count({ where: sinceFilter ? { decidedAt: sinceFilter } : undefined })
+  ]);
+
+  const momentum = buildReviewMomentum({ lastReviewAt, completedCount, createdCount, newRiskCount, decisionCount });
+  return { reviews, momentum };
 }
 
 export async function getAssistantDraftData() {
@@ -544,6 +615,271 @@ export async function getAssistantDraftData() {
 
 export async function getAutomationData() {
   return prisma.automation.findMany({ include: { runs: { orderBy: { createdAt: "desc" }, take: 5 } }, orderBy: { createdAt: "desc" } });
+}
+
+export async function getAutomationRunHistory(limit = 40) {
+  const runs = await prisma.automationRun.findMany({
+    include: {
+      automation: { select: { name: true, targetTool: true } },
+      triggeredBy: { select: { name: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit
+  });
+  return { runs, summary: summariseAutomationRuns(runs) };
+}
+
+export async function createRisk(formData: FormData) {
+  const issue = stringValue(formData, "issue");
+  if (!issue) throw new Error("Risk issue is required.");
+
+  const actionId = optionalString(formData, "actionId");
+  const streamId = optionalString(formData, "streamId");
+  const companyFunctionId = optionalString(formData, "companyFunctionId");
+  const actionContext = actionId && (!streamId || !companyFunctionId)
+    ? await prisma.action.findUnique({
+      where: { id: actionId },
+      select: { streamId: true, companyFunctionId: true }
+    })
+    : null;
+
+  await prisma.risk.create({
+    data: {
+      issue,
+      severity: enumValue(formData, "severity", RiskLevel, RiskLevel.MEDIUM),
+      status: stringValue(formData, "status") || "OPEN",
+      mitigation: optionalString(formData, "mitigation"),
+      nextReviewAt: dateValue(formData, "nextReviewAt"),
+      streamId: streamId ?? actionContext?.streamId,
+      companyFunctionId: companyFunctionId ?? actionContext?.companyFunctionId,
+      actionId
+    }
+  });
+
+  revalidatePath("/governance");
+  revalidatePath("/");
+  if (actionId) revalidatePath(`/actions/${actionId}`);
+}
+
+export async function updateRiskStatus(riskId: string, status: string) {
+  if (!riskId) throw new Error("Risk id is required.");
+  await prisma.risk.update({ where: { id: riskId }, data: { status } });
+  revalidatePath("/governance");
+  revalidatePath("/");
+}
+
+export async function createDecision(formData: FormData) {
+  const decision = stringValue(formData, "decision");
+  if (!decision) throw new Error("Decision text is required.");
+
+  const followUpActionId = optionalString(formData, "followUpActionId");
+
+  await prisma.decision.create({
+    data: {
+      decision,
+      rationale: optionalString(formData, "rationale"),
+      affectedArea: optionalString(formData, "affectedArea"),
+      relatedDocs: optionalString(formData, "relatedDocs"),
+      decidedAt: dateValue(formData, "decidedAt") ?? new Date(),
+      followUpActionId
+    }
+  });
+
+  revalidatePath("/governance");
+  revalidatePath("/");
+  if (followUpActionId) revalidatePath(`/actions/${followUpActionId}`);
+}
+
+export async function getGovernanceData() {
+  const [risks, decisions, reference] = await Promise.all([
+    prisma.risk.findMany({
+      include: { stream: true, companyFunction: true },
+      orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { createdAt: "desc" }]
+    }),
+    prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 50 }),
+    getReferenceData()
+  ]);
+  return { risks, decisions, ...reference };
+}
+
+export async function getPortfolioData() {
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const [streams, actions, risks, spendLinks] = await Promise.all([
+    prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
+    prisma.action.findMany({
+      where: {
+        OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
+      },
+      select: { status: true, streamId: true, dueAt: true, completedAt: true }
+    }),
+    prisma.risk.findMany({
+      where: { status: { notIn: ["CLOSED", "RESOLVED", "DONE"] } },
+      select: { streamId: true, status: true, severity: true }
+    }),
+    prisma.launchpadLink.findMany({ select: { cost: true, streamId: true } })
+  ]);
+  return {
+    portfolio: buildStreamPortfolio({ now, streams, actions, risks }),
+    spend: buildStreamSpend({ streams, links: spendLinks })
+  };
+}
+
+export async function getActionDetail(id: string) {
+  const [action, reference] = await Promise.all([
+    prisma.action.findUnique({
+      where: { id },
+      include: {
+        stream: true,
+        companyFunction: true,
+        assistantDraft: true,
+        automation: true,
+        review: true,
+        launchpadLink: true,
+        risks: true,
+        decisions: true
+      }
+    }),
+    getReferenceData()
+  ]);
+  return { action, ...reference };
+}
+
+export async function updateActionFromForm(actionId: string, formData: FormData) {
+  const title = stringValue(formData, "title");
+  if (!title) throw new Error("Action title is required.");
+
+  const existing = await prisma.action.findUnique({ where: { id: actionId }, select: { completedAt: true } });
+  if (!existing) throw new Error("Action not found.");
+
+  const status = enumValue(formData, "status", ActionStatus, ActionStatus.OPEN);
+
+  await prisma.action.update({
+    where: { id: actionId },
+    data: {
+      title,
+      description: optionalString(formData, "description") ?? null,
+      status,
+      priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+      dueAt: dateValue(formData, "dueAt") ?? null,
+      reviewAt: dateValue(formData, "reviewAt") ?? null,
+      nextStep: optionalString(formData, "nextStep") ?? null,
+      streamId: optionalString(formData, "streamId") ?? null,
+      companyFunctionId: optionalString(formData, "companyFunctionId") ?? null,
+      sensitive: formData.get("sensitive") === "on",
+      completedAt: status === ActionStatus.DONE ? existing.completedAt ?? new Date() : null
+    }
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath(`/actions/${actionId}`);
+}
+
+export async function getOperatingDigest() {
+  const [data, renewalLinks, digestRisks] = await Promise.all([
+    getTodayData(),
+    prisma.launchpadLink.findMany({ select: { id: true, name: true, group: true, cost: true, renewalAt: true, riskLevel: true } }),
+    prisma.risk.findMany({
+      orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { createdAt: "desc" }],
+      select: { issue: true, severity: true, status: true }
+    })
+  ]);
+  const closed = new Set(["CLOSED", "RESOLVED", "DONE"]);
+  const calendar = buildRenewalCalendar({ links: renewalLinks });
+
+  const active = [
+    ...data.buckets.overdue,
+    ...data.buckets.dueToday,
+    ...data.buckets.blocked,
+    ...data.buckets.waiting,
+    ...data.buckets.upcoming
+  ];
+
+  const topActions = active.slice(0, 10).map((action) => ({
+    title: action.title,
+    status: action.status,
+    priority: action.priority,
+    streamName: action.stream?.name ?? null,
+    dueKey: action.dueAt ? new Date(action.dueAt).toISOString().slice(0, 10) : null
+  }));
+
+  const openRisks = digestRisks
+    .filter((risk) => !closed.has(risk.status.toUpperCase()))
+    .map((risk) => ({ issue: risk.issue, severity: risk.severity, status: risk.status }));
+
+  const recentDecisions = data.decisions.map((decision) => ({ decision: decision.decision, decidedAt: decision.decidedAt }));
+
+  const renewalsDue = [...calendar.overdue, ...calendar.months.flatMap((month) => month.items)]
+    .slice(0, 12)
+    .map((item) => ({ name: item.name, renewalKey: item.renewalKey }));
+
+  return buildOperatingDigest({
+    generatedAt: new Date(),
+    pulse: data.pulse,
+    portfolio: data.portfolio,
+    topActions,
+    openRisks,
+    recentDecisions,
+    renewalsDue,
+    renewalForecast: { total: calendar.windowTotal, count: calendar.windowCount, monthsAhead: calendar.monthsAhead }
+  });
+}
+
+export async function getActivityData() {
+  const now = new Date();
+  const trendWeeks = 8;
+  const trendWindowStart = startOfWeek(now);
+  trendWindowStart.setUTCDate(trendWindowStart.getUTCDate() - 7 * (trendWeeks - 1));
+  const [completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews, completedForTrend] =
+    await Promise.all([
+      prisma.action.findMany({
+        where: { completedAt: { not: null } },
+        orderBy: { completedAt: "desc" },
+        take: 20,
+        select: { id: true, title: true, completedAt: true, stream: { select: { name: true } } }
+      }),
+      prisma.action.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: { id: true, title: true, createdAt: true, source: true }
+      }),
+      prisma.risk.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, issue: true, severity: true, createdAt: true } }),
+      prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 15, select: { id: true, decision: true, decidedAt: true } }),
+      prisma.automationRun.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 15,
+        select: { id: true, status: true, createdAt: true, automation: { select: { name: true } } }
+      }),
+      prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, sourceSummary: true, state: true, createdAt: true } }),
+      prisma.review.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { id: true, type: true, createdAt: true } }),
+      prisma.action.findMany({ where: { completedAt: { gte: trendWindowStart } }, orderBy: { completedAt: "desc" }, select: { completedAt: true } })
+    ]);
+
+  const feed = buildActivityFeed({ completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews }, 40);
+  const trend = buildCompletionTrend({ now, completedAts: completedForTrend.map((action) => action.completedAt), weeks: trendWeeks });
+  return { feed, trend };
+}
+
+export async function getCommandPaletteItems() {
+  const [actions, links] = await Promise.all([
+    prisma.action.findMany({
+      where: { status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
+      orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
+      select: { id: true, title: true, status: true, priority: true, dueAt: true, updatedAt: true }
+    }),
+    prisma.launchpadLink.findMany({
+      orderBy: [{ group: "asc" }, { name: "asc" }],
+      take: 60,
+      select: { id: true, name: true, url: true, group: true }
+    })
+  ]);
+  const sortedActions = actions
+    .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || dateRank(a.dueAt) - dateRank(b.dueAt) || b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, 50)
+    .map(({ id, title, status }) => ({ id, title, status }));
+
+  return { actions: sortedActions, links };
 }
 
 function stringValue(formData: FormData, key: string) {
@@ -570,17 +906,33 @@ function dateFromKey(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
+function priorityRank(priority: Priority) {
+  const ranks: Record<Priority, number> = {
+    [Priority.CRITICAL]: 0,
+    [Priority.HIGH]: 1,
+    [Priority.MEDIUM]: 2,
+    [Priority.LOW]: 3
+  };
+  return ranks[priority] ?? 4;
+}
+
+function dateRank(value: Date | null) {
+  return value ? value.getTime() : Number.POSITIVE_INFINITY;
+}
+
 function enumValue<T extends Record<string, string>>(formData: FormData, key: string, values: T, fallback: T[keyof T]) {
   const value = stringValue(formData, key);
   return Object.values(values).includes(value) ? (value as T[keyof T]) : fallback;
 }
 
+function startOfDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
 function startOfWeek(date: Date) {
-  const copy = new Date(date);
-  const day = copy.getDay();
-  const diff = copy.getDate() - day + (day === 0 ? -6 : 1);
-  copy.setDate(diff);
-  copy.setHours(0, 0, 0, 0);
+  const copy = startOfDay(date);
+  const day = copy.getUTCDay();
+  copy.setUTCDate(copy.getUTCDate() + (day === 0 ? -6 : 1 - day));
   return copy;
 }
 

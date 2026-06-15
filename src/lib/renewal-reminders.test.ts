@@ -57,7 +57,8 @@ describe("buildRenewalReminderRun", () => {
           owner: "Callum",
           riskLevel: "HIGH",
           loginNote: "Password manager entry name for the Xero admin account",
-          sensitive: true
+          sensitive: true,
+          streamId: "money-stream"
         },
         {
           id: "airwallex",
@@ -117,7 +118,8 @@ describe("buildRenewalReminderRun", () => {
     expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "xero")).toMatchObject({
       title: "Review Xero renewal due 2026-07-01",
       priority: "HIGH",
-      sensitive: true
+      sensitive: true,
+      streamId: "money-stream"
     });
     expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "chatgpt")).toMatchObject({
       priority: "MEDIUM"

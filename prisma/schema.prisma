@@ -117,8 +117,9 @@ model Stream {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  actions Action[]
-  risks   Risk[]
+  actions        Action[]
+  risks          Risk[]
+  launchpadLinks LaunchpadLink[]
 }
 
 model CompanyFunction {
@@ -189,11 +190,15 @@ model LaunchpadLink {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  streamId String?
+
+  stream  Stream?  @relation(fields: [streamId], references: [id], onDelete: SetNull)
   actions Action[]
 
   @@index([group])
   @@index([renewalAt])
   @@index([riskLevel])
+  @@index([streamId])
 }
 
 model Review {
