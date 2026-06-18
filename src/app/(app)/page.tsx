@@ -2,6 +2,7 @@ import { quickCaptureAction } from "@/app/actions";
 import { GovernanceSummaryPanel } from "@/components/governance-summary";
 import { LaunchpadHealthPanel } from "@/components/launchpad-health";
 import { OperatingBriefPanel } from "@/components/operating-brief-panel";
+import { SetupProgressPanel } from "@/components/setup-progress";
 import { TodayBoard } from "@/components/today-board";
 import { getTodayData } from "@/lib/services";
 
@@ -14,6 +15,7 @@ export default async function HomePage() {
     <div className="space-y-6">
       <TodayBoard buckets={data.buckets} focusSet={data.focusSet} nextAction={data.nextAction} quickCaptureAction={quickCaptureAction} />
       <OperatingBriefPanel brief={data.brief} />
+      <SetupProgressPanel readiness={data.setupReadiness} outstanding={data.setupOutstanding} />
       <section className="grid gap-5 xl:grid-cols-[1fr_1fr]">
         <LaunchpadHealthPanel health={data.launchpadHealth} />
         <GovernanceSummaryPanel summary={data.governanceSummary} />

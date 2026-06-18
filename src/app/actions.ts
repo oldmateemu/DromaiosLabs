@@ -12,6 +12,7 @@ import {
   createQuickCaptureDraft,
   prepareDraftAutomation,
   runAutomation,
+  setSetupItemStatus,
   updateActionStatus
 } from "@/lib/services";
 
@@ -52,6 +53,28 @@ export async function approveDraftAction(formData: FormData) {
   const user = await requireUser();
   await approveAssistantDraft(formData, user.id);
   redirect("/actions");
+}
+
+const SETUP_STATUS_TRANSITIONS = new Set<ActionStatus>([
+  ActionStatus.OPEN,
+  ActionStatus.IN_PROGRESS,
+  ActionStatus.WAITING,
+  ActionStatus.BLOCKED,
+  ActionStatus.DONE
+]);
+
+export async function setSetupItemStatusAction(formData: FormData) {
+  const user = await requireUser();
+  const itemKey = String(formData.get("itemKey") ?? "");
+  if (!itemKey) throw new Error("Missing setup item key.");
+
+  const requested = String(formData.get("status") ?? "");
+  if (!SETUP_STATUS_TRANSITIONS.has(requested as ActionStatus)) {
+    throw new Error(`Invalid setup status: ${requested}`);
+  }
+
+  await setSetupItemStatus(itemKey, requested as ActionStatus, user.id);
+  redirect("/setup");
 }
 
 export async function createLaunchpadLinkAction(formData: FormData) {

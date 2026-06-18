@@ -10,6 +10,12 @@ export type NextBestAction = {
   tone: CommandTone;
 };
 
+export type SetupAlert = {
+  /** Title of the overdue foundational setup item to escalate. */
+  title: string;
+  overdueCritical: boolean;
+};
+
 export type FocusSetItem = {
   label: "Control" | "Revenue" | "Strategy";
   actionTitle: string | null;
@@ -78,13 +84,27 @@ export function buildNextBestAction({
   buckets,
   today,
   draftCount,
-  automationCount
+  automationCount,
+  setupAlert
 }: {
   buckets: TodayBuckets<ActionLike>;
   today: string;
   draftCount: number;
   automationCount: number;
+  setupAlert?: SetupAlert;
 }): NextBestAction {
+  // A foundational setup obligation that has gone overdue (insurance, privacy,
+  // legal, tax) outranks routine overdue work — these carry company-level risk.
+  if (setupAlert?.overdueCritical) {
+    return {
+      title: "Close a foundational setup gap",
+      body: `${setupAlert.title} is overdue. Foundational legal, insurance, privacy, or tax work outranks routine tasks.`,
+      href: "/setup",
+      label: "Open setup",
+      tone: "danger"
+    };
+  }
+
   const overdue = buckets.overdue[0];
   if (overdue) {
     return {
