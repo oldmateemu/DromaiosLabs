@@ -37,6 +37,35 @@ describe("buildNextBestAction", () => {
     expect(next.tone).toBe("danger");
   });
 
+  it("escalates an overdue foundational setup gap above routine overdue work", () => {
+    const buckets = emptyBuckets();
+    buckets.overdue.push({ id: "a1", title: "Overdue BAS check", status: "OPEN", priority: "HIGH", dueAt: "2026-05-20" });
+
+    const next = buildNextBestAction({
+      buckets,
+      today: "2026-05-30",
+      draftCount: 0,
+      automationCount: 1,
+      setupAlert: { title: "Professional indemnity insurance in force", overdueCritical: true }
+    });
+
+    expect(next.title).toBe("Close a foundational setup gap");
+    expect(next.body).toContain("Professional indemnity insurance in force");
+    expect(next.href).toBe("/setup");
+    expect(next.tone).toBe("danger");
+  });
+
+  it("ignores the setup alert when it is not an overdue critical gap", () => {
+    const next = buildNextBestAction({
+      buckets: emptyBuckets(),
+      today: "2026-05-30",
+      draftCount: 0,
+      automationCount: 1,
+      setupAlert: { title: "Trademark filings", overdueCritical: false }
+    });
+    expect(next.title).toBe("Set the daily focus");
+  });
+
   it("falls back through due today, blocked, drafts, automation setup, and the calm daily lane", () => {
     const dueToday = emptyBuckets();
     dueToday.dueToday.push({ id: "a1", title: "Send Perth proposal", status: "OPEN", priority: "HIGH", dueAt: "2026-05-30" });

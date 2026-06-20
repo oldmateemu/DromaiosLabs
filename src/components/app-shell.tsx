@@ -6,10 +6,12 @@ import {
   Gauge,
   LayoutGrid,
   Link as LinkIcon,
+  ListChecks,
   LogOut,
   Repeat,
   ShieldAlert,
-  ShieldCheck
+  ShieldCheck,
+  Target
 } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 import { CommandPalette, type CommandItem } from "@/components/command-palette";
@@ -18,7 +20,9 @@ import { AppNavLink } from "@/components/nav-link";
 const navItems = [
   { href: "/", label: "Today", icon: Gauge },
   { href: "/portfolio", label: "Portfolio", icon: LayoutGrid },
+  { href: "/setup", label: "Setup", icon: ListChecks },
   { href: "/actions", label: "Actions", icon: ClipboardList },
+  { href: "/pipeline", label: "Pipeline", icon: Target },
   { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
   { href: "/governance", label: "Governance", icon: ShieldAlert },
   { href: "/reviews", label: "Reviews", icon: ShieldCheck },

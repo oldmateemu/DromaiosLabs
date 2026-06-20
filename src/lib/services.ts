@@ -18,6 +18,17 @@ import { buildCompletionTrend } from "./completion-trend";
 import { buildCompanyPulse } from "./company-pulse";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import {
+  buildSetupDraftContext,
+  buildSetupReadiness,
+  COMPANY_SETUP_CHECKLIST,
+  normaliseSetupTitle,
+  selectOutstandingSetupItems,
+  SETUP_CHECKLIST_STREAM,
+  setupDueDate,
+  summariseSetupChecklist,
+  type SetupActionState
+} from "./company-setup-checklist";
+import {
   buildDailyInboxTriageDraft,
   buildStaleTaskSummaryDraft,
   buildWeeklyReviewPrepDraft,
@@ -34,6 +45,7 @@ import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
 import { buildRenewalReminderRun, getLocalApprovalAutomationKind, planRenewalReminderPersistence } from "./renewal-reminders";
+import { SALES_PIPELINE_STAGES, summariseSalesPipeline } from "./sales-pipeline";
 
 export async function getReferenceData() {
   const [streams, companyFunctions] = await Promise.all([
@@ -44,7 +56,7 @@ export async function getReferenceData() {
 }
 
 export async function getTodayData() {
-  const [actions, links, automations, drafts, risks, decisions] = await Promise.all([
+  const [actions, links, automations, drafts, risks, decisions, setupSummary] = await Promise.all([
     prisma.action.findMany({
       orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
       include: { stream: true, companyFunction: true },
@@ -54,13 +66,20 @@ export async function getTodayData() {
     prisma.automation.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
     prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
     prisma.risk.findMany({ orderBy: [{ severity: "desc" }, { nextReviewAt: "asc" }, { createdAt: "desc" }], take: 5 }),
-    prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 5 })
+    prisma.decision.findMany({ orderBy: { decidedAt: "desc" }, take: 5 }),
+    getCompanySetupData()
   ]);
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const buckets = bucketActionsForToday(actions);
   const draftsNeedingReview = drafts.filter((draft) => draft.state !== AssistantDraftState.APPROVED).length;
+
+  const setupReadiness = buildSetupReadiness(setupSummary);
+  const setupOutstanding = selectOutstandingSetupItems(setupSummary, 3);
+  const overdueFoundational = setupOutstanding.find(
+    (item) => item.overdue && (item.priority === "CRITICAL" || item.priority === "HIGH")
+  );
 
   const weekStart = startOfWeek(now);
   const pulseSince = new Date(weekStart);
@@ -112,11 +131,16 @@ export async function getTodayData() {
     portfolio,
     actions,
     buckets,
+    setupReadiness,
+    setupOutstanding,
     nextAction: buildNextBestAction({
       buckets,
       today,
       draftCount: draftsNeedingReview,
-      automationCount: automations.length
+      automationCount: automations.length,
+      setupAlert: overdueFoundational
+        ? { title: overdueFoundational.title, overdueCritical: true }
+        : undefined
     }),
     focusSet: buildFocusSet(buckets),
     brief: buildOperatingBrief({
@@ -551,7 +575,8 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
           take: 50
         }),
         links: await prisma.launchpadLink.findMany({ orderBy: [{ riskLevel: "desc" }, { renewalAt: "asc" }, { name: "asc" }], take: 80 }),
-        draftsNeedingReview: await prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } })
+        draftsNeedingReview: await prisma.assistantDraft.count({ where: { state: { not: AssistantDraftState.APPROVED } } }),
+        setup: buildSetupDraftContext(await getCompanySetupData())
       })
       : kind === "STALE_TASK_SUMMARY"
         ? buildStaleTaskSummaryDraft({
@@ -601,6 +626,113 @@ export async function getActionRegisterData(filters: Record<string, string | und
   ]);
 
   return { actions, ...reference };
+}
+
+export async function getCompanySetupData() {
+  const titles = COMPANY_SETUP_CHECKLIST.map((item) => item.title);
+  const actions = await prisma.action.findMany({
+    where: { title: { in: titles } },
+    // Oldest first so that if a title is ever duplicated, this view and
+    // setSetupItemStatus deterministically resolve to the same row.
+    orderBy: { createdAt: "asc" },
+    select: { id: true, title: true, status: true, dueAt: true }
+  });
+
+  const stateByTitle = new Map<string, SetupActionState>();
+  for (const action of actions) {
+    const key = normaliseSetupTitle(action.title);
+    if (stateByTitle.has(key)) continue;
+    stateByTitle.set(key, { status: action.status as SetupActionState["status"], dueAt: action.dueAt });
+  }
+
+  return summariseSetupChecklist(COMPANY_SETUP_CHECKLIST, stateByTitle);
+}
+
+export async function setSetupItemStatus(itemKey: string, status: ActionStatus, userId: string) {
+  const item = COMPANY_SETUP_CHECKLIST.find((entry) => entry.key === itemKey);
+  if (!item) throw new Error("Unknown setup checklist item.");
+
+  // Oldest first, matching getCompanySetupData, so both resolve the same row.
+  const existing = await prisma.action.findFirst({
+    where: { title: item.title },
+    orderBy: { createdAt: "asc" }
+  });
+
+  if (existing) {
+    // Refresh the due date when reopening a completed item (or when one is
+    // missing) so it lands back on a fresh horizon rather than instantly overdue.
+    const reopening = existing.status === ActionStatus.DONE && status !== ActionStatus.DONE;
+    const dueAt = status === ActionStatus.DONE
+      ? existing.dueAt
+      : reopening || !existing.dueAt
+        ? setupDueDate(item)
+        : existing.dueAt;
+
+    await prisma.action.update({
+      where: { id: existing.id },
+      data: {
+        status,
+        dueAt,
+        completedAt: status === ActionStatus.DONE ? new Date() : null
+      }
+    });
+  } else {
+    // Self-healing: if the action was never seeded (or was deleted), recreate it
+    // from the checklist definition so the cockpit stays consistent.
+    const [stream, companyFunction] = await Promise.all([
+      prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } }),
+      prisma.companyFunction.findUnique({ where: { name: item.companyFunction } })
+    ]);
+    if (!stream) throw new Error(`Missing setup stream: ${SETUP_CHECKLIST_STREAM}.`);
+    if (!companyFunction) throw new Error(`Missing company function: ${item.companyFunction}.`);
+
+    await prisma.action.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        nextStep: item.nextStep,
+        sensitive: item.sensitive,
+        priority: item.priority as Priority,
+        status,
+        dueAt: setupDueDate(item),
+        completedAt: status === ActionStatus.DONE ? new Date() : null,
+        source: ActionSource.USER,
+        streamId: stream.id,
+        companyFunctionId: companyFunction.id,
+        createdById: userId
+      }
+    });
+  }
+
+  revalidatePath("/setup");
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath("/reviews");
+}
+
+const HUBSPOT_DEFAULT_URL = "https://app.hubspot.com/";
+
+export async function getSalesPipelineData() {
+  const [salesActions, hubspot] = await Promise.all([
+    prisma.action.findMany({
+      where: {
+        companyFunction: { name: { equals: "sales", mode: "insensitive" } },
+        status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
+      },
+      include: { stream: true },
+      // priority desc so the take limit keeps the highest-priority deals: the
+      // Priority enum is declared LOW..CRITICAL, so desc returns CRITICAL first.
+      orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+      take: 50
+    }),
+    prisma.launchpadLink.findFirst({ where: { name: "HubSpot" } })
+  ]);
+
+  return {
+    stages: SALES_PIPELINE_STAGES,
+    summary: summariseSalesPipeline(salesActions),
+    hubspotUrl: hubspot?.url ?? HUBSPOT_DEFAULT_URL
+  };
 }
 
 export async function getLaunchpadData() {
