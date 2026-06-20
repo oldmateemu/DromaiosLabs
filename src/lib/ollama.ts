@@ -14,16 +14,15 @@ export async function draftActionFromQuickCapture(sourceText: string) {
     `Rough note: ${sourceText}`
   ].join("\n");
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45_000);
     const response = await fetch(`${baseUrl}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model, prompt, stream: false, format: "json" }),
       signal: controller.signal
     });
-    clearTimeout(timeout);
 
     if (!response.ok) {
       return {
@@ -55,5 +54,10 @@ export async function draftActionFromQuickCapture(sourceText: string) {
       draft: normaliseQuickCaptureDraft(sourceText, ""),
       error: error instanceof Error ? error.message : "Ollama request failed."
     };
+  } finally {
+    // Always clear the abort timer, including the throw path, so a failed
+    // request never leaves a 45s timer pending (which would keep the process
+    // or a test worker alive).
+    clearTimeout(timeout);
   }
 }

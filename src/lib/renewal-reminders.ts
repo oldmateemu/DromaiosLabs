@@ -25,6 +25,20 @@ export type RenewalReminderRun = {
   actionsToCreate: RenewalReminderActionDraft[];
 };
 
+export type ExistingRenewalReminderRef = {
+  id: string;
+  launchpadLinkId: string | null;
+};
+
+export type RenewalReminderActionUpdate = RenewalReminderActionDraft & {
+  actionId: string;
+};
+
+export type RenewalReminderPersistencePlan = {
+  actionsToCreate: RenewalReminderActionDraft[];
+  actionsToUpdate: RenewalReminderActionUpdate[];
+};
+
 const RENEWAL_WINDOW_DAYS = 30;
 const REMINDER_LEAD_DAYS = 7;
 
@@ -84,6 +98,27 @@ export function buildRenewalReminderRun({
   };
 }
 
+export function planRenewalReminderPersistence(
+  run: RenewalReminderRun,
+  existingReminders: ExistingRenewalReminderRef[]
+): RenewalReminderPersistencePlan {
+  const existingByLaunchpadLinkId = new Map(
+    existingReminders
+      .filter((action): action is ExistingRenewalReminderRef & { launchpadLinkId: string } => Boolean(action.launchpadLinkId))
+      .map((action) => [action.launchpadLinkId, action.id])
+  );
+
+  return {
+    actionsToCreate: run.actionsToCreate.filter((action) => !existingByLaunchpadLinkId.has(action.launchpadLinkId)),
+    actionsToUpdate: run.actionsToCreate
+      .map((action) => {
+        const actionId = existingByLaunchpadLinkId.get(action.launchpadLinkId);
+        return actionId ? { ...action, actionId } : null;
+      })
+      .filter((action): action is RenewalReminderActionUpdate => Boolean(action))
+  };
+}
+
 function toReminderAction(link: LaunchpadHealthLink, now: Date): RenewalReminderActionDraft {
   const renewalAt = dateKey(new Date(link.renewalAt as Date | string));
   const dueAt = reminderDueDate(renewalAt, now);
@@ -91,7 +126,9 @@ function toReminderAction(link: LaunchpadHealthLink, now: Date): RenewalReminder
   const owner = link.owner?.trim() || "owner not recorded";
   const group = link.group?.trim() || "ungrouped";
   const cost = link.cost === null || link.cost === undefined || String(link.cost).trim() === "" ? "cost not recorded" : String(link.cost);
+  const risk = link.riskLevel ?? "not recorded";
   const credentialContext = credentialCheckLine(link);
+  const credential = credentialSummary(link);
 
   return {
     launchpadLinkId: link.id,
@@ -102,13 +139,13 @@ function toReminderAction(link: LaunchpadHealthLink, now: Date): RenewalReminder
       `Group: ${group}.`,
       `Owner: ${owner}.`,
       `Cost: ${cost}.`,
-      `Risk: ${link.riskLevel ?? "not recorded"}.`,
+      `Risk: ${risk}.`,
       `Credential note: ${credentialContext}`
     ].join("\n"),
     priority,
     dueAt,
     reviewAt: dueAt,
-    nextStep: `Confirm the renewal decision, payment status, account owner, cost, and credential access for ${link.name}.`,
+    nextStep: `Review ${link.name} renewal decision before ${renewalAt}: owner ${owner}; cost ${cost}; risk ${risk}; credential note ${credential}.`,
     sensitive: Boolean(link.sensitive)
   };
 }

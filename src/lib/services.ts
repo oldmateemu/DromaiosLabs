@@ -11,7 +11,7 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { buildActionRegisterWhere } from "./action-filters";
-import { assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
+import { AutomationBlockedError, assertAutomationCanPrepareDraft, assertAutomationCanRun } from "./automations";
 import { buildFocusSet, buildGovernanceSummary, buildLaunchpadHealth, buildNextBestAction } from "./cockpit-insights";
 import {
   buildDailyInboxTriageDraft,
@@ -24,7 +24,7 @@ import { buildCompanyMailroomFilingRun } from "./mailroom-filing";
 import { prisma } from "./db";
 import { draftActionFromQuickCapture } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
-import { buildRenewalReminderRun, getLocalApprovalAutomationKind } from "./renewal-reminders";
+import { buildRenewalReminderRun, getLocalApprovalAutomationKind, planRenewalReminderPersistence } from "./renewal-reminders";
 
 export async function getReferenceData() {
   const [streams, companyFunctions] = await Promise.all([
@@ -311,7 +311,7 @@ export async function runAutomation(automationId: string, approved: boolean, use
       data: {
         automationId,
         triggeredById: userId,
-        status: error instanceof Error && error.message.includes("cannot execute") ? AutomationRunStatus.BLOCKED : AutomationRunStatus.FAILED,
+        status: error instanceof AutomationBlockedError ? AutomationRunStatus.BLOCKED : AutomationRunStatus.FAILED,
         requestSummary: `Manual trigger for ${automation.name}`,
         error: error instanceof Error ? error.message : "Automation failed."
       }
@@ -395,11 +395,10 @@ async function runRenewalReminderAutomation(automationId: string, userId: string
         launchpadLinkId: { in: launchpadLinkIds },
         status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
       },
-      select: { launchpadLinkId: true }
+      select: { id: true, launchpadLinkId: true }
     })
     : [];
-  const existingIds = new Set(existingReminders.map((action) => action.launchpadLinkId).filter((id): id is string => Boolean(id)));
-  const actionsToCreate = run.actionsToCreate.filter((action) => !existingIds.has(action.launchpadLinkId));
+  const { actionsToCreate, actionsToUpdate } = planRenewalReminderPersistence(run, existingReminders);
 
   await prisma.$transaction(async (tx) => {
     for (const action of actionsToCreate) {
@@ -421,6 +420,23 @@ async function runRenewalReminderAutomation(automationId: string, userId: string
       });
     }
 
+    for (const action of actionsToUpdate) {
+      await tx.action.update({
+        where: { id: action.actionId },
+        data: {
+          title: action.title,
+          description: action.description,
+          priority: action.priority,
+          dueAt: dateFromKey(action.dueAt),
+          reviewAt: dateFromKey(action.reviewAt),
+          nextStep: action.nextStep,
+          sensitive: action.sensitive,
+          launchpadLinkId: action.launchpadLinkId,
+          automationId
+        }
+      });
+    }
+
     await tx.automationRun.create({
       data: {
         automationId,
@@ -432,7 +448,7 @@ async function runRenewalReminderAutomation(automationId: string, userId: string
           "",
           "Run result",
           `- Reminder actions created this run: ${actionsToCreate.length}`,
-          `- Existing open reminders skipped: ${existingIds.size}`
+          `- Existing open reminders refreshed this run: ${actionsToUpdate.length}`
         ].join("\n")
       }
     });
@@ -454,7 +470,7 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
   try {
     assertAutomationCanPrepareDraft(automation.safetyLevel);
     if (automation.status !== "ACTIVE") {
-      throw new Error("Paused automations cannot prepare drafts.");
+      throw new AutomationBlockedError("Inactive automations cannot prepare drafts.");
     }
     if (!kind) {
       throw new Error("No local draft runner is registered for this automation.");
@@ -503,9 +519,7 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
       data: {
         automationId,
         triggeredById: userId,
-        status: message.includes("draft-only") || message.includes("Blocked") || message.includes("Paused")
-          ? AutomationRunStatus.BLOCKED
-          : AutomationRunStatus.FAILED,
+        status: error instanceof AutomationBlockedError ? AutomationRunStatus.BLOCKED : AutomationRunStatus.FAILED,
         requestSummary,
         error: message
       }

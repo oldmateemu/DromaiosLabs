@@ -25,6 +25,8 @@ describe("buildCompanyMailroomFilingRun", () => {
     expect(run.responseSummary).toContain("Receipt and invoice support");
     expect(run.responseSummary).toContain("Company Core/Finance/Receipts/Inbox");
     expect(run.responseSummary).toContain("Company Core/Finance/Invoices/Inbox");
+    expect(run.responseSummary).toContain("Company Core/Admin/Renewals");
+    expect(run.actionsToCreate[0].description).toContain("Company Core/Admin/Renewals");
     expect(run.responseSummary).toContain("Finance Receipt Log");
     expect(run.responseSummary).toContain("Supplier Invoice Review");
     expect(run.responseSummary).toContain("OCR foundation");
