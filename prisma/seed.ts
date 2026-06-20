@@ -77,6 +77,51 @@ async function main() {
       await prisma.launchpadLink.create({ data: metadataForCreate(system) });
     }
   }
+
+  await seedGovernance();
+}
+
+async function seedGovernance() {
+  const [riskCount, decisionCount] = await Promise.all([prisma.risk.count(), prisma.decision.count()]);
+
+  if (riskCount === 0) {
+    const riskFunction = await prisma.companyFunction.findUnique({ where: { name: "risk" } });
+    await prisma.risk.createMany({
+      data: [
+        {
+          issue: "Key supplier or platform renewal lapses without notice",
+          severity: "HIGH",
+          status: "OPEN",
+          mitigation: "Track renewals in Launchpad and run the renewal reminder automation weekly.",
+          companyFunctionId: riskFunction?.id ?? null
+        },
+        {
+          issue: "Founder workload concentration creates single point of failure",
+          severity: "MEDIUM",
+          status: "OPEN",
+          mitigation: "Capture recurring tasks as automations and document operating procedures.",
+          companyFunctionId: riskFunction?.id ?? null
+        }
+      ]
+    });
+  }
+
+  if (decisionCount === 0) {
+    await prisma.decision.createMany({
+      data: [
+        {
+          decision: "Run Dromaios Cockpit local/VPN-first before any public hardening",
+          rationale: "Keeps sensitive company data off public infrastructure while the operating model stabilises.",
+          affectedArea: "admin"
+        },
+        {
+          decision: "Default the assistant to Ollama for private company-memory work",
+          rationale: "Avoids sending sensitive context to cloud AI unless privacy rules explicitly allow it.",
+          affectedArea: "product"
+        }
+      ]
+    });
+  }
 }
 
 function metadataForCreate(system: LaunchpadSystemMetadata) {

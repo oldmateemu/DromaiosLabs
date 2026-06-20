@@ -61,7 +61,8 @@ describe("buildRenewalReminderRun", () => {
           owner: "Callum",
           riskLevel: "HIGH",
           loginNote: "Password manager entry name for the Xero admin account",
-          sensitive: true
+          sensitive: true,
+          streamId: "money-stream"
         },
         {
           id: "airwallex",
@@ -122,7 +123,8 @@ describe("buildRenewalReminderRun", () => {
       title: "Review Xero renewal due 2026-07-01",
       priority: "HIGH",
       nextStep: "Review Xero renewal decision before 2026-07-01: owner Callum; cost 0.00; risk HIGH; credential note Password manager entry name for the Xero admin account.",
-      sensitive: true
+      sensitive: true,
+      streamId: "money-stream"
     });
     expect(run.actionsToCreate.find((action) => action.launchpadLinkId === "lawpath")?.nextStep).toBe(
       "Review Lawpath renewal decision before 2026-07-01: owner Callum; cost 0.00; risk HIGH; credential note Password manager entry name for the Lawpath admin account."

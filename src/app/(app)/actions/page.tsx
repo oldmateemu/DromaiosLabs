@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createActionAction, completeActionAction } from "@/app/actions";
 import { ActionForm, ActionRegisterFilters, ActionSavedViews, CollapsiblePanel } from "@/components/forms";
 import { getActionRegisterData } from "@/lib/services";
@@ -45,7 +46,9 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
             {data.actions.map((action) => (
               <tr key={action.id}>
                 <td>
-                  <p className="font-medium text-command-ink">{action.title}</p>
+                  <Link className="font-medium text-command-ink hover:text-command-navy hover:underline" href={`/actions/${action.id}`}>
+                    {action.title}
+                  </Link>
                   {action.nextStep ? <p className="muted">{action.nextStep}</p> : null}
                 </td>
                 <td>{statusLabel(action.status)}</td>

@@ -8,11 +8,15 @@ import {
   completeWeeklyReview,
   createActionFromForm,
   createAutomation,
+  createDecision,
   createLaunchpadLink,
   createQuickCaptureDraft,
+  createRisk,
   prepareDraftAutomation,
   runAutomation,
-  updateActionStatus
+  updateActionFromForm,
+  updateActionStatus,
+  updateRiskStatus
 } from "@/lib/services";
 
 export async function loginAction(formData: FormData) {
@@ -48,6 +52,13 @@ export async function completeActionAction(formData: FormData) {
   redirect("/actions");
 }
 
+export async function updateActionAction(formData: FormData) {
+  await requireUser();
+  const actionId = String(formData.get("actionId") ?? "").trim();
+  await updateActionFromForm(actionId, formData);
+  redirect(`/actions/${actionId}`);
+}
+
 export async function approveDraftAction(formData: FormData) {
   const user = await requireUser();
   await approveAssistantDraft(formData, user.id);
@@ -78,6 +89,41 @@ export async function runAutomationAction(formData: FormData) {
   const approved = formData.get("approved") === "true";
   await runAutomation(automationId, approved, user.id);
   redirect("/automations");
+}
+
+export async function createRiskAction(formData: FormData) {
+  await requireUser();
+  await createRisk(formData);
+  redirect("/governance");
+}
+
+export async function closeRiskAction(formData: FormData) {
+  await requireUser();
+  const riskId = String(formData.get("riskId") ?? "");
+  await updateRiskStatus(riskId, "CLOSED");
+  redirect("/governance");
+}
+
+export async function createDecisionAction(formData: FormData) {
+  await requireUser();
+  await createDecision(formData);
+  redirect("/governance");
+}
+
+export async function addRiskToActionAction(formData: FormData) {
+  await requireUser();
+  const actionId = String(formData.get("actionId") ?? "").trim();
+  if (!actionId) throw new Error("Action id is required.");
+  await createRisk(formData);
+  redirect(`/actions/${encodeURIComponent(actionId)}`);
+}
+
+export async function addDecisionToActionAction(formData: FormData) {
+  await requireUser();
+  const actionId = String(formData.get("followUpActionId") ?? "").trim();
+  if (!actionId) throw new Error("Action id is required.");
+  await createDecision(formData);
+  redirect(`/actions/${encodeURIComponent(actionId)}`);
 }
 
 export async function prepareDraftAutomationAction(formData: FormData) {

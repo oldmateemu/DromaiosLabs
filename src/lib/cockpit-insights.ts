@@ -27,6 +27,7 @@ export type LaunchpadHealthLink = {
   riskLevel?: string | null;
   loginNote?: string | null;
   sensitive?: boolean | null;
+  streamId?: string | null;
 };
 
 export type LaunchpadHealthRef = {
