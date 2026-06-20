@@ -1,0 +1,21 @@
+# Hetzner front-door overlay.
+#
+# Use with:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.frontdoor.yml
+#
+# This joins the app to the existing VPS Caddy and Ollama networks without
+# changing the default local Docker Compose path.
+services:
+  app:
+    networks:
+      default:
+      frontend-net:
+        aliases:
+          - dromaios-cockpit
+      ai-net:
+
+networks:
+  frontend-net:
+    external: true
+  ai-net:
+    external: true
