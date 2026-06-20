@@ -100,6 +100,22 @@ describe("normaliseQuickCaptureDraft", () => {
     expect(draft.proposedAction.companyFunction).toBe("legal");
     expect(draft.proposedAction.dueDate).toBe("2026-06-01");
   });
+
+  it("omits empty optional date fields from assistant JSON", () => {
+    const draft = normaliseQuickCaptureDraft(
+      "follow up invoice tomorrow",
+      JSON.stringify({
+        title: "Follow up overdue invoice",
+        priority: "HIGH",
+        dueDate: "2026-06-22",
+        reviewDate: ""
+      })
+    );
+
+    expect(draft.state).toBe("READY");
+    expect(draft.proposedAction.dueDate).toBe("2026-06-22");
+    expect(draft.proposedAction.reviewDate).toBeUndefined();
+  });
 });
 
 describe("mapReviewAnswersToDraftActions", () => {

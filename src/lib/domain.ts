@@ -44,6 +44,11 @@ export type NormalisedQuickCaptureDraft = {
   error?: string;
 };
 
+const optionalDateString = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+);
+
 const assistantActionSchema = z.object({
   title: z.string().trim().min(1).max(180),
   description: z.string().trim().max(2000).optional(),
@@ -51,8 +56,8 @@ const assistantActionSchema = z.object({
   companyFunction: z.string().trim().max(80).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
   status: z.enum(["OPEN", "IN_PROGRESS", "BLOCKED", "WAITING"]).default("OPEN"),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dueDate: optionalDateString,
+  reviewDate: optionalDateString,
   nextStep: z.string().trim().max(500).optional(),
   sensitive: z.boolean().default(false)
 });

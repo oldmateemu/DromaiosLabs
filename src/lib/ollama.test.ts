@@ -58,6 +58,8 @@ describe("draftActionFromQuickCapture", () => {
     const payload = JSON.parse(init?.body as string);
     expect(payload).toMatchObject({ model: "llama3:8b", stream: false, format: "json" });
     expect(payload.prompt).toContain("something rough");
+    expect(payload.prompt).toContain("Today's local date is");
+    expect(payload.prompt).toContain("Do not return empty strings for omitted fields.");
     expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
