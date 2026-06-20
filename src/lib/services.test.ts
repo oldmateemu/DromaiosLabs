@@ -15,14 +15,14 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     stream: { findMany: vi.fn(), findUnique: vi.fn() },
     companyFunction: { findMany: vi.fn(), findUnique: vi.fn() },
-    action: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-    launchpadLink: { findMany: vi.fn(), create: vi.fn() },
+    action: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
+    launchpadLink: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
     automation: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
-    automationRun: { create: vi.fn() },
+    automationRun: { findMany: vi.fn(), create: vi.fn() },
     assistantDraft: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
     review: { create: vi.fn(), findMany: vi.fn() },
-    risk: { findMany: vi.fn() },
-    decision: { findMany: vi.fn() },
+    risk: { findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
+    decision: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
     $transaction: vi.fn()
   }
 }));
@@ -53,6 +53,7 @@ beforeEach(() => {
     prismaMock.assistantDraft,
     prismaMock.risk,
     prismaMock.decision,
+    prismaMock.automationRun,
     prismaMock.review
   ] as Array<{ findMany?: ReturnType<typeof vi.fn> }>) {
     model.findMany?.mockResolvedValue([]);
@@ -60,8 +61,13 @@ beforeEach(() => {
   prismaMock.stream.findUnique.mockResolvedValue(null);
   prismaMock.companyFunction.findUnique.mockResolvedValue(null);
   prismaMock.action.findFirst.mockResolvedValue(null);
+  prismaMock.action.findUnique.mockResolvedValue(null);
+  prismaMock.action.count.mockResolvedValue(0);
+  prismaMock.launchpadLink.findFirst.mockResolvedValue(null);
   prismaMock.automation.findUnique.mockResolvedValue(null);
   prismaMock.assistantDraft.count.mockResolvedValue(0);
+  prismaMock.risk.count.mockResolvedValue(0);
+  prismaMock.decision.count.mockResolvedValue(0);
   prismaMock.action.create.mockResolvedValue({ id: "action-1" });
   prismaMock.action.update.mockResolvedValue({ id: "action-1" });
   prismaMock.launchpadLink.create.mockResolvedValue({ id: "link-1" });
@@ -70,6 +76,9 @@ beforeEach(() => {
   prismaMock.assistantDraft.create.mockResolvedValue({ id: "draft-1" });
   prismaMock.assistantDraft.update.mockResolvedValue({ id: "draft-1" });
   prismaMock.review.create.mockResolvedValue({ id: "review-1" });
+  prismaMock.risk.create.mockResolvedValue({ id: "risk-1" });
+  prismaMock.risk.update.mockResolvedValue({ id: "risk-1" });
+  prismaMock.decision.create.mockResolvedValue({ id: "decision-1" });
   prismaMock.$transaction.mockImplementation(async (cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock));
 });
 

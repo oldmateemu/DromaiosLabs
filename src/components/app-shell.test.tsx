@@ -1,7 +1,12 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+const push = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ push })
+}));
 vi.mock("@/app/actions", () => ({ logoutAction: vi.fn() }));
 
 const { AppShell } = await import("./app-shell");
@@ -9,7 +14,7 @@ const { AppShell } = await import("./app-shell");
 describe("AppShell", () => {
   it("renders the primary navigation, signed-in user, and sign-out control", () => {
     render(
-      <AppShell userName="Founder">
+      <AppShell commandItems={[]} userName="Founder">
         <p>Workspace content</p>
       </AppShell>
     );
@@ -23,7 +28,7 @@ describe("AppShell", () => {
   });
 
   it("marks the active section based on the current path", () => {
-    render(<AppShell userName="Founder">x</AppShell>);
+    render(<AppShell commandItems={[]} userName="Founder">x</AppShell>);
 
     const sidebar = screen.getByRole("complementary");
     expect(within(sidebar).getByRole("link", { name: /Today/ })).toHaveClass("sidebar-link-active");
