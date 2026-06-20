@@ -127,6 +127,13 @@ export async function closeRiskAction(formData: FormData) {
   redirect("/governance");
 }
 
+export async function restoreRiskAction(formData: FormData) {
+  await requireUser();
+  const riskId = String(formData.get("riskId") ?? "");
+  await updateRiskStatus(riskId, "OPEN");
+  redirect("/governance");
+}
+
 export async function createDecisionAction(formData: FormData) {
   await requireUser();
   await createDecision(formData);
