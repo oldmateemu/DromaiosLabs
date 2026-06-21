@@ -39,10 +39,10 @@ import { buildRenewalCalendar } from "./renewal-calendar";
 import { buildReviewMomentum } from "./review-momentum";
 import { buildStreamPortfolio } from "./stream-portfolio";
 import { buildStreamSpend } from "./stream-spend";
-import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
+import { bucketActionsForToday, mapReviewAnswersToDraftActions, normaliseQuickCaptureDraft } from "./domain";
 import { buildCompanyMailroomFilingRun } from "./mailroom-filing";
 import { prisma } from "./db";
-import { draftActionFromQuickCapture } from "./ollama";
+import { buildQuickCaptureDraftRequest, draftActionFromQuickCapture } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
 import { buildRenewalReminderRun, getLocalApprovalAutomationKind, planRenewalReminderPersistence } from "./renewal-reminders";
 import { SALES_PIPELINE_STAGES, summariseSalesPipeline } from "./sales-pipeline";
@@ -201,22 +201,57 @@ export async function createQuickCaptureDraft(text: string, userId: string) {
   const trimmed = text.trim();
   if (!trimmed) throw new Error("Quick capture text is required.");
 
-  const result = await draftActionFromQuickCapture(trimmed);
-  const state = result.draft.state === "READY" ? AssistantDraftState.READY : AssistantDraftState.FAILED;
-
-  return prisma.assistantDraft.create({
+  const request = buildQuickCaptureDraftRequest(trimmed);
+  const fallback = normaliseQuickCaptureDraft(trimmed, "").proposedAction;
+  const draft = await prisma.assistantDraft.create({
     data: {
       provider: AssistantProvider.OLLAMA,
-      model: result.model,
-      state,
+      model: request.model,
+      state: AssistantDraftState.PENDING,
       sourceSummary: "Quick capture",
       sourceText: trimmed,
-      prompt: result.prompt,
-      output: result.draft.proposedAction,
-      error: result.error ?? result.draft.error,
+      prompt: request.prompt,
+      output: fallback,
       createdById: userId
     }
   });
+
+  void finaliseQuickCaptureDraft(draft.id, trimmed).catch(() => undefined);
+
+  revalidatePath("/");
+  revalidatePath("/assistant");
+  return draft;
+}
+
+async function finaliseQuickCaptureDraft(draftId: string, sourceText: string) {
+  const request = buildQuickCaptureDraftRequest(sourceText);
+
+  try {
+    const result = await draftActionFromQuickCapture(sourceText);
+    const state = result.draft.state === "READY" ? AssistantDraftState.READY : AssistantDraftState.FAILED;
+
+    await prisma.assistantDraft.update({
+      where: { id: draftId },
+      data: {
+        model: result.model,
+        state,
+        prompt: result.prompt,
+        output: result.draft.proposedAction,
+        error: result.error ?? result.draft.error ?? null
+      }
+    });
+  } catch (error) {
+    await prisma.assistantDraft.update({
+      where: { id: draftId },
+      data: {
+        model: request.model,
+        state: AssistantDraftState.FAILED,
+        prompt: request.prompt,
+        output: normaliseQuickCaptureDraft(sourceText, "").proposedAction,
+        error: error instanceof Error ? error.message : "Local assistant draft failed."
+      }
+    });
+  }
 }
 
 export async function approveAssistantDraft(formData: FormData, userId: string) {

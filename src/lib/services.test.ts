@@ -29,7 +29,14 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("./db", () => ({ prisma: prismaMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("./ollama", () => ({ draftActionFromQuickCapture: vi.fn() }));
+vi.mock("./ollama", () => ({
+  buildQuickCaptureDraftRequest: vi.fn((sourceText: string) => ({
+    baseUrl: "http://localhost:11434",
+    model: "gemma3:1b",
+    prompt: `prompt:${sourceText}`
+  })),
+  draftActionFromQuickCapture: vi.fn()
+}));
 
 const { revalidatePath } = await import("next/cache");
 const { draftActionFromQuickCapture } = await import("./ollama");
@@ -39,6 +46,10 @@ function form(values: Record<string, string>) {
   const fd = new FormData();
   for (const [key, value] of Object.entries(values)) fd.set(key, value);
   return fd;
+}
+
+async function waitForBackgroundTasks() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
@@ -157,6 +168,28 @@ describe("createQuickCaptureDraft", () => {
     await expect(services.createQuickCaptureDraft("   ", "user-1")).rejects.toThrow("Quick capture text is required.");
   });
 
+  it("persists a pending draft immediately when the local assistant is still generating", async () => {
+    vi.mocked(draftActionFromQuickCapture).mockReturnValue(new Promise(() => {}));
+    prismaMock.assistantDraft.create.mockResolvedValue({ id: "draft-pending" });
+
+    const result = await Promise.race([
+      services.createQuickCaptureDraft("  call supplier  ", "user-1"),
+      new Promise((resolve) => setTimeout(() => resolve("timed out"), 25))
+    ]);
+
+    expect(result).toMatchObject({ id: "draft-pending" });
+    const data = prismaMock.assistantDraft.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      provider: AssistantProvider.OLLAMA,
+      model: "gemma3:1b",
+      state: AssistantDraftState.PENDING,
+      sourceSummary: "Quick capture",
+      sourceText: "call supplier",
+      createdById: "user-1"
+    });
+    expect(draftActionFromQuickCapture).toHaveBeenCalledWith("call supplier");
+  });
+
   it("persists a READY draft from a successful assistant run", async () => {
     vi.mocked(draftActionFromQuickCapture).mockResolvedValue({
       model: "gemma3:1b",
@@ -172,16 +205,27 @@ describe("createQuickCaptureDraft", () => {
     });
 
     await services.createQuickCaptureDraft("  pay bas  ", "user-1");
+    await waitForBackgroundTasks();
 
-    const data = prismaMock.assistantDraft.create.mock.calls[0][0].data;
-    expect(data).toMatchObject({
+    const created = prismaMock.assistantDraft.create.mock.calls[0][0].data;
+    expect(created).toMatchObject({
       provider: AssistantProvider.OLLAMA,
       model: "gemma3:1b",
-      state: AssistantDraftState.READY,
+      state: AssistantDraftState.PENDING,
       sourceText: "pay bas",
-      prompt: "prompt-text"
+      prompt: "prompt:pay bas"
     });
-    expect(data.output).toMatchObject({ title: "Pay BAS" });
+    const update = prismaMock.assistantDraft.update.mock.calls[0][0];
+    expect(update).toMatchObject({
+      where: { id: "draft-1" },
+      data: {
+        model: "gemma3:1b",
+        state: AssistantDraftState.READY,
+        prompt: "prompt-text",
+        error: null
+      }
+    });
+    expect(update.data.output).toMatchObject({ title: "Pay BAS" });
   });
 
   it("persists a FAILED draft and surfaces the assistant error", async () => {
@@ -200,10 +244,13 @@ describe("createQuickCaptureDraft", () => {
     });
 
     await services.createQuickCaptureDraft("broken", "user-1");
+    await waitForBackgroundTasks();
 
-    const data = prismaMock.assistantDraft.create.mock.calls[0][0].data;
-    expect(data.state).toBe(AssistantDraftState.FAILED);
-    expect(data.error).toBe("Ollama returned HTTP 503.");
+    const created = prismaMock.assistantDraft.create.mock.calls[0][0].data;
+    expect(created.state).toBe(AssistantDraftState.PENDING);
+    const update = prismaMock.assistantDraft.update.mock.calls[0][0];
+    expect(update.data.state).toBe(AssistantDraftState.FAILED);
+    expect(update.data.error).toBe("Ollama returned HTTP 503.");
   });
 });
 
