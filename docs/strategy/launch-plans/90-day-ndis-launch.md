@@ -96,12 +96,20 @@ offer with paying customers and a repeatable acquisition channel.*
 
 **Workstream A — DromaiosEd catalogue (AI-built, human-reviewed)**
 - W1: Lock the NDIS course list — Tier 0 mandatory stack (U01–U09), **F01 OVA**, **F03 NDIS
-  Registration-Ready**, **S05 NDIS Worker Capability**. AI drafts learning outcomes + assessment items
-  mapped to NDIS Practice Standards & Code of Conduct.
-- W2–3: AI authors course content + knowledge-check assessments; **clinician micro-review** of OVA +
-  any clinical content for accuracy; build accessible formats.
-- W4: Publish catalogue on the LMS/delivery surface; smoke-test enrolment → completion → certificate
-  → evidence record.
+  Registration-Ready**, **S05 NDIS Worker Capability**, plus **N-RP as a generic multi-state template**
+  (general principles; state-specific authorisation deep-dives deferred to Phase 2 — see
+  `../courses/ndis-course-outlines.md`). AI drafts learning outcomes + assessment items mapped to NDIS
+  Practice Standards & Code of Conduct.
+- W2–3: AI authors course content + knowledge-check assessments. **Clinician micro-review (scoped):**
+  the QA checklist requires clinician sign-off on **N-OVA, N-RP, N-MED, N-MAN, N-SIRS** before publish.
+  Given constrained micro-engagement hours, review in this **priority order** — **(1) N-OVA**
+  (flagship, highest visibility), **(2) N-SIRS** + **(3) N-RP generic template** (reportable-incident
+  /restrictive-practice accuracy is audit-critical), then **(4) N-MED** and **(5) N-MAN**. Any course
+  not yet clinician-reviewed **stays unpublished** until it is (it does not block the others). Build
+  accessible formats.
+- W4: Publish the clinician-reviewed catalogue on the LMS/delivery surface; smoke-test enrolment →
+  completion → certificate → evidence record. (N-RP state-specific modules publish in Phase 2 after
+  state legal review.)
 
 **Workstream B — ClinicBoss MVP**
 - W1: Stand up multi-tenant skeleton on the existing Next.js/Prisma/Postgres stack (reuse the Cockpit
@@ -121,6 +129,16 @@ offer with paying customers and a repeatable acquisition channel.*
 - W3–4: Light external privacy/compliance review; **claims register** (every marketing claim ↔ its
   proof) per company guardrails. **Terms, DPA, security one-pager** drafted for buyers.
 - **GATE G2 at end of W4: no outbound sales until this is signed off.**
+  - **Sign-off authority:** the **founder** signs off G2 overall, but the **non-SaMD determination and
+    the privacy/data-residency posture require sign-off from the external privacy/compliance reviewer
+    (and legal counsel where a question is genuinely contentious).** The founder cannot self-approve
+    those two items.
+  - **Decision rule on disagreement:** **the more conservative position wins.** If the founder and the
+    reviewer disagree on whether a capability is non-SaMD, treat it as **in-scope (potential SaMD) and
+    do not ship it** until resolved (e.g. via TGA guidance or counsel). Same for any unresolved privacy
+    question — default to *not* shipping/selling until cleared. This mirrors the Cockpit safety default
+    of approval-gated, draft-first behaviour for regulatory matters.
+  - The pre-sale checklist (§8) is annotated with **who must approve each item** on this basis.
 
 **Workstream D — GTM groundwork (no selling yet)**
 - W2–4: Landing page + the bundle offer (AI-drafted, claims-checked); set up analytics/CRM; define
@@ -220,14 +238,20 @@ Bias to AI + sweat equity; spend only where it unblocks a gate.
 
 ## 8. Pre-sale compliance checklist (the G2 gate — do not skip)
 
-- [ ] AU data residency confirmed for all customer/learner data.
-- [ ] Privacy policy + APP compliance; **automated-decision-making disclosure** included.
+*Approver column per the G2 sign-off rule (Workstream C): **F** = founder, **R** = external
+privacy/compliance reviewer, **L** = legal counsel where contentious. On any F↔R/L disagreement, the
+**conservative position wins** (don't ship/sell until cleared).*
+
+- [ ] AU data residency confirmed for all customer/learner data. — **R** (founder confirms infra)
+- [ ] Privacy policy + APP compliance; **automated-decision-making disclosure** included. — **R**
 - [ ] AI guardrails documented: **non-SaMD**; human-in-the-loop on compliance outputs; no identifiable
-      health data into third-party LLMs without a compliant basis.
+      health data into third-party LLMs without a compliant basis. — **R (+L if contentious)**
 - [ ] No clinically-influential / diagnostic feature shipped (keeps us out of TGA device regulation).
+      — **R/L (binding on the non-SaMD call); F cannot self-approve**
 - [ ] Claims register: every marketing claim mapped to evidence; no "trusted by" without named users.
-- [ ] Buyer-facing terms, DPA, and a security one-pager ready.
-- [ ] Cockpit automations remain draft-only / approval-gated.
+      — **F**
+- [ ] Buyer-facing terms, DPA, and a security one-pager ready. — **L (F drafts)**
+- [ ] Cockpit automations remain draft-only / approval-gated. — **F**
 
 ---
 

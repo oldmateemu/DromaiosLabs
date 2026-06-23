@@ -36,8 +36,13 @@
 | N-CULT | Cultural Safety & Inclusive Support | Core | 45 min | Reflective task | — |
 | N-PCA | Person-Centred & Rights-Based Support | Core | 30–45 min | Knowledge check | — |
 
-> Launch priority for the 90-day plan: **N-OVA, N-REG, N-RP, N-CODE, N-SIRS** first (the
-> differentiated + registration-critical set), then the mandatory stack to complete the bundle.
+> Launch priority for the 90-day plan: **N-OVA, N-REG, N-CODE, N-SIRS** first (the differentiated +
+> registration-critical set), then the mandatory stack to complete the bundle. **N-RP ships in Phase 1
+> as a generic, multi-state template** (the five regulated practices, PBS principles, general
+> authorisation/reporting concepts); the **detailed state/territory-specific authorisation rules and
+> their legal review are deferred to Phase 2** (see N-RP notes below and the 90-day plan Workstream A).
+> This keeps the Week-4 G2 gate achievable for a near-solo team while still covering restrictive
+> practices at launch.
 
 ---
 
@@ -119,6 +124,14 @@
   sign-off in ClinicBoss** for workers implementing behaviour support plans.
 - **Notes:** **localise authorisation content per state/territory** — this is the most common audit
   failure point and a genuine differentiator if done well.
+- **Phasing (resolves the 90-day scope question):** **Phase 1 ships a generic multi-state template**
+  covering the five regulated practices, PBS principles, and general authorisation/consent/reporting
+  concepts — authored by AI, clinician-reviewed, and **explicitly labelled "general principles; confirm
+  your state's authorisation requirements."** **Phase 2 adds the per-state/territory authorisation
+  deep-dives**, each requiring a **state-localisation expert / legal review** before publish (budget a
+  fixed-scope reviewer per priority state — e.g. the founder's home state + the two largest markets
+  first). Do **not** publish state-specific authorisation rules as authoritative until that review is
+  complete. This decision is mirrored in the launch-priority note (above) and the 90-day plan.
 
 ## N-CODE — NDIS Code of Conduct & Worker Obligations
 

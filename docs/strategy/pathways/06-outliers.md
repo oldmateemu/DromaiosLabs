@@ -16,7 +16,7 @@
 | Niche | Size | Buyer | Key regulator/accreditation | Sharpest hook |
 |-------|------|-------|------------------------------|---------------|
 | **Dental** | ~20,300 dentists (2023); industry ~A$13bn; ~90% owner-operated, PE roll-ups active | Practice principal; corporate group ops | Dental Board/AHPRA + CPD; **NSQHS for sedation/surgical day-procedure**; IPC; radiation licensing | IPC + radiation + NSQHS day-procedure |
-| **Community pharmacy** | ~5,900 pharmacies; ~A$27bn; ~40,000+ pharmacists | Pharmacy owner; banner HQ | Pharmacy Board/AHPRA; **QCPP → QSPP** (QCPP phased out by 2029); 8CPA | **QCPP→QSPP transition** + professional-service programs |
+| **Community pharmacy** | ~5,900 pharmacies; ~A$27bn; ~40,000+ pharmacists | Pharmacy owner; banner HQ | Pharmacy Board/AHPRA; **QCPP → QSPP** (QCPP elements phased out by Sep 2029); 8CPA | **QCPP→QSPP transition** + professional-service programs |
 | **Optometry** | ~7,000+ optometrists; heavily corporatised (Specsavers, OPSM, Bailey Nelson) | Practice owner/franchisee; banner ops | Optometry Board/AHPRA CPD; therapeutic endorsement | CPD + teleoptometry compliance |
 | **Correctional / justice health** | State-run (Justice Health NSW, etc.) | State justice-health director; corrections procurement | **RACGP prison-health standards** + NSQHS | **OVA** (verbal abuse dominant; nurses main victims) |
 | **Defence / veteran health** | Bupa holds ADF HSC (85,000 personnel; ~A$3.4–6bn); **re-tender 1 Jul 2027** | Defence health contracting (prime); DVA | Defence health contracts; ANAO audits; Open Arms | **2027 ADF HSC re-tender** subcontracting |
@@ -66,9 +66,13 @@
   for sedation/surgical practices). Channel: **ADA congresses/ADX**, corporate dental groups.
 - **Optometry — CPD-led.** Lead with CPD + teleoptometry-compliance training; light ClinicBoss CPD/
   policy layer. Channel: **O=MEGA** + banner HQs (Specsavers/OPSM).
-- **Correctional/justice — OVA-led.** Lead with the **OVA flagship (F01) + V-OVA** — verbal abuse
-  dominant, nurses main victims; RACGP prison-standards + NSQHS evidence layer. Channel: direct to
-  state justice-health services.
+- **Correctional/justice — OVA-led.** Lead with the **OVA flagship (F01) + V-OVA**. The current,
+  sector-wide demand signal is strong: **Safe Work Australia** records **serious workers'-comp claims
+  for workplace violence/assault up ~56% (2017–18 → 2021–22)** and ~40% of health/community-services
+  workers exposed to violent/traumatic events; custodial settings are among the highest-risk (an older
+  2007–10 NSW study found verbal abuse dominant, nurses the main victims — directionally consistent,
+  but treat the *correctional-specific* baseline as dated; see confidence flags). RACGP prison-
+  standards + NSQHS evidence layer. Channel: direct to state justice-health services.
 - **Defence/veteran — partnership/tender-led.** The **2027 ADF HSC re-tender** is a live multi-
   billion-dollar opportunity; position as a **training + compliance subcontractor** to the prime,
   and DVA-network training (Open Arms-adjacent). Pursue via partnership, not direct.
@@ -170,9 +174,13 @@ Dental: AIHW dental workforce, BDO, Lexology (PE), Services Australia (CDBS), Ce
 Pharmacy: Pharmacy Guild Pharmacy Profile 2024, INTHEBLACK, QLD Pharmacy Ownership Act 2024,
 Australasian Pharmacy (QCPP→QSPP), Guild/DoHA 8CPA, APP Conference. Optometry: Insight 2024 review,
 Optometry Australia (MBS, O=MEGA). Correctional: Justice Health NSW, Corrections Vic, RACGP prison
-standards, BMC violence study. Defence/veteran: Bupa ADF HSC, Health Services Daily, DVA/Open Arms,
-ANAO. Telehealth/AI: AHPRA telehealth guidance, TGA AI-SaMD guidance.
+standards, BMC violence study (2007–10), **Safe Work Australia work-related violence data (to
+2021–22)**. Defence/veteran: Bupa ADF HSC, Health Services Daily, DVA/Open Arms, ANAO. Telehealth/AI:
+AHPRA telehealth guidance, TGA AI-SaMD guidance.
 **Confidence flags:** dentist count varies (AIHW 19,499 vs ~20,300, both 2023); day-hospital/private
-data stale (ABS 2016–17); correctional OVA stats older (2007–10 study); FIFO/defence contract values
-estimated; niche SaaS pricing not public; cosmetic/IVF/imaging/pathology not deep-dived — flagged for
-follow-up. Pharmacy/dental/optometry conference figures peak-body self-reported.
+data stale (ABS 2016–17); the **correctional-specific** OVA study is dated (2007–10) — the OVA wedge
+is now anchored to current sector-wide Safe Work Australia data (to 2021–22), with custodial-specific
+prevalence a known gap worth a targeted refresh from state justice-health annual reports before a
+correctional campaign; FIFO/defence contract values estimated; niche SaaS pricing not public.
+Cosmetic/IVF/imaging/pathology are now covered in depth in **Pathway 07** (follow-up complete).
+Pharmacy/dental/optometry conference figures peak-body self-reported.
