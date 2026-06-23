@@ -52,6 +52,9 @@ entry stays cheap and fast; medtech remains a deliberately-later, evidence-led c
   30/60/90 plan turning the strategy into first paying customers via the NDIS education-led wedge
   (Wave 1 beachhead), building the horizontal engine that every other pathway reuses. Re-pointable to
   aged care or allied health.
+- **[`courses/ndis-course-outlines.md`](courses/ndis-course-outlines.md)** — build-ready outlines for
+  the NDIS launch catalogue (12 courses: OVA, registration-readiness, restrictive practices, the
+  mandatory stack), with standards mappings, assessments, packaging, and a pre-publish QA checklist.
 
 ## Each pathway answers your four asks
 
