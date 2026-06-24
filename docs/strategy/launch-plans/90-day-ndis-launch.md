@@ -84,8 +84,18 @@ offer with paying customers and a repeatable acquisition channel.*
   per-site** for the long tail / **per-participant** for SIL/SDA; implementation **waived** for the
   first 2–3 lighthouse customers in exchange for a named case study.
 - **Channel pricing** — mirror the NDS/etrainu model: a member/partner discount to win an endorsement.
-- Anchor the value to the **1 Jul 2026 registration** and **verification/certification audit** pain,
-  and to the frozen-NDIS-price margin squeeze (sell *cost-saving compliance*, not premium spend).
+- Anchor the value to the **ongoing** registration + **verification/certification audit** pain — which
+  *persists well past* 1 Jul 2026 (registration is a continuing obligation, not a one-day event; the
+  long tail keeps registering, re-auditing, and maintaining evidence) — plus the award-linked margin
+  pressure (sell *cost-saving compliance*, not premium spend).
+
+> **Timing note (deadline vs the G2 gate).** With an early-June start, the **1 Jul 2026 cliff lands in
+> Week 3**, but the G2 compliance gate (end of W4) would push *software* outbound to W5 — after the
+> date. Resolve this two ways: **(1) start the G2 compliance/privacy review pre-kickoff (Week 0)** so
+> the **education-only** offer (lowest-risk, no ClinicBoss data-processing) can go out **before** the
+> deadline; and **(2) anchor messaging to the durable registration/verification/audit pain above**, so
+> the campaign keeps converting after 1 Jul. Don't gate the low-risk education wedge behind the full
+> ClinicBoss G2 review.
 
 ---
 
@@ -118,7 +128,9 @@ offer with paying customers and a repeatable acquisition channel.*
   **C2** Policy/Document Control (versioning, attestation).
 - W3: **C4** Accreditation Readiness with the **NDIS Practice Standards crosswalk** (AI-generated
   draft, human-verified) + **C8** Dashboard (readiness score, training %).
-- W4: Light **V-SIRS** (reportable-incident capture + 24h clock) and **V-RP** (restrictive-practice
+- W4: Light **V-SIRS** (reportable-incident capture + **both NDIS clocks: 24h immediate notification
+  *and* the 5-business-day form**, plus the 5-business-day path for non-harm unauthorised restrictive
+  practices) and **V-RP** (restrictive-practice
   register) stubs; end-to-end demo data.
 
 **Workstream C — Compliance / legal / AI governance (the G2 gate — blocks all selling)**
@@ -260,7 +272,7 @@ privacy/compliance reviewer, **L** = legal counsel where contentious. On any F�
 | Risk | Mitigation | Kill/pivot signal |
 |------|-----------|-------------------|
 | Free NDIS Worker Orientation Module sets a price floor | Differentiate: competency-assessed, CPD-style, the compliance *record* | If buyers won't pay above free → reposition on ClinicBoss evidence value, not training alone |
-| Long tail too price-sensitive / frozen NDIS prices | Low self-serve pricing; cost-saving framing | If ACV can't beat CAC in any channel by Day 60 → switch lead segment to aged care (higher WTP) |
+| Long tail too price-sensitive / tight NDIS pricing | Low self-serve pricing; cost-saving framing | If ACV can't beat CAC in any channel by Day 60 → switch lead segment to aged care (higher WTP) |
 | Registration cliff slips/changes | Sell durable audit-readiness, not just the deadline | If 1 Jul registration is materially deferred → lean on verification/certification audit pain instead |
 | Solo bandwidth | AI does the heavy lifting; fractional dev post-revenue | If product can't reach G1 by W4 → cut scope to catalogue + C3 only |
 | Compliance/AI misstep | G2 gate blocks selling until signed off | Any unresolved privacy/SaMD question → pause outbound, fix first |

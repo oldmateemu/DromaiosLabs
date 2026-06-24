@@ -43,7 +43,8 @@
 
 ## C. Funding levers
 
-- **Activity-Based Funding** (IHACPA; **NEP 2024–25 = A$6,465/NWAU**); **private health insurance**
+- **Activity-Based Funding** (IHACPA; **NEP 2026–27 = A$7,418/NWAU**, released Mar 2026, up from
+  $7,258 in 2025–26); **private health insurance**
   (12.69M / 45.6% with hospital cover, Dec 2025); DVA; WorkCover/CTP. Private-hospital margin stress
   (Healthscope receivership; proposed fixed pricing) → **cost discipline on overhead software**.
 

@@ -2,7 +2,8 @@
 
 > Grouped because both run on a near-identical **compliance posture**: a powerful regulator
 > (Aged Care Quality & Safety Commission / NDIS Quality & Safeguards Commission), standards-based
-> audits, **reportable-incident schemes (SIRS)**, **restrictive practices / behaviour support**,
+> audits, **reportable-incident schemes (aged-care SIRS; NDIS Reportable Incidents / Incident
+> Management — distinct regimes, see §B)**, **restrictive practices / behaviour support**,
 > **worker screening**, **mandatory training**, and **per-bed / per-participant** software pricing.
 > The wedge differs (aged care = compliance-led, high WTP; NDIS = education-led, price-sensitive
 > long tail) but the **engine is shared**. This is **Wave 1** — the sharpest regulatory cliffs.
@@ -52,12 +53,16 @@
 - **NDIS Practice Standards** via **verification** (desktop) vs **certification** (on-site, for
   SIL/SDA/early-childhood/behaviour support) audits.
 - **Mandatory registration for SIL & platform providers from 1 Jul 2026** (intent to extend to
-  personal care/daily living/closed settings). **NDIS Amendment (Integrity & Safeguarding) Act
-  2025:** criminal penalties for unregistered operation, **civil penalties up to A$15m**, expanded
+  personal care/daily living/closed settings). **NDIS Amendment (Integrity and Safeguarding) Act
+  2026** (Royal Assent 8 Apr 2026 — the 2025 item was the Bill; Commission-powers/whistleblower
+  provisions commenced 9 Apr 2026): criminal penalties for unregistered operation, **civil penalties
+  up to A$15m**, expanded
   banning powers (incl. auditors/consultants).
-- **Worker Screening Check** (first 5-yr checks expire **Feb 2026** → renewal spike); **reportable
-  incidents/SIRS**; **restrictive practices / behaviour support**; mandatory **Worker Orientation
-  Module "Quality, Safety and You"** (free) + risk-based competency training.
+- **Worker Screening Check** (first 5-yr checks expire **Feb 2026** → renewal spike); **NDIS
+  reportable incidents** (the NDIS Commission's **Reportable Incidents / Incident Management** regime —
+  *not* the aged-care "SIRS", which is a separate scheme); **restrictive practices / behaviour
+  support**; mandatory **Worker Orientation Module "Quality, Safety and You"** (free) + risk-based
+  competency training.
 
 ---
 
@@ -71,9 +76,11 @@
   is now **ACQSC consumer-protection enforcement** (refund powers for overcharging, mandatory monthly
   statements, a published quarterly national price summary). Sell *price-transparency + compliance*,
   not a price-cap deadline.
-- **NDIS:** **Pricing Arrangements 2025–26** — core rates **frozen a 6th year** (L2 $100.14/hr,
-  L3 $190.54/hr); therapy travel billable at 50%. Frozen prices = **margin squeeze → demand for
-  cost/efficiency + compliance tooling** (not premium spend).
+- **NDIS:** the **2026–27 Pricing Schedule** (a new document replacing the PAPL, effective **1 Jul
+  2026**) lifts **DSW/core-support rates ~4.75%** in line with the Fair Work decision + super increase
+  — so the long-running *freeze* framing **no longer holds for core supports in 2026–27**; therapy
+  caps remain tight (confirm exact 2026–27 caps in the new schedule). Margins stay pressured (award-
+  linked cost growth) → **demand for cost/efficiency + compliance tooling** rather than premium spend.
 
 **WTP asymmetry:** Aged care **pays for compliance evidence** (funding tied to it) → strong WTP.
 NDIS long tail is **price-sensitive** → low-cost, self-serve, education-led.
@@ -193,7 +200,7 @@ eLearning) for high-risk tasks — tracked in ClinicBoss C3.
   RLDatix** — integrate around them; own the *evidence/accreditation* layer they under-serve.
 - **Free NDIS Worker Orientation Module** sets a price floor on basic training — go beyond it with
   competency-assessed, CPD-style depth + the compliance record.
-- **NDIS margin squeeze** (frozen prices) → keep NDIS pricing low; lead with cost-saving framing.
+- **NDIS margin squeeze** (tight, award-linked pricing; therapy caps held) → keep NDIS pricing low; lead with cost-saving framing.
 - **Penalty severity** ($1.65m aged care; $15m NDIS) cuts both ways — it drives WTP **and** raises
   the buyer's bar on vendor trust/data security: lead with onshore, APP-compliant posture.
 - **Reform churn** (Apr 2026 funding changes; Support at Home bedding in; registration extensions) —

@@ -44,7 +44,8 @@
 - **Medicare/MBS:** from **1 Jul 2025** the **GP Chronic Condition Management Plan (GPCCMP)**
   replaced GPMP+TCA; up to **5 allied-health services/yr** (10 for Aboriginal/Torres Strait Islander
   patients); referral by letter.
-- **NDIS** is a dominant allied-health revenue source but **rates frozen** (therapy $193.99/hr since
+- **NDIS** is a dominant allied-health revenue source but **therapy caps held tight** (physio
+  $193.99/hr largely unchanged since
   2019; travel now 50%) → **margin squeeze** (34% of allied-health providers reported a loss in
   2022–23). **Support at Home** (1 Nov 2025) adds a **Restorative Care Pathway (up to 16 weeks,
   ~$6,000/episode, up to 2 episodes)** with multidisciplinary allied-health input, and reclassifies
@@ -153,7 +154,7 @@ accreditation/endorsement by the relevant professional associations is the credi
 
 - **Crowded, cheap PMS market** — do **not** compete on PMS; be the compliance/CPD/supervision layer
   and integrate.
-- **Thin margins** (NDIS rate freeze) — price low; rely on volume + education attach + group deals.
+- **Thin margins** (tight NDIS therapy caps) — price low; rely on volume + education attach + group deals.
 - **Self-regulated professions** have softer mandates — lead with CPD value + funded-work
   obligations, not fear.
 - **ACCC merger regime (1 Jan 2026)** may slow roll-ups — keep both bottom-up and group motions live.

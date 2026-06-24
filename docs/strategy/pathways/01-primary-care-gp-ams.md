@@ -46,8 +46,9 @@
 - **Mandatory operational requirements:** CPR currency, IPC, cold-chain/vaccine-fridge logs,
   anaphylaxis/emergency, sterilisation/reprocessing, privacy/records, complaints & incident
   management, recall/reminder systems, policy & procedure manuals.
-- **CPD (AHPRA/Medical Board, since 2023):** **50 hrs/yr** (≥12.5 educational; ≥25 across
-  reviewing performance + measuring outcomes; ≥5 reflecting on feedback) + annual PDP + CPR per
+- **CPD (AHPRA/Medical Board, since 2023):** **50 hrs/yr** = **≥12.5 educational**, **12.5 flexible**,
+  and **≥25 across reviewing performance + measuring outcomes with a ≥5-hour minimum in *each* of those
+  two types** (a CPD logbook must track both minimums separately, not just one) + annual PDP + CPR per
   triennium; tracked via RACGP **MyCPD**/ACRRM.
 - **Accreditation is financially mandatory** — it gates **PIP** and most MyMedicare-linked
   incentives. *Caveat:* the **Bulk Billing Practice Incentive Program (BBPIP, from 1 Nov 2025)** has an

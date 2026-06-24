@@ -43,14 +43,16 @@ pathology and IVF.**
   payment — **not accredited = cannot bill Medicare**. 15 standards/4 parts; full accreditation
   4-yearly; accreditors NATA/HDAA/QIP. Underpinned by **RANZCR Standards (2025)**; **ARPANSA RPS C-5**
   + the **2024 diagnostic-imaging-apparatus performance-testing standard**; state radiation
-  licensing; **NDRLs** for dose. **MHR share-by-default** from 1 Jul 2026 (service-level: diagnostic-
-  imaging provider reports/records, not only radiologist-authored reports).
+  licensing; **NDRLs** for dose. **MHR share-by-default** from 1 Jul 2026 — applies to **written
+  diagnostic-imaging reports authored by, or on behalf of, a radiologist** (uploaded within 24h);
+  **images themselves are excluded**.
 - **Pathology — NATA/RCPA ISO 15189**: required for Approved Pathology Authority/Laboratory status
   and Medicare billing — **no accreditation = no Medicare**. **NPAAC** category-of-testing standards
   layered on top. The **ISO 15189:2022 transition is now substantially complete** (NATA reported
   ~670 labs accredited, May 2026; the SAD application document took effect Feb 2026) — so the live
   lever is **ongoing ISO 15189 QMS maintenance + surveillance**, not a one-off transition scramble.
-  **MHR share-by-default** (service-level: pathology provider reports/records) 1 Jul 2026.
+  **MHR share-by-default** (written **pathology reports authored by/on behalf of a pathologist**;
+  raw images/data excluded) 1 Jul 2026.
 - **Cosmetic** — **NSQHS Cosmetic Surgery Standards** (launched Dec 2023; 7 standards/101 actions;
   accreditation from early 2025) mandatory for invasive surgery under sedation/GA; **"surgeon" title
   protection** (Sep 2023); **AHPRA cosmetic surgery reforms** (Jul 2023: referral, two consults, BDD
@@ -187,7 +189,8 @@ all just merged — disparate QMS across merged sites needs unifying).
 
 **Required net-new functions:** DIAS + ISO 15189 crosswalks; dose-monitoring/NDRL benchmarking;
 advertising-compliance scanner; aesthetic consent engine; electronic-witnessing integration;
-ART accreditation-transition crosswalk; MHR upload assurance; ISO 15189:2022 transition tooling.
+ART accreditation-transition crosswalk; MHR upload assurance; **ongoing ISO 15189 QMS/surveillance
+tooling** (the 2022 transition is complete — not a migration build).
 
 ---
 

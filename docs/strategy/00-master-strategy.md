@@ -234,7 +234,7 @@ This directly answers the founder's stated posture.
 | **Quote-gated pricing opacity** → mispricing | Lead with transparent, low, flat pricing as a *differentiator*; validate with first deals |
 | **Scope creep across 8 segments** dilutes a small team | The waves (§4) gate spend; the horizontal engine caps marginal cost |
 | **AI/regulatory misstep** (TGA SaMD, Privacy Act, AMS data) | Hard guardrails (§9); non-SaMD posture; onshore; legal review before any clinical-adjacent feature |
-| **Margin squeeze in NDIS/allied health** (frozen prices) | Position as the *cost-saving* compliance/efficiency tool; price low; rely on volume + education attach |
+| **Margin squeeze in NDIS/allied health** (tight, award-linked pricing; therapy caps held) | Position as the *cost-saving* compliance/efficiency tool; price low; rely on volume + education attach |
 | **Over-claiming** vs company guardrails | Keep all public claims aligned to proof; pilots framed as pilots |
 
 ---
