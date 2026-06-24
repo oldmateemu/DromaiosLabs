@@ -27,7 +27,7 @@
 | N-REG | NDIS Registration & Practice Standards Readiness | Flagship (F03) | 60–90 min | Knowledge check + readiness self-audit | Yes |
 | N-RP | Restrictive Practices & Positive Behaviour Support | Flagship (F02) | 90 min | Knowledge check; competency sign-off in ClinicBoss | Yes |
 | N-CODE | NDIS Code of Conduct & Worker Obligations | Core | 30–45 min | Knowledge check | — |
-| N-SIRS | Incident Management & Reportable Incidents (SIRS) | Core | 45–60 min | Scenario quiz | — |
+| N-RIM | Reportable Incidents & Incident Management (NDIS) | Core | 45–60 min | Scenario quiz | — |
 | N-SAFE | Safeguarding, Abuse & Neglect Awareness | Core | 45 min | Knowledge check | — |
 | N-MAN | Safe Manual Handling (Disability) | Mandatory stack | 30–45 min | Knowledge check + practical sign-off | — |
 | N-IPC | Infection Prevention & Control | Mandatory stack | 30 min | Knowledge check | — |
@@ -36,7 +36,7 @@
 | N-CULT | Cultural Safety & Inclusive Support | Core | 45 min | Reflective task | — |
 | N-PCA | Person-Centred & Rights-Based Support | Core | 30–45 min | Knowledge check | — |
 
-> Launch priority for the 90-day plan: **N-OVA, N-REG, N-CODE, N-SIRS** first (the differentiated +
+> Launch priority for the 90-day plan: **N-OVA, N-REG, N-CODE, N-RIM** first (the differentiated +
 > registration-critical set), then the mandatory stack to complete the bundle. **N-RP ships in Phase 1
 > as a generic, multi-state template** (the five regulated practices, PBS principles, general
 > authorisation/reporting concepts); the **detailed state/territory-specific authorisation rules and
@@ -72,7 +72,7 @@
   3. Distinguish **behaviour of concern** (support need) from intentional aggression, and respond
      within a person-centred, trauma-informed, least-restrictive frame.
   4. Take correct **post-incident** steps: immediate safety, reporting, debrief, support.
-  5. Identify when an incident is **reportable** (links to N-SIRS) and when a restrictive practice
+  5. Identify when an incident is **reportable** (links to N-RIM) and when a restrictive practice
      was used (links to N-RP).
 - **Core sections:** the disability context of OVA (prevalence, duty of care, worker right to safety);
   understanding behaviour as communication; environmental & relational triggers; the de-escalation
@@ -115,7 +115,7 @@
   2. Explain the **authorisation, consent and reporting** requirements (state-specific) and the role
      of a **behaviour support plan**.
   3. Apply **least-restrictive, person-centred** principles and PBS fundamentals.
-  4. Correctly **record and report** use of a regulated restrictive practice (links to N-SIRS).
+  4. Correctly **record and report** use of a regulated restrictive practice (links to N-RIM).
   5. Recognise **unauthorised** restrictive practice as a reportable incident.
 - **Core sections:** what counts as a restrictive practice; the harm and the rights frame; PBS basics
   (function of behaviour, proactive strategies); authorisation & consent by state; the behaviour
@@ -140,7 +140,12 @@
   preventing violence/exploitation/neglect/abuse) to day-to-day decisions; know how/when to raise
   concerns; understand consequences of breaches. **Scenario-led**, short, foundational.
 
-## N-SIRS — Incident Management & Reportable Incidents (SIRS)
+## N-RIM — Reportable Incidents & Incident Management (NDIS)
+
+> Named for the NDIS **(Incident Management and Reportable Incidents) Rules** — deliberately **not**
+> "SIRS," which is the *aged-care* Serious Incident Response Scheme. The ClinicBoss **V-SIRS** pack
+> spans both regimes at platform level, but this NDIS course uses NDIS regulator terminology to avoid
+> conflating aged-care language with NDIS audit evidence.
 
 - **Maps to:** NDIS (Incident Management and Reportable Incidents) Rules; Practice Standards (incident
   management).
@@ -153,7 +158,7 @@
 
 - **Outcomes:** recognise signs/types of abuse, neglect and exploitation of people with disability;
   understand mandatory responses and reporting; supporting a person to be safe; the worker's
-  safeguarding duty. Trauma-informed; links to N-SIRS and N-CODE.
+  safeguarding duty. Trauma-informed; links to N-RIM and N-CODE.
 
 ## N-MAN — Safe Manual Handling (Disability)
 
@@ -192,7 +197,7 @@
 
 ## Packaging for sale (ties to the launch plan)
 
-- **"NDIS Worker Compliance Pack"** — the mandatory stack + N-CODE + N-SIRS + N-SAFE, per learner/yr
+- **"NDIS Worker Compliance Pack"** — the mandatory stack + N-CODE + N-RIM + N-SAFE, per learner/yr
   (the volume product for the long tail).
 - **"Registration-Ready Pack"** — N-REG + N-RP + the worker pack, aimed at providers facing the
   1 Jul 2026 registration / an audit; pairs with **ClinicBoss C4 + V-SIRS/V-RP**.
@@ -203,7 +208,7 @@
 ## Build & quality checklist (per course, before publish)
 
 - [ ] "Maps to" line cites the **current version** of each NDIS instrument (re-verify around reforms).
-- [ ] **Clinician review** complete for any clinical/safety content (N-OVA, N-RP, N-MED, N-MAN, N-SIRS).
+- [ ] **Clinician review** complete for any clinical/safety content (N-OVA, N-RP, N-MED, N-MAN, N-RIM).
 - [ ] Plain English + accessibility (captions, alt text, screen-reader friendly, Easy Read where apt).
 - [ ] Scenarios are disability-sector-authentic (SIL/SDA/community/in-home), not generic.
 - [ ] Assessment ≥ 80% pass; competency-sign-off items flagged to **ClinicBoss C3** where practical.

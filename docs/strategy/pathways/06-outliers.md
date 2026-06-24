@@ -7,7 +7,7 @@
 > (shared NSQHS), not here.
 >
 > Cross-references: `../clinicboss-module-catalogue.md` (V-PHARM, V-DENT, V-OVA) and
-> `../dromaiosed-course-catalogue.md` (S11, S12, F03, F01, U02).
+> `../dromaiosed-course-catalogue.md` (S11, S12, S13, F03, F01, U02, U06 telehealth/privacy).
 
 ---
 

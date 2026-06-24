@@ -101,9 +101,9 @@ offer with paying customers and a repeatable acquisition channel.*
   `../courses/ndis-course-outlines.md`). AI drafts learning outcomes + assessment items mapped to NDIS
   Practice Standards & Code of Conduct.
 - W2–3: AI authors course content + knowledge-check assessments. **Clinician micro-review (scoped):**
-  the QA checklist requires clinician sign-off on **N-OVA, N-RP, N-MED, N-MAN, N-SIRS** before publish.
+  the QA checklist requires clinician sign-off on **N-OVA, N-RP, N-MED, N-MAN, N-RIM** before publish.
   Given constrained micro-engagement hours, review in this **priority order** — **(1) N-OVA**
-  (flagship, highest visibility), **(2) N-SIRS** + **(3) N-RP generic template** (reportable-incident
+  (flagship, highest visibility), **(2) N-RIM** + **(3) N-RP generic template** (reportable-incident
   /restrictive-practice accuracy is audit-critical), then **(4) N-MED** and **(5) N-MAN**. Any course
   not yet clinician-reviewed **stays unpublished** until it is (it does not block the others). Build
   accessible formats.
