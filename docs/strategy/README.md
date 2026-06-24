@@ -52,6 +52,10 @@ entry stays cheap and fast; medtech remains a deliberately-later, evidence-led c
   30/60/90 plan turning the strategy into first paying customers via the NDIS education-led wedge
   (Wave 1 beachhead), building the horizontal engine that every other pathway reuses. Re-pointable to
   aged care or allied health.
+- **[`specs/clinicboss-mvp-spec.md`](specs/clinicboss-mvp-spec.md)** — the engineering build spec for
+  the ClinicBoss MVP the launch plan depends on (multi-tenancy, C2/C3/C4/C8 + light V-SIRS/V-RP, the
+  NDIS Practice Standards crosswalk, Prisma models, AI guardrails), grounded in the existing Next.js/
+  Prisma stack.
 - **[`courses/ndis-course-outlines.md`](courses/ndis-course-outlines.md)** — build-ready outlines for
   the NDIS launch catalogue (12 courses: OVA, registration-readiness, restrictive practices, the
   mandatory stack), with standards mappings, assessments, packaging, and a pre-publish QA checklist.

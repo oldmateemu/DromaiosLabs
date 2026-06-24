@@ -121,9 +121,10 @@ offer with paying customers and a repeatable acquisition channel.*
   completion → certificate → evidence record. (N-RP state-specific modules publish in Phase 2 after
   state legal review.)
 
-**Workstream B — ClinicBoss MVP**
-- W1: Stand up multi-tenant skeleton on the existing Next.js/Prisma/Postgres stack (reuse the Cockpit
-  `Action` model for C6 tasks). AU-region hosting confirmed.
+**Workstream B — ClinicBoss MVP** *(full engineering spec: `../specs/clinicboss-mvp-spec.md`)*
+- W1: Stand up multi-tenant skeleton on the existing Next.js/Prisma/Postgres stack (Org/membership +
+  org-scoped models — see spec §3/§4; customer data in a **separate DB** from the internal Cockpit).
+  AU-region hosting confirmed.
 - W2: **C3** Training & Competency Register (assign courses, track completion, renewal reminders) +
   **C2** Policy/Document Control (versioning, attestation).
 - W3: **C4** Accreditation Readiness with the **NDIS Practice Standards crosswalk** (AI-generated
