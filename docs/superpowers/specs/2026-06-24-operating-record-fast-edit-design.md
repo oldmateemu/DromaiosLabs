@@ -80,7 +80,7 @@ Inline edits should use focused server actions that update one small record surf
 
 Setup quick edits update the existing `Action` row for the checklist item. If the row is missing, the existing self-healing setup path should recreate it before applying the edit.
 
-Launchpad quick edits update `LaunchpadLink`. Edited `cost`, `renewalAt`, `owner`, `riskLevel`, `group`, and `loginNote` values must feed the existing launchpad health, renewal calendar, stream spend, and renewal reminder automation.
+Launchpad quick edits update `LaunchpadLink`. Edited `cost`, `renewalAt`, `owner`, `riskLevel`, and `group` values must feed the existing launchpad health, renewal calendar, stream spend, and renewal reminder automation. Full launchpad detail edits also update `loginNote` as the credential-location note.
 
 Action quick edits update `Action`. Marking an action done should preserve the existing completion timestamp behavior: set `completedAt` when first marked done, clear it when reopened.
 
