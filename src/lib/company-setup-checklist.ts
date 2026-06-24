@@ -465,6 +465,9 @@ export function setupDueDate(item: Pick<SetupChecklistItem, "priority" | "horizo
 export type SetupActionState = {
   status: SetupItemStatus;
   dueAt?: Date | string | null;
+  priority?: SetupPriority | null;
+  description?: string | null;
+  nextStep?: string | null;
 };
 
 export type SetupItemView = SetupChecklistItem & {
@@ -531,7 +534,17 @@ export function summariseSetupChecklist(
     const active = status === "OPEN" || status === "IN_PROGRESS";
     const overdue = active && dueKey !== null && dueKey < todayKey;
     const dueSoon = active && !overdue && dueKey !== null && dueKey <= dueSoonKey;
-    const view: SetupItemView = { ...item, status, done, dueAt, overdue, dueSoon };
+    const view: SetupItemView = {
+      ...item,
+      status,
+      priority: state?.priority ?? item.priority,
+      description: state?.description?.trim() ? state.description : item.description,
+      nextStep: state?.nextStep?.trim() ? state.nextStep : item.nextStep,
+      done,
+      dueAt,
+      overdue,
+      dueSoon
+    };
 
     let category = categoryIndex.get(item.category);
     if (!category) {

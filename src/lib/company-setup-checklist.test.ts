@@ -150,6 +150,33 @@ describe("summariseSetupChecklist", () => {
     expect(summary.overdue).toBe(1);
   });
 
+  it("overlays mutable action fields onto checklist defaults", () => {
+    const summary = summariseSetupChecklist(
+      [item({ key: "a", title: "Item A", priority: "HIGH", description: "default desc", nextStep: "default step" })],
+      stateMap([
+        [
+          "Item A",
+          {
+            status: "IN_PROGRESS",
+            dueAt: "2026-07-15",
+            priority: "CRITICAL",
+            description: "updated desc",
+            nextStep: "updated step"
+          }
+        ]
+      ]),
+      NOW
+    );
+
+    expect(summary.categories[0].items[0]).toMatchObject({
+      status: "IN_PROGRESS",
+      dueAt: "2026-07-15",
+      priority: "CRITICAL",
+      description: "updated desc",
+      nextStep: "updated step"
+    });
+  });
+
   it("groups items by category in first-seen order with per-category stats", () => {
     const summary = summariseSetupChecklist(items, stateMap([["Item A", state("DONE")]]), NOW);
     expect(summary.categories.map((c) => c.category)).toEqual(["Group one", "Group two"]);
