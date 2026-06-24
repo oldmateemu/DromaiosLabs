@@ -26,7 +26,7 @@
 |-------|------------------|------------------------------|----------------|----------------|
 | **Diagnostic imaging** | ~A$5.3bn Medicare imaging (2022–23); ~2,900 businesses; ~27M services/yr | **I-MED** (~215 clinics; sold to Jardine Matheson ~A$3.4bn, May 2026), **Lumus** (~130; Affinity), **Integral Diagnostics/Capitol** (~155, merged Dec 2024), **Sonic** | **DIAS** — *mandatory for Medicare* (15 standards; 4-yearly) | My Health Record share-by-default (1 Jul 2026); ARPANSA 2024 dose standard; TGA AI-SaMD |
 | **Pathology** | ~A$3.8bn Medicare path (2022–23) | **Sonic ~31%, Healius ~30%, ACL ~20% (>80% combined)** | **NATA/RCPA ISO 15189** — *mandatory for Medicare* | **ISO 15189:2022 transition now complete** (NATA, ~670 labs, May 2026) → ongoing QMS/surveillance; **MHR share-by-default (1 Jul 2026)** |
-| **Cosmetic / aesthetic** | ~A$1.4bn; >500,000 procedures/yr; surgical fragmented, non-surgical corporatising | **SILK/Wesfarmers Health** (~142 clinics), **Laser Clinics (KKR)**; long independent surgical tail | **NSQHS Cosmetic Surgery Standards** (mandatory for surgery under sedation/GA) | **AHPRA 2025 non-surgical guidelines** (eff. 2 Sep 2025) + **TGA injectables advertising crackdown** (penalties to A$16.5m/breach) |
+| **Cosmetic / aesthetic** | ~A$1.4bn; >500,000 procedures/yr; surgical fragmented, non-surgical corporatising | **SILK/Wesfarmers Health** (~142 clinics), **Laser Clinics (KKR)**; long independent surgical tail | **NSQHS Cosmetic Surgery Standards** (mandatory for **all services performing cosmetic surgery** — incl. office-based/local-anaesthetic, not only sedation/GA) | **AHPRA 2025 non-surgical guidelines** (eff. 2 Sep 2025) + **TGA injectables advertising crackdown** (penalties to A$16.5m/breach) |
 | **IVF / ART** | ~104,000 cycles (2023); ~US$730m, ~8.5% CAGR | **Monash IVF + Virtus >70%**, **Genea** (Liverpool Partners), **City Fertility** (CHA/SMG) | **RTAC Code of Practice** (→ **ACSQHC standards: testing from Jan 2027, full transition by Dec 2028**; RTAC continues meanwhile) | **Post-Monash Rapid Review** → ACSQHC standards phased in (test 2027 → transition 2028); new embryologist/nurse CPD & qualification rules |
 
 **Economic buyer (all four):** concentrated at **corporate-group HQ** — national Quality & Compliance
@@ -54,7 +54,8 @@ pathology and IVF.**
   **MHR share-by-default** (written **pathology reports authored by/on behalf of a pathologist**;
   raw images/data excluded) 1 Jul 2026.
 - **Cosmetic** — **NSQHS Cosmetic Surgery Standards** (launched Dec 2023; 7 standards/101 actions;
-  accreditation from early 2025) mandatory for invasive surgery under sedation/GA; **"surgeon" title
+  accreditation from early 2025) **mandatory for all services where cosmetic surgery is performed**
+  (per ACSQHC — including office-based/local-anaesthetic settings, not only sedation/GA); **"surgeon" title
   protection** (Sep 2023); **AHPRA cosmetic surgery reforms** (Jul 2023: referral, two consults, BDD
   screening); **AHPRA non-surgical cosmetic guidelines** (eff. 2 Sep 2025: RN experience minimums,
   in-person/video consult each prescribe, mandatory CPD, influencer/under-18 advertising bans);
@@ -86,10 +87,12 @@ pathology and IVF.**
 >   A$18.5m scheme, A$2,000 × up to 2 cycles + A$250 pre-IVF testing.
 > - **NSW** — *Assisted Reproductive Technology Act 2007* + **Regulation 2024** (commenced 1 Sep
 >   2024); NSW Health maintains the **Central Register** (offspring access at 18) + Voluntary
->   Register; record-keeping under **s 30/s 31**, data-accuracy offence **s 62**. The 2024 Regulation
->   added a **pregnancy/birth-outcome follow-up duty (reasonable steps 1–4 months post-treatment)** —
->   a defined, recurring, auditable workflow ideal for ClinicBoss reminders/tracking — plus
->   **strengthened donor-recipient counselling** requirements. **State rebate:** Fertility Treatment
+>   Register; record-keeping under **s 30/s 31**, data-accuracy offence **s 62**. **(Note: a 1–4 month
+>   pregnancy/birth-outcome follow-up duty appears in some jurisdictions (e.g. ACT/QLD); whether the
+>   NSW Regulation 2024 imposes an equivalent operative duty is contested between sources and could not
+>   be confirmed against SL-2024-0373 here — verify before building any NSW-specific follow-up reminder;
+>   the confirmed NSW duties are the Central Register/donor records, s 30/31 record-keeping and s 62.)**
+>   Plus **strengthened donor-recipient counselling** requirements. **State rebate:** Fertility Treatment
 >   Rebate-2 (Service NSW, from Feb 2025), A$2,000, income-tested, to Aug 2028.
 > - Neither SA nor NSW has (as at Jun 2026) announced a *standalone post-Monash* Bill — both move via
 >   the national process; their 2024–25 reforms predate Monash. **Near-term certain lever = ACSQHC

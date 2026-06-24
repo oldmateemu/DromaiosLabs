@@ -45,8 +45,12 @@
   care; food & nutrition; continuous improvement).
 - **Care minutes:** 215 min/resident/day incl. 44 RN min (since 1 Oct 2024); **externally-audited
   Care Minutes Performance Statement mandatory from FY2025–26**. **24/7 RN** on-site.
-- **SIRS:** 8 reportable categories (P1 ≤24h / P2 ≤30d / final ≤60d); **extended to home care from
-  1 Nov 2025**; civil penalties up to **A$1.65m**. **Star Ratings** published quarterly.
+- **SIRS:** 8 reportable categories (P1 ≤24h / P2 ≤30d; **final report only when the Commissioner
+  requires it, per Aged Care Rules 2025 s165A-45 — the old blanket ≤60d timer no longer applies**;
+  reported as up to ~84 days from first notice, *verify*). SIRS has applied to **home services since
+  1 Dec 2022** (residential since Apr 2021) and **continues under Support at Home** from 1 Nov 2025 —
+  i.e. not a brand-new home-care obligation, but restated under the new Act; civil penalties up to
+  **A$1.65m**. **Star Ratings** published quarterly.
 - Plus Code of Conduct, mandatory training, restrictive practices, open disclosure, IPC.
 
 ### NDIS
@@ -68,7 +72,9 @@
 
 ## C. Funding levers
 
-- **Aged care:** **AN-ACC** national price **A$295.64/day (from 1 Oct 2025)** with a new **Care
+- **Aged care:** **AN-ACC** national price **A$295.64 per NWAU** (the base price, from 1 Oct 2025 — *not*
+  a flat per-resident amount; **average funding ~$316/resident/day** after NWAU-class + Base Care Tariff
+  weighting) with a new **Care
   Minutes Supplement (~$33.41 PRPD)** explicitly tying funding to care-minute compliance (further
   changes Apr 2026). **Support at Home** (from 1 Nov 2025): 8 classes ~A$10,731–78,106/yr,
   quarterly budgets; separate AT-Home-Mods scheme. **Service-level price caps (originally 1 Jul 2026)

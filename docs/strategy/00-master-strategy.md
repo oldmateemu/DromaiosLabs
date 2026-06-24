@@ -106,7 +106,7 @@ High-confidence dates (cross-corroborated across multiple authoritative sources)
 
 | Date | Event | Sells |
 |------|-------|-------|
-| **1 Nov 2025** | New **Aged Care Act 2024** + **strengthened Aged Care Quality Standards (7)** + **Support at Home** commence; SIRS extends to home care | Aged-care training refresh, SIRS/RP packs, care-minutes evidence |
+| **1 Nov 2025** | New **Aged Care Act 2024** + **strengthened Aged Care Quality Standards (7)** + **Support at Home** commence (SIRS, which has applied to home services since 1 Dec 2022, continues/restated under the new Act) | Aged-care training refresh, SIRS/RP packs, care-minutes evidence |
 | FY2025–26 | Externally-audited **Care Minutes Performance Statement** required | ClinicBoss V-CM |
 | **Feb 2026** | First wave of 5-year **NDIS worker-screening** checks expire | Credentialing (C5) renewal spike |
 | **1 Jul 2026** | **NDIS mandatory registration** for SIL & platform providers (intent to extend) | Registration/audit-readiness packs + training |

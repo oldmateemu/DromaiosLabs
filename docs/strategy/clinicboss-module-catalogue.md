@@ -46,7 +46,7 @@
 | ID | Pack | Modules / fields added | Primary segment(s) |
 |----|------|------------------------|--------------------|
 | **V-OVA** | **Occupational Violence & Aggression** | OVA incident type, body-map, post-incident support workflow, hotspot analytics, links to OVA training (DromaiosEd flagship). | All — esp. hospital, aged care, justice, ED |
-| **V-SIRS** | **Serious / Reportable Incident** | Aged-care SIRS (8 categories, P1 ≤24h / P2 ≤30d / final ≤60d clocks) and NDIS reportable-incident workflows; regulator-ready notification packs. | Aged care, NDIS |
+| **V-SIRS** | **Serious / Reportable Incident** | Aged-care SIRS (8 categories, P1 ≤24h / P2 ≤30d clocks; **final report only when the Commissioner requires it — Aged Care Rules 2025 s165A-45, ~84 days, not a blanket 60d**) and NDIS reportable-incident workflows (**24h immediate notification + 5-business-day form**); regulator-ready notification packs. | Aged care, NDIS |
 | **V-RP** | **Restrictive Practices & Behaviour Support** | RP register, authorisation tracking (state-specific), behaviour-support-plan linkage, reporting. | Aged care, NDIS |
 | **V-CM** | **Care Minutes & Rostering** | Care-minute capture vs 215/44-RN target, roster-to-target, externally-auditable Care Minutes Performance Statement support. | Residential aged care |
 | **V-GP** | **General Practice Pack** | Cold-chain/vaccine-fridge logs, recall/reminder safety register, PIP-QI data extract helper, RACGP 5th-ed crosswalk. | GP, AMS |

@@ -44,12 +44,13 @@
 - **Medicare/MBS:** from **1 Jul 2025** the **GP Chronic Condition Management Plan (GPCCMP)**
   replaced GPMP+TCA; up to **5 allied-health services/yr** (10 for Aboriginal/Torres Strait Islander
   patients); referral by letter.
-- **NDIS** is a dominant allied-health revenue source but **therapy caps held tight** (physio
-  $193.99/hr largely unchanged since
-  2019; travel now 50%) → **margin squeeze** (34% of allied-health providers reported a loss in
-  2022–23). **Support at Home** (1 Nov 2025) adds a **Restorative Care Pathway (up to 16 weeks,
-  ~$6,000/episode, up to 2 episodes)** with multidisciplinary allied-health input, and reclassifies
-  showering as clinical care — an allied-health opportunity.
+- **NDIS** is a dominant allied-health revenue source but **therapy caps held tight** (physiotherapy
+  **$183.99/hr** in the 2026–27 schedule — lower than the $193.99/hr that still applies to several
+  other therapy disciplines; travel now 50%) → **margin squeeze** (34% of allied-health providers
+  reported a loss in 2022–23). **Support at Home** (1 Nov 2025) adds a **Restorative Care Pathway (up
+  to 16 weeks, ~$6,000/episode, up to 2 episodes)** with multidisciplinary allied-health input;
+  separately, **personal care (incl. showering) becomes fully government-funded clinical support from
+  1 Oct 2026** (not at the Nov-2025 launch) — an allied-health opportunity that goes live later in 2026.
 - Also: private-health "extras", WorkCover/CTP, DVA.
 
 **WTP:** price-sensitive (squeezed margins) → **low monthly per-seat**, compliance/LMS as an
