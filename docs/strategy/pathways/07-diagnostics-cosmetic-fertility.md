@@ -87,12 +87,13 @@ pathology and IVF.**
 >   A$18.5m scheme, A$2,000 × up to 2 cycles + A$250 pre-IVF testing.
 > - **NSW** — *Assisted Reproductive Technology Act 2007* + **Regulation 2024** (commenced 1 Sep
 >   2024); NSW Health maintains the **Central Register** (offspring access at 18) + Voluntary
->   Register; record-keeping under **s 30/s 31**, data-accuracy offence **s 62**. **(Note: a 1–4 month
->   pregnancy/birth-outcome follow-up duty appears in some jurisdictions (e.g. ACT/QLD); whether the
->   NSW Regulation 2024 imposes an equivalent operative duty is contested between sources and could not
->   be confirmed against SL-2024-0373 here — verify before building any NSW-specific follow-up reminder;
->   the confirmed NSW duties are the Central Register/donor records, s 30/31 record-keeping and s 62.)**
->   Plus **strengthened donor-recipient counselling** requirements. **State rebate:** Fertility Treatment
+>   Register; record-keeping under **s 30/s 31**, data-accuracy offence **s 62**. NSW **does** impose
+>   pregnancy/birth-outcome follow-up duties (confirmed against secondary legal analyses of SL-2024-0373
+>   + the ART Act after a source conflict): the **2024 Regulation** requires reasonable steps **1–4
+>   months** post-treatment to find out whether the recipient became pregnant, and **s 30(7)** of the
+>   Act requires reasonable steps **10–15 months** post-treatment to verify a live birth + offspring
+>   details — both defined, recurring, auditable workflows ideal for ClinicBoss/V-ART reminders. Plus
+>   **strengthened donor-recipient counselling** requirements. **State rebate:** Fertility Treatment
 >   Rebate-2 (Service NSW, from Feb 2025), A$2,000, income-tested, to Aug 2028.
 > - Neither SA nor NSW has (as at Jun 2026) announced a *standalone post-Monash* Bill — both move via
 >   the national process; their 2024–25 reforms predate Monash. **Near-term certain lever = ACSQHC
