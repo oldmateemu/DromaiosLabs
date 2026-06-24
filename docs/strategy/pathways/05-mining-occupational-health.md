@@ -152,7 +152,10 @@ delivery (Tier 3) suits remote-site/camp cohorts — a network-delivered, high-m
 - **Guardrails:** **fitness-for-work decisions must remain human-made and defensible** (Fair Work/
   tribunal exposure) — AI assists, never decides; **biometric fatigue monitoring** raises privacy/
   surveillance concerns (consent, proportionality); health-surveillance data is sensitive (APP,
-  onshore); non-SaMD; automated-decision disclosure by 10 Dec 2026.
+  onshore); non-SaMD. **Automated-decision-making disclosure (OAIC, from 10 Dec 2026) bites
+  specifically where AI materially informs a decision that significantly affects a person's rights/
+  interests — e.g. fitness-for-work** — so attach the disclosure to those high-impact features, not as
+  a blanket label on every AI play.
 
 ---
 

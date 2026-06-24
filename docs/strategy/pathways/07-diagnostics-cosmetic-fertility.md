@@ -43,20 +43,22 @@ pathology and IVF.**
   payment — **not accredited = cannot bill Medicare**. 15 standards/4 parts; full accreditation
   4-yearly; accreditors NATA/HDAA/QIP. Underpinned by **RANZCR Standards (2025)**; **ARPANSA RPS C-5**
   + the **2024 diagnostic-imaging-apparatus performance-testing standard**; state radiation
-  licensing; **NDRLs** for dose. **MHR share-by-default** from 1 Jul 2026 (radiologist reports).
+  licensing; **NDRLs** for dose. **MHR share-by-default** from 1 Jul 2026 (service-level: diagnostic-
+  imaging provider reports/records, not only radiologist-authored reports).
 - **Pathology — NATA/RCPA ISO 15189**: required for Approved Pathology Authority/Laboratory status
   and Medicare billing — **no accreditation = no Medicare**. **NPAAC** category-of-testing standards
   layered on top. The **ISO 15189:2022 transition is now substantially complete** (NATA reported
   ~670 labs accredited, May 2026; the SAD application document took effect Feb 2026) — so the live
   lever is **ongoing ISO 15189 QMS maintenance + surveillance**, not a one-off transition scramble.
-  **MHR share-by-default** (pathologist reports) 1 Jul 2026.
+  **MHR share-by-default** (service-level: pathology provider reports/records) 1 Jul 2026.
 - **Cosmetic** — **NSQHS Cosmetic Surgery Standards** (launched Dec 2023; 7 standards/101 actions;
   accreditation from early 2025) mandatory for invasive surgery under sedation/GA; **"surgeon" title
   protection** (Sep 2023); **AHPRA cosmetic surgery reforms** (Jul 2023: referral, two consults, BDD
   screening); **AHPRA non-surgical cosmetic guidelines** (eff. 2 Sep 2025: RN experience minimums,
   in-person/video consult each prescribe, mandatory CPD, influencer/under-18 advertising bans);
-  **TGA injectables advertising crackdown** (2025: prohibited terms, before/after bans; **98 of 100
-  clinic sites found non-compliant**; penalties up to A$1.65m individual / A$16.5m corporate per
+  **TGA injectables advertising crackdown** (2025: prohibited terms, before/after bans; an
+  **Operation Redress (OPRED) review of 100 clinic websites found 98 non-compliant** — a third-party
+  study, not a regulator's own audit; penalties up to A$1.65m individual / A$16.5m corporate per
   breach; Targeted Compliance Unit active).
 - **IVF/ART** — currently **RTAC Code of Practice** (FSANZ, self-regulatory); after the 2024–25
   **Monash IVF embryo incidents**, Health Ministers (Sep 2025) agreed **ACSQHC will independently
@@ -142,7 +144,8 @@ smaller/mid public services** first and position against in-house TCO.
   ISO 15189 QMS/surveillance** (the 2022 transition itself is complete); education attach (S18/S19).
   Network-wide deal from one HQ win.
 - **Cosmetic — advertising-compliance + consent-led.** Lead with the **advertising-compliance
-  module + S16 advertising course** (98/100 breach rate, A$16.5m exposure = board-level urgency),
+  module + S16 advertising course** (the OPRED study's 98/100 website non-compliance + A$16.5m
+  exposure = board-level urgency),
   plus aesthetic consent (V-COSMETIC) and CPD/scope training (S15); land via chain HQ
   (SILK/Wesfarmers, Laser Clinics) and independent surgical facilities needing NSQHS Cosmetic
   Surgery accreditation.
@@ -232,7 +235,8 @@ colleges where possible.
    member as a lighthouse).
 2. **Imaging parallel (M3–12):** same V-DIAG engine, DIAS crosswalk + dose + MHR; target a
    post-merger group (IDX/Capitol, I-MED, Lumus) on **QMS harmonisation** pain.
-3. **Cosmetic advertising-compliance wedge (M0–9):** the 98/100 breach rate + A$16.5m penalties make
+3. **Cosmetic advertising-compliance wedge (M0–9):** the OPRED study's 98/100 website non-compliance
+   + A$16.5m penalties make
    the **advertising module + S16 course** an urgent, board-level sale into chain HQs (SILK/
    Wesfarmers, Laser Clinics) and surgical facilities needing NSQHS Cosmetic accreditation.
 4. **IVF accreditation-transition (M6–18):** position for the **ACSQHC ART standards (2027)**; land
@@ -247,7 +251,8 @@ colleges where possible.
 
 - **Plays (safe, non-SaMD):** accreditation-**evidence assembler** (DIAS/ISO 15189/NSQHS/RTAC);
   **advertising-compliance scanner** (flags prohibited injectable terms/before-after imagery — a
-  natural, high-value AI use given the 98/100 breach rate); QMS document generation; dose-analytics
+  natural, high-value AI use given the OPRED study's 98/100 website non-compliance); QMS document
+  generation; dose-analytics
   vs NDRLs; ISO 15189 transition gap-analysis; MHR upload-assurance checks.
 - **Hard guardrails:** **image interpretation (radiology/digital pathology) and embryo
   selection/grading are TGA SaMD** — regulated by intended purpose; ClinicBoss must **never** enter

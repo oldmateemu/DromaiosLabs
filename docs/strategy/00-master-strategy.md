@@ -110,7 +110,7 @@ High-confidence dates (cross-corroborated across multiple authoritative sources)
 | FY2025–26 | Externally-audited **Care Minutes Performance Statement** required | ClinicBoss V-CM |
 | **Feb 2026** | First wave of 5-year **NDIS worker-screening** checks expire | Credentialing (C5) renewal spike |
 | **1 Jul 2026** | **NDIS mandatory registration** for SIL & platform providers (intent to extend) | Registration/audit-readiness packs + training |
-| **2 Sep 2025** | **AHPRA non-surgical cosmetic guidelines** + **TGA injectables advertising crackdown** (penalties to A$16.5m/breach; 98/100 clinics non-compliant) | Cosmetic advertising-compliance + consent + CPD (Pathway 07) |
+| **2 Sep 2025** | **AHPRA non-surgical cosmetic guidelines** (eff. 2 Sep 2025) — separately, the **TGA injectables-advertising enforcement** is an ongoing 2025 action (not tied to this exact date), with penalties to A$16.5m/breach (the "98/100 non-compliant" figure is from the third-party OPRED website study, not a regulator audit) | Cosmetic advertising-compliance + consent + CPD (Pathway 07) |
 | **Complete (May 2026)** | **ISO 15189:2022** pathology transition finished (NATA, ~670 labs; SAD effective Feb 2026) | Shift to **ongoing QMS/surveillance** + MHR (V-DIAG) — not a one-off cliff |
 | **1 Jul 2026** | **My Health Record "sharing by default"** for path/imaging reports | Privacy training; interoperability positioning; MHR upload assurance |
 | **1 Jun 2026** | Mining **QLD RSHLA Act 2024 critical-controls** compliance deadline (safety-critical-role competencies transition to **1 Jun 2030**) | Mining critical-controls assurance + induction/SHMS + V-MINE |
@@ -119,6 +119,14 @@ High-confidence dates (cross-corroborated across multiple authoritative sources)
 | **Jan 2027 → Dec 2028** | **ACSQHC national ART accreditation**: draft standards for **testing from Jan 2027**, all providers transitioned by **Dec 2028** (RTAC continues meanwhile; post-Monash reforms) | IVF/ART accreditation-transition + chain-of-custody + embryologist CPD (Pathway 07) |
 | **2027** | **CHSP** transitions into Support at Home (no earlier than 1 Jul 2027); **ADF Health Services Contract** re-tender (1 Jul 2027) | Aged-care home-care expansion; defence subcontracting opportunity |
 | 2028+ | **NSQHS 3rd edition** released (assessment ~2030) | Hospital slow-burn; not an immediate trigger |
+
+> **Citations & traceability:** this calendar is a *summary*; the authoritative source instrument and
+> URL for each date lives in the relevant pathway doc's **§M (Sources & confidence)** — e.g. NDIS
+> registration (NDIS Commission) and worker screening in `pathways/02`; aged-care Act/Support-at-Home
+> (health.gov.au/ACQSC) in `pathways/02`; MHR sharing-by-default (health.gov.au) and ISO 15189 (NATA),
+> ART (ACSQHC) in `pathways/07`; RSHLA (RSHQ) in `pathways/05`; BBPIP/PIP (health.gov.au) in
+> `pathways/01`. **Re-verify each date against its primary source before running a campaign** (several
+> shifted in 2026 — e.g. Support-at-Home price caps deferred, ISO 15189 transition completed).
 
 > Run the company's quarterly review (existing Cockpit rhythm) against this calendar. Each cliff is
 > a campaign trigger.
