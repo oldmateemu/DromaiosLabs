@@ -25,9 +25,9 @@
 | Niche | Size / structure | Dominant buyers (win-the-HQ) | Mandatory hook | 2024–27 shock |
 |-------|------------------|------------------------------|----------------|----------------|
 | **Diagnostic imaging** | ~A$5.3bn Medicare imaging (2022–23); ~2,900 businesses; ~27M services/yr | **I-MED** (~215 clinics; sold to Jardine Matheson ~A$3.4bn, May 2026), **Lumus** (~130; Affinity), **Integral Diagnostics/Capitol** (~155, merged Dec 2024), **Sonic** | **DIAS** — *mandatory for Medicare* (15 standards; 4-yearly) | My Health Record share-by-default (1 Jul 2026); ARPANSA 2024 dose standard; TGA AI-SaMD |
-| **Pathology** | ~A$3.8bn Medicare path (2022–23) | **Sonic ~31%, Healius ~30%, ACL ~20% (>80% combined)** | **NATA/RCPA ISO 15189** — *mandatory for Medicare* | **ISO 15189:2022 transition (eff. Feb 2026)**; MHR share-by-default (1 Jul 2026) |
+| **Pathology** | ~A$3.8bn Medicare path (2022–23) | **Sonic ~31%, Healius ~30%, ACL ~20% (>80% combined)** | **NATA/RCPA ISO 15189** — *mandatory for Medicare* | **ISO 15189:2022 transition now complete** (NATA, ~670 labs, May 2026) → ongoing QMS/surveillance; **MHR share-by-default (1 Jul 2026)** |
 | **Cosmetic / aesthetic** | ~A$1.4bn; >500,000 procedures/yr; surgical fragmented, non-surgical corporatising | **SILK/Wesfarmers Health** (~142 clinics), **Laser Clinics (KKR)**; long independent surgical tail | **NSQHS Cosmetic Surgery Standards** (mandatory for surgery under sedation/GA) | **AHPRA 2025 non-surgical guidelines** (eff. 2 Sep 2025) + **TGA injectables advertising crackdown** (penalties to A$16.5m/breach) |
-| **IVF / ART** | ~104,000 cycles (2023); ~US$730m, ~8.5% CAGR | **Monash IVF + Virtus >70%**, **Genea** (Liverpool Partners), **City Fertility** (CHA/SMG) | **RTAC Code of Practice** (→ **ACSQHC national accreditation by Jan 2027**) | **Post-Monash Rapid Review** → ACSQHC standards from 2027; new embryologist/nurse CPD & qualification rules |
+| **IVF / ART** | ~104,000 cycles (2023); ~US$730m, ~8.5% CAGR | **Monash IVF + Virtus >70%**, **Genea** (Liverpool Partners), **City Fertility** (CHA/SMG) | **RTAC Code of Practice** (→ **ACSQHC standards: testing from Jan 2027, full transition by Dec 2028**; RTAC continues meanwhile) | **Post-Monash Rapid Review** → ACSQHC standards phased in (test 2027 → transition 2028); new embryologist/nurse CPD & qualification rules |
 
 **Economic buyer (all four):** concentrated at **corporate-group HQ** — national Quality & Compliance
 Managers, Clinical/Scientific Governance leads, CMO/Medical Directors, Group Operations. At site
@@ -46,8 +46,10 @@ pathology and IVF.**
   licensing; **NDRLs** for dose. **MHR share-by-default** from 1 Jul 2026 (radiologist reports).
 - **Pathology — NATA/RCPA ISO 15189**: required for Approved Pathology Authority/Laboratory status
   and Medicare billing — **no accreditation = no Medicare**. **NPAAC** category-of-testing standards
-  layered on top. **ISO 15189:2022 transition (application document effective Feb 2026)** forces a
-  fresh QMS/document-control update wave. **MHR share-by-default** (pathologist reports) 1 Jul 2026.
+  layered on top. The **ISO 15189:2022 transition is now substantially complete** (NATA reported
+  ~670 labs accredited, May 2026; the SAD application document took effect Feb 2026) — so the live
+  lever is **ongoing ISO 15189 QMS maintenance + surveillance**, not a one-off transition scramble.
+  **MHR share-by-default** (pathologist reports) 1 Jul 2026.
 - **Cosmetic** — **NSQHS Cosmetic Surgery Standards** (launched Dec 2023; 7 standards/101 actions;
   accreditation from early 2025) mandatory for invasive surgery under sedation/GA; **"surgeon" title
   protection** (Sep 2023); **AHPRA cosmetic surgery reforms** (Jul 2023: referral, two consults, BDD
@@ -58,8 +60,10 @@ pathology and IVF.**
   breach; Targeted Compliance Unit active).
 - **IVF/ART** — currently **RTAC Code of Practice** (FSANZ, self-regulatory); after the 2024–25
   **Monash IVF embryo incidents**, Health Ministers (Sep 2025) agreed **ACSQHC will independently
-  accredit ART against national standards from 2027** (standards project began Apr 2026; in place by
-  Jan 2027), with new **minimum qualifications + CPD for embryologists/nurses/counsellors/doctors**
+  accredit ART against national standards** (standards project began Apr 2026; **draft standards
+  available for testing from Jan 2027, with all providers transitioned by Dec 2028** — **RTAC
+  continues to manage accreditation during the transition**), with new **minimum qualifications + CPD
+  for embryologists/nurses/counsellors/doctors**
   and a **national donor registry**. State fragmentation accelerating reform (VIC: VARTA abolished,
   Dept of Health regulator from 1 Jan 2025; QLD ART Act 2024 from Sep 2025; WA Bill 2025, regime
   ~mid-2027).
@@ -134,8 +138,9 @@ smaller/mid public services** first and position against in-house TCO.
 ## E. Entry wedge (mixed per niche, all HQ-channel)
 
 - **Imaging/pathology — QMS/accreditation-led to corporate HQ.** Lead with **ClinicBoss V-DIAG**
-  (DIAS or ISO 15189 crosswalk + QMS + dose/MHR assurance), timed to the **ISO 15189:2022 transition**
-  and **MHR 1 Jul 2026** deadlines; education attach (S18/S19). Network-wide deal from one HQ win.
+  (DIAS or ISO 15189 crosswalk + QMS + dose/MHR assurance), timed to **MHR 1 Jul 2026** and **ongoing
+  ISO 15189 QMS/surveillance** (the 2022 transition itself is complete); education attach (S18/S19).
+  Network-wide deal from one HQ win.
 - **Cosmetic — advertising-compliance + consent-led.** Lead with the **advertising-compliance
   module + S16 advertising course** (98/100 breach rate, A$16.5m exposure = board-level urgency),
   plus aesthetic consent (V-COSMETIC) and CPD/scope training (S15); land via chain HQ
@@ -221,7 +226,8 @@ colleges where possible.
 
 ## J. Strategy to move through the stream
 
-1. **Pathology QMS beachhead (M0–9):** ride the **ISO 15189:2022 transition (Feb 2026)** + **MHR
+1. **Pathology QMS beachhead (M0–9):** lead with **ongoing ISO 15189 QMS maintenance/surveillance**
+   (the 2022 transition is complete) + **MHR
    (Jul 2026)**; pitch V-DIAG QMS/evidence to one of Sonic/Healius/ACL at HQ (or a public-pathology
    member as a lighthouse).
 2. **Imaging parallel (M3–12):** same V-DIAG engine, DIAS crosswalk + dose + MHR; target a

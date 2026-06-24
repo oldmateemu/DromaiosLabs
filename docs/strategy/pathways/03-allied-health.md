@@ -46,8 +46,9 @@
   patients); referral by letter.
 - **NDIS** is a dominant allied-health revenue source but **rates frozen** (therapy $193.99/hr since
   2019; travel now 50%) → **margin squeeze** (34% of allied-health providers reported a loss in
-  2022–23). **Support at Home** (1 Nov 2025) adds a **Restorative Care Pathway (12 weeks, +$6,000
-  for allied health)** and reclassifies showering as clinical care — an allied-health opportunity.
+  2022–23). **Support at Home** (1 Nov 2025) adds a **Restorative Care Pathway (up to 16 weeks,
+  ~$6,000/episode, up to 2 episodes)** with multidisciplinary allied-health input, and reclassifies
+  showering as clinical care — an allied-health opportunity.
 - Also: private-health "extras", WorkCover/CTP, DVA.
 
 **WTP:** price-sensitive (squeezed margins) → **low monthly per-seat**, compliance/LMS as an

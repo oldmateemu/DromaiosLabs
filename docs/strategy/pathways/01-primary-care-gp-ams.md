@@ -1,7 +1,7 @@
 # Pathway 01 — Primary Care: Community Clinics / GPs + AMS / ACCHOs
 
 > Grouped because both run on the **RACGP Standards for general practices (5th ed.)** clinical
-> accreditation pathway (AGPAL or QPA, 3-year cycle + 18-month check), and accreditation is the
+> accreditation pathway (AGPAL or QPA, 3-year cycle), and accreditation is the
 > **gate to funding** (PIP, bulk-billing incentives). AMS/ACCHOs are treated as an **extension**
 > of the GP pathway with three additions: organisational accreditation (QIC/ISO), funding-linked
 > **nKPI/OSR** reporting, and **Indigenous Data Sovereignty**.
@@ -39,7 +39,9 @@
 
 - **RACGP Standards 5th ed.** — five areas (communication & participation; rights & needs;
   governance & risk; comprehensive care; clinical safety/quality). **3-year accreditation** +
-  18-month mid-cycle check; self-assessment + document review + on-site assessor. Agencies:
+  assessment scheduled 4–8 months before expiry; self-assessment + document review + on-site
+  assessor (a mid-cycle/mid-point review is a *proposed* ACSQHC change, **not** the current baseline).
+  Agencies:
   **AGPAL, QPA** (QIP in adjacent sectors).
 - **Mandatory operational requirements:** CPR currency, IPC, cold-chain/vaccine-fridge logs,
   anaphylaxis/emergency, sterilisation/reprocessing, privacy/records, complaints & incident
@@ -47,7 +49,10 @@
 - **CPD (AHPRA/Medical Board, since 2023):** **50 hrs/yr** (≥12.5 educational; ≥25 across
   reviewing performance + measuring outcomes; ≥5 reflecting on feedback) + annual PDP + CPR per
   triennium; tracked via RACGP **MyCPD**/ACRRM.
-- **Accreditation is financially mandatory** — it's the gate to PIP and bulk-billing incentives.
+- **Accreditation is financially mandatory** — it gates **PIP** and most MyMedicare-linked
+  incentives. *Caveat:* the **Bulk Billing Practice Incentive Program (BBPIP, from 1 Nov 2025)** has an
+  **accreditation exemption** for practices registering in MyMedicare for the first time *purely* for
+  BBPIP — so don't frame accreditation as the gate to *all* bulk-billing incentives (PIP still is).
 - **AMS additions:** **dual/multi-accreditation** (RACGP clinical + **QIC Health & Community
   Services Standards** or **ISO 9001** organisational); **nKPI** (20 indicators, 6-monthly) +
   **OSR** (annual) reporting, both tied to IAHP funding; cultural-safety training; Closing-the-Gap
@@ -89,7 +94,7 @@ Communicare — we **integrate** (FHIR/Halo Connect) and own the audit-readiness
 - **GP/community:** **Education-led opener → accreditation-pack anchor.** Start with a low-cost,
   CPD-accredited **IPC (U02)** and **OVA (F01)** course sold to the Practice Manager (short cycle,
   budgeted), then expand to the **"Accreditation-Ready: RACGP 5th ed" (F03)** course + **ClinicBoss
-  V-GP** accreditation pack ahead of each practice's 3-year/18-month milestone.
+  V-GP** accreditation pack ahead of each practice's 3-year accreditation milestone.
 - **AMS:** **Education-led on trust.** Lead with **Cultural Safety (F05, co-designed with First
   Nations clinicians)** + **OVA (F01)**, via **NACCHO/affiliates**, then expand to **ClinicBoss
   V-AMS** (nKPI/OSR automation + dual-accreditation crosswalk) — the highest-value, funding-linked
@@ -105,7 +110,9 @@ Accreditation Readiness (RACGP 5th-ed crosswalk) + C8 Dashboard. Pairs with Drom
 Credentialing (locum/contractor GPs, nurse registrations, CPR currency) + C7 Calendar
 (accreditation cycle, CPD year, fridge logs) + **V-GP** (cold-chain logs, recall/reminder safety
 register, **PIP-QI data extract helper**).
-**Phase 3 (AMS / deepen):** **V-AMS** — **nKPI (20 indicators) + OSR reporting helpers**,
+**Phase 3 (AMS / deepen):** **V-AMS** — **nKPI + OSR reporting helpers** (key off the *current*
+indicator list rather than a fixed count — ~20 per AIHW's operational collection, health.gov.au
+headlines 24, and the set is under 2025–26 review),
 CTG/kinship/cultural fields, dual-accreditation crosswalk (RACGP + QIC/ISO), **Indigenous
 data-sovereignty controls**; integrate with **Communicare/BP** for source data.
 
@@ -158,7 +165,7 @@ free/generic training.
 1. **Beachhead (M0–6):** CPD-accredited IPC + OVA eLearning to GP practice managers via 1–2 PHNs;
    publish the RACGP 5th-ed Accreditation-Ready course. Win 5–10 reference practices.
 2. **Attach ClinicBoss (M3–9):** convert education customers to the "Accreditation + Capability"
-   bundle ahead of their 18-month/3-year milestones; ship V-GP + PIP-QI extract.
+   bundle ahead of their 3-year accreditation milestones; ship V-GP + PIP-QI extract.
 3. **AMS extension (M6–15):** enter via NACCHO/affiliate cultural-safety + OVA training; co-design
    with First Nations clinicians; then sell V-AMS nKPI/OSR automation (the killer app) with
    Indigenous data governance.

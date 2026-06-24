@@ -66,7 +66,11 @@
 - **Aged care:** **AN-ACC** national price **A$295.64/day (from 1 Oct 2025)** with a new **Care
   Minutes Supplement (~$33.41 PRPD)** explicitly tying funding to care-minute compliance (further
   changes Apr 2026). **Support at Home** (from 1 Nov 2025): 8 classes ~A$10,731–78,106/yr,
-  quarterly budgets; separate AT-Home-Mods scheme; price caps from 1 Jul 2026.
+  quarterly budgets; separate AT-Home-Mods scheme. **Service-level price caps (originally 1 Jul 2026)
+  were deferred (announced ~May 2026) citing market volatility** — no fixed start date; the live lever
+  is now **ACQSC consumer-protection enforcement** (refund powers for overcharging, mandatory monthly
+  statements, a published quarterly national price summary). Sell *price-transparency + compliance*,
+  not a price-cap deadline.
 - **NDIS:** **Pricing Arrangements 2025–26** — core rates **frozen a 6th year** (L2 $100.14/hr,
   L3 $190.54/hr); therapy travel billable at 50%. Frozen prices = **margin squeeze → demand for
   cost/efficiency + compliance tooling** (not premium spend).

@@ -32,9 +32,12 @@
 
 - **State-based mining WHS** (not unified): NSW Resources Regulator (WHS (Mines & Petroleum Sites)
   Act/Reg 2022); **QLD Resources Safety & Health Queensland (RSHQ)**; WA DMIRS (WHS (Mines) Reg 2022).
-- **QLD RSHLA Act 2024** — major near-term driver: new provisions commenced **1 Jun 2025**; industry
-  **compliance deadline 1 Jun 2026**; strengthened safety-critical-role competencies + new induction/
-  training + SHMS requirements for Remote Operating Centre workers.
+- **QLD RSHLA Act 2024** — major near-term driver: new provisions commenced **1 Jun 2025**; the
+  **critical-controls compliance deadline is 1 Jun 2026**. Note the **safety-critical-role
+  competency/certificate transition runs to 1 Jun 2030** (full assessment for new applicants from
+  1 Jun 2026), so the *immediate* 2026 demand is critical-controls assurance + induction/SHMS for
+  Remote Operating Centre workers, with competency uplift a longer (to-2030) tail — don't oversell
+  2026 as a competency cliff.
 - **Coal Mine Workers' Health Scheme (QLD)** + NSW Coal Services — mandatory employer-funded periodic
   health assessments (spirometry, chest imaging) for fitness-for-work and CWP/silicosis detection.
 - **Dust/respiratory:** NSW respirable coal dust WES 1.5 mg/m³ (2021); QLD Chapter 8A crystalline
@@ -131,7 +134,8 @@ delivery (Tier 3) suits remote-site/camp cohorts — a network-delivered, high-m
 
 1. **Training beachhead (M0–9):** sell OVA + fatigue + D&A + emergency-response training into
    remote-site clinics, camps, and occupational-health contractors; ride the **QLD RSHLA 2024
-   1-Jun-2026** competency deadline. High-WTP, fast revenue.
+   1-Jun-2026 critical-controls deadline** (competency transition runs to 2030). High-WTP, fast
+   revenue.
 2. **V-MINE land (M6–18):** attach fitness-for-work + health-surveillance compliance to
    occupational-health contractors (Sonic HealthPlus long tail / regional providers).
 3. **Operator expansion (M12–24):** enterprise deals with operators; interoperate with Avetta/Cm3/

@@ -50,7 +50,7 @@
 | **V-RP** | **Restrictive Practices & Behaviour Support** | RP register, authorisation tracking (state-specific), behaviour-support-plan linkage, reporting. | Aged care, NDIS |
 | **V-CM** | **Care Minutes & Rostering** | Care-minute capture vs 215/44-RN target, roster-to-target, externally-auditable Care Minutes Performance Statement support. | Residential aged care |
 | **V-GP** | **General Practice Pack** | Cold-chain/vaccine-fridge logs, recall/reminder safety register, PIP-QI data extract helper, RACGP 5th-ed crosswalk. | GP, AMS |
-| **V-AMS** | **ACCHO Pack** | nKPI (20 indicators) + OSR reporting helpers, CTG/kinship/cultural-safety fields, dual-accreditation crosswalk (RACGP + QIC/ISO), Indigenous data-sovereignty controls. | AMS/ACCHO |
+| **V-AMS** | **ACCHO Pack** | nKPI + OSR reporting helpers (key off the current indicator set), CTG/kinship/cultural-safety fields, dual-accreditation crosswalk (RACGP + QIC/ISO), Indigenous data-sovereignty controls. | AMS/ACCHO |
 | **V-HOSP** | **Hospital / Day-Procedure Pack** | NSQHS 2nd-ed (8 standards) crosswalk, credentialing & scope-of-practice committee workflow, hand-hygiene/IPC audit, short-notice-assessment readiness. | Hospitals, day surgeries |
 | **V-MINE** | **Fitness-for-Work & Site Safety** | Fitness-for-work + health-surveillance records (CMWHS/dust), D&A program (AS/NZS 4308/4760), fatigue, statutory competency/induction, contractor pre-qual & site-access gating. | Mining, occupational health |
 | **V-AH** | **Allied Health Pack** | CPD logbook, clinical-supervision logs (provisional psychologists/new grads/students), NDIS/aged-care documentation helpers. | Allied health |
