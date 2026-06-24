@@ -16,7 +16,11 @@ const { authMock, servicesMock, redirectMock } = vi.hoisted(() => ({
     createQuickCaptureDraft: vi.fn(),
     prepareDraftAutomation: vi.fn(),
     runAutomation: vi.fn(),
-    updateActionStatus: vi.fn()
+    updateActionQuickEditFromForm: vi.fn(),
+    updateActionStatus: vi.fn(),
+    updateLaunchpadLinkFromForm: vi.fn(),
+    updateLaunchpadQuickFieldsFromForm: vi.fn(),
+    updateSetupItemFromForm: vi.fn()
   },
   redirectMock: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
@@ -76,9 +80,29 @@ describe("authenticated form actions", () => {
     expect(servicesMock.createActionFromForm).toHaveBeenCalledWith(expect.any(FormData), "user-1");
   });
 
+  it("updateSetupItemAction updates setup metadata and redirects to setup", async () => {
+    await expect(actions.updateSetupItemAction(form({ itemKey: "legal-asic-current", status: "IN_PROGRESS" }))).rejects.toThrow(
+      "REDIRECT:/setup"
+    );
+
+    expect(servicesMock.updateSetupItemFromForm).toHaveBeenCalledWith(
+      "legal-asic-current",
+      expect.any(FormData),
+      "user-1"
+    );
+  });
+
   it("completeActionAction marks the action DONE", async () => {
     await expect(actions.completeActionAction(form({ actionId: "a-1" }))).rejects.toThrow("REDIRECT:/actions");
     expect(servicesMock.updateActionStatus).toHaveBeenCalledWith("a-1", ActionStatus.DONE);
+  });
+
+  it("updateActionQuickEditAction updates action metadata and redirects to actions", async () => {
+    await expect(actions.updateActionQuickEditAction(form({ actionId: "action-1", status: "WAITING" }))).rejects.toThrow(
+      "REDIRECT:/actions"
+    );
+
+    expect(servicesMock.updateActionQuickEditFromForm).toHaveBeenCalledWith("action-1", expect.any(FormData));
   });
 
   it("approveDraftAction approves and redirects to the register", async () => {
@@ -89,6 +113,22 @@ describe("authenticated form actions", () => {
   it("createLaunchpadLinkAction creates a link and redirects to launchpad", async () => {
     await expect(actions.createLaunchpadLinkAction(form({ name: "Xero" }))).rejects.toThrow("REDIRECT:/launchpad");
     expect(servicesMock.createLaunchpadLink).toHaveBeenCalledWith(expect.any(FormData));
+  });
+
+  it("updateLaunchpadQuickEditAction updates launchpad metadata and redirects to launchpad", async () => {
+    await expect(actions.updateLaunchpadQuickEditAction(form({ linkId: "link-1", cost: "99.00" }))).rejects.toThrow(
+      "REDIRECT:/launchpad"
+    );
+
+    expect(servicesMock.updateLaunchpadQuickFieldsFromForm).toHaveBeenCalledWith("link-1", expect.any(FormData));
+  });
+
+  it("updateLaunchpadLinkAction updates the full launchpad record and redirects to detail", async () => {
+    await expect(actions.updateLaunchpadLinkAction(form({ linkId: "link-1", name: "Xero" }))).rejects.toThrow(
+      "REDIRECT:/launchpad/link-1"
+    );
+
+    expect(servicesMock.updateLaunchpadLinkFromForm).toHaveBeenCalledWith("link-1", expect.any(FormData));
   });
 
   it("weeklyReviewAction completes the review and redirects", async () => {
