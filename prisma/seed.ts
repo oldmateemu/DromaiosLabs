@@ -5,7 +5,7 @@ import {
   loadLaunchpadSystemMetadata,
   type LaunchpadSystemMetadata
 } from "../src/lib/launchpad-system-metadata";
-import { phase0AuthorityTrustChecklist } from "../src/lib/strategy-checklist";
+import { authorityTrustChecklist } from "../src/lib/strategy-checklist";
 
 const prisma = new PrismaClient();
 
@@ -90,7 +90,7 @@ async function seedStrategyChecklist(adminUserId: string) {
   const streamByName = new Map(streamRecords.map((stream) => [stream.name, stream.id]));
   const functionByName = new Map(functionRecords.map((fn) => [fn.name, fn.id]));
 
-  for (const item of phase0AuthorityTrustChecklist) {
+  for (const item of authorityTrustChecklist) {
     const existing = await prisma.action.findFirst({
       where: { title: item.title, source: ActionSource.USER }
     });
