@@ -8,6 +8,7 @@ node_modules/
 .env.hetzner
 .env.production
 prisma/launchpad-system-metadata.local.json
+.intake/
 coverage/
 test-results/
 playwright-report/

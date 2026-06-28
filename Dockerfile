@@ -14,6 +14,10 @@ RUN pnpm build
 
 FROM base AS runner
 ENV NODE_ENV=production
+# Local document reading for the intake pathway: Tesseract OCR for scans/photos
+# and poppler-utils (pdftotext/pdftoppm) for PDFs. Keeps all document reading on
+# the box with no external OCR service.
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng poppler-utils
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/node_modules ./node_modules

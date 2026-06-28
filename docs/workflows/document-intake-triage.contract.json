@@ -1,0 +1,77 @@
+{
+  "name": "Document intake triage",
+  "owner": "founder/operator",
+  "companyFunction": "admin",
+  "financeOrLegalReview": true,
+  "trigger": "manual scan triage",
+  "targetTool": "local cockpit (Tesseract OCR + poppler + Ollama)",
+  "safetyLevel": "APPROVAL_REQUIRED",
+  "sourceWorkflow": "docs/workflows/document-intake-triage.md",
+  "machineReadableContract": "docs/workflows/document-intake-triage.contract.json",
+  "intakeSources": {
+    "folder": "<INTAKE_DIR>/inbox/scan",
+    "email": "<INTAKE_DIR>/inbox/email",
+    "upload": "/intake in-cockpit upload"
+  },
+  "intakeDirDefault": "/data/intake",
+  "pipeline": ["CAPTURED", "READ", "TRIAGED", "IN_REVIEW", "FILED", "ARCHIVED", "REJECTED", "FAILED"],
+  "domains": ["BUSINESS", "PERSONAL", "MIXED", "UNKNOWN"],
+  "dispositions": ["ACTION", "FILE", "ARCHIVE", "UNSURE"],
+  "readingEngine": {
+    "ocr": ["tesseract-ocr", "tesseract-ocr-data-eng", "poppler-utils"],
+    "understanding": "local Ollama (OLLAMA_MODEL, OLLAMA_BASE_URL)",
+    "cloudReadingEnabled": false,
+    "degradesToFilenameTriage": true
+  },
+  "businessVsPersonalRouting": {
+    "field": "domain (orthogonal on IntakeDocument and Action)",
+    "businessFinanceTypes": ["invoice", "receipt", "statement", "payslip", "bill", "utility-bill", "rates-notice"],
+    "businessLegalTypes": ["contract", "insurance", "certificate"],
+    "businessRoute": "Company Core + finance/legal/admin",
+    "personalRoute": "Personal pipeline; no company stream or function",
+    "mixedOrUnknownRoute": "admin, flagged for human reclassification"
+  },
+  "deduplication": {
+    "key": "sha256 content hash",
+    "defaultAction": "skip duplicate capture"
+  },
+  "outputsCreated": [
+    "IntakeDocument review-queue record",
+    "Local OCR text and triage proposal",
+    "Cockpit Action on human approval (carrying domain)",
+    "Cockpit run summary and a review action when run via automation"
+  ],
+  "blockedActions": [
+    "Sending document bytes or text to cloud AI/OCR by default",
+    "Payment execution",
+    "Bank rule changes",
+    "BAS, tax, legal, or compliance lodgement",
+    "Xero create, update, approve, or submit",
+    "Creating any Action from a document without human approval",
+    "External email sending",
+    "Public publishing"
+  ],
+  "rollbackOrDisablePath": [
+    "Stop dropping files into the watched folders or pause the automation",
+    "Reject incorrectly captured documents (moves to REJECTED, not deleted)",
+    "Archived documents move to <INTAKE_DIR>/archive and can be restored",
+    "Close or cancel related Cockpit review actions once resolved"
+  ],
+  "failureNotificationPath": [
+    "IntakeDocument status FAILED with a triage note",
+    "Document remains visible in the /intake queue",
+    "Cockpit run summary visible in /automations"
+  ],
+  "proofMetrics": [
+    "documents_captured_by_source",
+    "documents_read_vs_failed",
+    "triage_domain_split",
+    "manual_corrections_per_batch",
+    "approved_vs_filed_vs_archived_vs_rejected"
+  ],
+  "promotionRule": {
+    "trustedLoopMinimumDays": 30,
+    "trustedLoopMinimumCleanRuns": 20,
+    "requiresWrittenRollbackCheck": true
+  }
+}

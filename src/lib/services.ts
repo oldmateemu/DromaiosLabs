@@ -5,6 +5,10 @@ import {
   AssistantProvider,
   AutomationRunStatus,
   AutomationSafetyLevel,
+  IntakeDisposition,
+  IntakeDomain,
+  IntakeSource,
+  IntakeStatus,
   Priority,
   RiskLevel,
   ReviewType
@@ -34,6 +38,21 @@ import {
   buildWeeklyReviewPrepDraft,
   getLocalDraftAutomationKind
 } from "./draft-automations";
+import {
+  buildDocumentIntakeRun,
+  buildIntakeTriage,
+  mergeExtractionIntoTriage,
+  summariseIntakeQueue,
+  type IntakeProposedAction
+} from "./document-intake";
+import { extractDocumentText } from "./document-read";
+import {
+  collectInboxCandidates,
+  commitInboxCandidate,
+  discardInboxFile,
+  moveToArchive,
+  storeUploadedFile
+} from "./document-intake-store";
 import { buildOperatingDigest } from "./operating-digest";
 import { buildRenewalCalendar } from "./renewal-calendar";
 import { buildReviewMomentum } from "./review-momentum";
@@ -42,7 +61,7 @@ import { buildStreamSpend } from "./stream-spend";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
 import { buildCompanyMailroomFilingRun } from "./mailroom-filing";
 import { prisma } from "./db";
-import { draftActionFromQuickCapture } from "./ollama";
+import { draftActionFromQuickCapture, extractIntakeFieldsFromDocument } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
 import { buildRenewalReminderRun, getLocalApprovalAutomationKind, planRenewalReminderPersistence } from "./renewal-reminders";
 import { SALES_PIPELINE_STAGES, summariseSalesPipeline } from "./sales-pipeline";
@@ -366,6 +385,10 @@ export async function runAutomation(automationId: string, approved: boolean, use
       await runCompanyMailroomFilingAutomation(automationId, userId);
       return;
     }
+    if (localApprovalKind === "DOCUMENT_INTAKE_TRIAGE") {
+      await runDocumentIntakeTriageAutomation(automationId, userId);
+      return;
+    }
 
     if (!automation.webhookUrl) {
       throw new Error("Automation has no webhook URL configured.");
@@ -459,6 +482,341 @@ async function runCompanyMailroomFilingAutomation(automationId: string, userId: 
 
   revalidatePath("/");
   revalidatePath("/actions");
+  revalidatePath("/automations");
+}
+
+// ---------------------------------------------------------------------------
+// Document intake & triage pathway
+//
+// Scan/upload/email -> captured -> read (local OCR + Ollama) -> triaged into a
+// Business/Personal/Mixed domain -> human review -> action, file, or archive.
+// Reading is local-only; no document bytes or text leave the box, and no Action
+// is created from a document without explicit human approval.
+// ---------------------------------------------------------------------------
+
+const INTAKE_PENDING_STATUSES = [
+  IntakeStatus.CAPTURED,
+  IntakeStatus.READ,
+  IntakeStatus.TRIAGED,
+  IntakeStatus.IN_REVIEW,
+  IntakeStatus.FAILED
+];
+const INTAKE_HISTORY_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
+
+export async function getIntakeQueueData() {
+  const [docs, reference] = await Promise.all([
+    prisma.intakeDocument.findMany({
+      orderBy: [{ status: "asc" }, { capturedAt: "desc" }],
+      include: { action: { select: { id: true, title: true } } },
+      take: 200
+    }),
+    getReferenceData()
+  ]);
+
+  const summary = summariseIntakeQueue(docs.map((doc) => ({ status: doc.status, domain: doc.domain })));
+  const pending = docs.filter((doc) => (INTAKE_PENDING_STATUSES as string[]).includes(doc.status));
+  const history = docs.filter((doc) => (INTAKE_HISTORY_STATUSES as string[]).includes(doc.status)).slice(0, 40);
+
+  return { pending, history, summary, ...reference };
+}
+
+/**
+ * Pulls newly scanned/emailed files from the watched inbox folders into the
+ * review queue as CAPTURED documents, deduplicating by content hash. No reading
+ * or action creation happens here.
+ */
+export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicates: number }> {
+  const candidates = await collectInboxCandidates();
+  let ingested = 0;
+  let duplicates = 0;
+
+  for (const candidate of candidates) {
+    const existing = await prisma.intakeDocument.findFirst({ where: { contentHash: candidate.contentHash }, select: { id: true } });
+    if (existing) {
+      await discardInboxFile(candidate.absPath);
+      duplicates += 1;
+      continue;
+    }
+
+    const stored = await commitInboxCandidate(candidate);
+    await prisma.intakeDocument.create({
+      data: {
+        source: candidate.source as IntakeSource,
+        status: IntakeStatus.CAPTURED,
+        originalFilename: stored.filename,
+        storedPath: stored.storedPath,
+        contentHash: stored.contentHash,
+        mimeType: stored.mimeType,
+        byteSize: stored.byteSize,
+        receivedAt: candidate.source === "EMAIL" ? new Date() : null
+      }
+    });
+    ingested += 1;
+  }
+
+  revalidatePath("/intake");
+  return { ingested, duplicates };
+}
+
+export async function uploadIntakeDocument(formData: FormData) {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Choose a document to upload.");
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const stored = await storeUploadedFile(file.name, bytes);
+
+  const existing = await prisma.intakeDocument.findFirst({ where: { contentHash: stored.contentHash }, select: { id: true } });
+  if (!existing) {
+    await prisma.intakeDocument.create({
+      data: {
+        source: IntakeSource.UPLOAD,
+        status: IntakeStatus.CAPTURED,
+        originalFilename: stored.filename,
+        storedPath: stored.storedPath,
+        contentHash: stored.contentHash,
+        mimeType: stored.mimeType,
+        byteSize: stored.byteSize
+      }
+    });
+  }
+
+  revalidatePath("/intake");
+}
+
+/**
+ * Reads a captured document locally (OCR) and triages it (heuristics enriched
+ * by a local Ollama extraction). Updates the document with the extracted text,
+ * proposed domain, document type, disposition, and a proposed Action draft. It
+ * never creates an Action; the result waits for human approval.
+ */
+export async function readAndTriageIntakeDocument(intakeId: string) {
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId } });
+  if (!doc) throw new Error("Intake document not found.");
+
+  try {
+    const read = await extractDocumentText({ storedPath: doc.storedPath, mimeType: doc.mimeType, filename: doc.originalFilename });
+    const text = read.text ?? "";
+
+    let extractionError: string | undefined;
+    let extraction;
+    if (text.trim().length > 0) {
+      const result = await extractIntakeFieldsFromDocument(text, doc.originalFilename);
+      extraction = result.extraction;
+      extractionError = result.error;
+    }
+
+    const triage = mergeExtractionIntoTriage(buildIntakeTriage({ filename: doc.originalFilename, text, now: new Date() }), extraction);
+    const note = [read.error, extractionError].filter(Boolean).join(" | ");
+
+    await prisma.intakeDocument.update({
+      where: { id: intakeId },
+      data: {
+        status: IntakeStatus.TRIAGED,
+        ocrText: text.length > 0 ? text : null,
+        ocrEngine: read.engine,
+        summary: triage.summary,
+        docType: triage.docType,
+        disposition: triage.disposition as IntakeDisposition,
+        domain: triage.domain as IntakeDomain,
+        suggestedDomain: triage.domain as IntakeDomain,
+        domainConfidence: triage.domainConfidence,
+        signals: triage.signals,
+        suggestedAction: triage.proposedAction,
+        triageNote: note.length > 0 ? note : null,
+        sensitive: triage.proposedAction.sensitive,
+        readAt: new Date(),
+        triagedAt: new Date()
+      }
+    });
+  } catch (error) {
+    await prisma.intakeDocument.update({
+      where: { id: intakeId },
+      data: {
+        status: IntakeStatus.FAILED,
+        readAt: new Date(),
+        triageNote: error instanceof Error ? error.message : "Read and triage failed."
+      }
+    });
+  }
+
+  revalidatePath("/intake");
+}
+
+/**
+ * Human approval: turns a triaged document into a tracked Action carrying the
+ * chosen Business/Personal/Mixed domain, then files the document. Mirrors the
+ * assistant draft approval flow. Source is ASSISTANT (AI proposed, human
+ * approved) so no new ActionSource value is needed.
+ */
+export async function approveIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  const title = stringValue(formData, "title");
+  if (!intakeId || !title) throw new Error("Document and title are required.");
+
+  const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.BUSINESS);
+  const streamName = optionalString(formData, "stream");
+  const functionName = optionalString(formData, "companyFunction");
+  // Personal documents intentionally do not attach to a company stream/function.
+  const stream = domain !== IntakeDomain.PERSONAL && streamName ? await prisma.stream.findUnique({ where: { name: streamName } }) : null;
+  const companyFunction =
+    domain !== IntakeDomain.PERSONAL && functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
+
+  await prisma.$transaction(async (tx) => {
+    const action = await tx.action.create({
+      data: {
+        title,
+        description: optionalString(formData, "description"),
+        status: enumValue(formData, "status", ActionStatus, ActionStatus.OPEN),
+        priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+        source: ActionSource.ASSISTANT,
+        domain,
+        dueAt: dateValue(formData, "dueDate"),
+        reviewAt: dateValue(formData, "reviewDate"),
+        nextStep: optionalString(formData, "nextStep"),
+        sensitive: formData.get("sensitive") === "on",
+        streamId: stream?.id,
+        companyFunctionId: companyFunction?.id,
+        createdById: userId
+      }
+    });
+
+    await tx.intakeDocument.update({
+      where: { id: intakeId },
+      data: {
+        status: IntakeStatus.FILED,
+        domain,
+        disposition: IntakeDisposition.ACTION,
+        actionId: action.id,
+        reviewedById: userId,
+        reviewedAt: new Date(),
+        reviewerNote: optionalString(formData, "reviewerNote")
+      }
+    });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/intake");
+  revalidatePath("/actions");
+}
+
+export async function archiveIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId } });
+  if (!doc) throw new Error("Intake document not found.");
+
+  const archivedPath = await moveToArchive(doc.storedPath);
+  await prisma.intakeDocument.update({
+    where: { id: intakeId },
+    data: {
+      status: IntakeStatus.ARCHIVED,
+      storedPath: archivedPath,
+      disposition: IntakeDisposition.ARCHIVE,
+      domain: enumValue(formData, "domain", IntakeDomain, doc.domain),
+      reviewedById: userId,
+      reviewedAt: new Date(),
+      reviewerNote: optionalString(formData, "reviewerNote")
+    }
+  });
+
+  revalidatePath("/intake");
+}
+
+export async function rejectIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+
+  await prisma.intakeDocument.update({
+    where: { id: intakeId },
+    data: {
+      status: IntakeStatus.REJECTED,
+      reviewedById: userId,
+      reviewedAt: new Date(),
+      reviewerNote: optionalString(formData, "reviewerNote")
+    }
+  });
+
+  revalidatePath("/intake");
+}
+
+export async function setIntakeDomain(formData: FormData) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+  const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN);
+
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { suggestedAction: true } });
+  const suggested = (doc?.suggestedAction as IntakeProposedAction | null) ?? null;
+
+  await prisma.intakeDocument.update({
+    where: { id: intakeId },
+    data: {
+      domain,
+      suggestedAction: suggested ? { ...suggested, domain } : suggested ?? undefined
+    }
+  });
+
+  revalidatePath("/intake");
+}
+
+async function runDocumentIntakeTriageAutomation(automationId: string, userId: string) {
+  const { ingested, duplicates } = await ingestIntakeFolder();
+  const run = buildDocumentIntakeRun({ now: new Date(), ingested, duplicates });
+
+  const [stream, companyFunction, existingReviewAction] = await Promise.all([
+    prisma.stream.findUnique({ where: { name: "Company Core" }, select: { id: true } }),
+    prisma.companyFunction.findUnique({ where: { name: "admin" }, select: { id: true } }),
+    prisma.action.findFirst({
+      where: {
+        automationId,
+        title: run.actionsToCreate[0]?.title,
+        status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
+      },
+      select: { id: true }
+    })
+  ]);
+  const actionsToCreate = existingReviewAction ? [] : run.actionsToCreate;
+
+  await prisma.$transaction(async (tx) => {
+    for (const action of actionsToCreate) {
+      await tx.action.create({
+        data: {
+          title: action.title,
+          description: action.description,
+          status: ActionStatus.OPEN,
+          priority: action.priority,
+          source: ActionSource.AUTOMATION,
+          dueAt: dateFromKey(action.dueAt),
+          reviewAt: dateFromKey(action.reviewAt),
+          nextStep: action.nextStep,
+          sensitive: action.sensitive,
+          createdById: userId,
+          automationId,
+          streamId: stream?.id,
+          companyFunctionId: companyFunction?.id
+        }
+      });
+    }
+
+    await tx.automationRun.create({
+      data: {
+        automationId,
+        triggeredById: userId,
+        status: AutomationRunStatus.SUCCESS,
+        requestSummary: "Approved local document intake triage run",
+        responseSummary: [
+          run.responseSummary,
+          "",
+          "Cockpit result",
+          `- Review actions created this run: ${actionsToCreate.length}`,
+          `- Existing open review actions skipped: ${existingReviewAction ? 1 : 0}`
+        ].join("\n")
+      }
+    });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath("/intake");
   revalidatePath("/automations");
 }
 

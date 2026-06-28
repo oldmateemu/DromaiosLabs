@@ -23,6 +23,7 @@
 - Stale task summary.
 - Subscription and renewal reminders.
 - Company mailroom filing for labelled Gmail attachments, receipts, and invoices.
+- Document intake triage for scanned, uploaded, and emailed documents.
 - Due-soon compliance checks.
 - Lead follow-up drafts.
 - Post-course feedback follow-up drafts.
@@ -63,3 +64,14 @@ The reminder due date targets seven days before the renewal date when possible. 
 - Hard limits: no Gmail deletion, no Drive quarantine deletion, no payment execution, no bank rules, no BAS/tax/legal lodgement, no Xero writes, no sending, and no publishing.
 
 The v1 external workflow supports Gmail labels including `receipt`, `invoice`, `contract`, `certificate`, `insurance`, `venue`, `course`, and `software`; files to Drive quarantine/review folders; and writes metadata rows to `Finance Receipt Log`, `Supplier Invoice Review`, and `Automation Exception Log`. OCR columns are reserved for later, but OCR is disabled in v1 and must remain review-only when added.
+
+`Document intake triage` is an `APPROVAL_REQUIRED` local control-room runner for the in-cockpit document pathway.
+
+- Scope: reads files from the watched intake folders (`<INTAKE_DIR>/inbox/scan`, `<INTAKE_DIR>/inbox/email`) and the cockpit upload; reads document content locally (Tesseract OCR + poppler + Ollama). No external service is contacted.
+- Trigger: manual approval from the Automations registry, or per-document `Read & triage` from `/intake`.
+- External contract: `docs/workflows/document-intake-triage.md`.
+- Machine-readable contract: `docs/workflows/document-intake-triage.contract.json`.
+- Output: captures documents into the `/intake` review queue (status `CAPTURED`), and on approval writes the run summary plus a `Company Core` review action. Per-document approval creates a normal Action carrying a Business/Personal/Mixed `domain`.
+- Hard limits: no document bytes or text sent to cloud AI by default, no payment execution, no Xero writes, and no Action created from any document without explicit human approval.
+
+Unlike mailroom filing, OCR is enabled for this pathway but runs locally only and is always review-only: extracted text and AI summaries are drafts that a human approves, never final accounting or filing decisions.

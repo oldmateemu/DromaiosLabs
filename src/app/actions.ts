@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { loginWithPassword, logout, requireUser } from "@/lib/auth";
 import {
   approveAssistantDraft,
+  approveIntakeDocument,
+  archiveIntakeDocument,
   completeWeeklyReview,
   createActionFromForm,
   createAutomation,
@@ -12,12 +14,17 @@ import {
   createLaunchpadLink,
   createQuickCaptureDraft,
   createRisk,
+  ingestIntakeFolder,
   prepareDraftAutomation,
+  readAndTriageIntakeDocument,
+  rejectIntakeDocument,
   runAutomation,
+  setIntakeDomain,
   setSetupItemStatus,
   updateActionFromForm,
   updateActionStatus,
-  updateRiskStatus
+  updateRiskStatus,
+  uploadIntakeDocument
 } from "@/lib/services";
 
 export async function loginAction(formData: FormData) {
@@ -161,4 +168,48 @@ export async function prepareDraftAutomationAction(formData: FormData) {
   const automationId = String(formData.get("automationId") ?? "");
   await prepareDraftAutomation(automationId, user.id);
   redirect("/automations");
+}
+
+export async function ingestIntakeFolderAction() {
+  await requireUser();
+  await ingestIntakeFolder();
+  redirect("/intake");
+}
+
+export async function uploadIntakeDocumentAction(formData: FormData) {
+  await requireUser();
+  await uploadIntakeDocument(formData);
+  redirect("/intake");
+}
+
+export async function readIntakeDocumentAction(formData: FormData) {
+  await requireUser();
+  const intakeId = String(formData.get("intakeId") ?? "").trim();
+  if (!intakeId) throw new Error("Document is required.");
+  await readAndTriageIntakeDocument(intakeId);
+  redirect("/intake");
+}
+
+export async function approveIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await approveIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function archiveIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await archiveIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function rejectIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await rejectIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function setIntakeDomainAction(formData: FormData) {
+  await requireUser();
+  await setIntakeDomain(formData);
+  redirect("/intake");
 }
