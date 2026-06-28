@@ -223,11 +223,13 @@ Leading indicators: consistent posting streak; first advisor confirmed; first in
 "tell me more" from a healthcare leader.
 
 All four phases are operationalised in the cockpit: they are seeded as tracked `Action`
-records (source USER, status OPEN), each tagged with its phase, from
-`src/lib/strategy-checklist.ts`, so every item appears on the Today board and Actions
-register and moves through the normal action lifecycle and weekly governance review.
-Re-seeding is idempotent and will not duplicate items. Treat later-phase items as the
-backlog: they become live only when the prior phase's proof exists.
+records (source USER), each tagged with its phase, from `src/lib/strategy-checklist.ts`.
+Phase 0 is seeded `OPEN` as live work. Phases 1 to 3 are seeded `WAITING`, so they sit in
+the backlog and out of the active Today focus until their phase is activated. Activating a
+phase is simply moving its items from `WAITING` to `OPEN`. In the Actions register, filter
+by status `Waiting` to see the backlog or `Open` to see active work. Re-seeding is
+idempotent and will not duplicate items, and it does not overwrite the status of items you
+have already started.
 
 ### Phase 1 - Credible presence (recognised as serious)
 

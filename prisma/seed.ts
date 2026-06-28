@@ -5,7 +5,7 @@ import {
   loadLaunchpadSystemMetadata,
   type LaunchpadSystemMetadata
 } from "../src/lib/launchpad-system-metadata";
-import { authorityTrustChecklist } from "../src/lib/strategy-checklist";
+import { authorityTrustChecklist, STRATEGY_PHASE_LABELS } from "../src/lib/strategy-checklist";
 
 const prisma = new PrismaClient();
 
@@ -96,13 +96,19 @@ async function seedStrategyChecklist(adminUserId: string) {
     });
     if (existing) continue;
 
+    // Phase 0 is live work (OPEN). Later phases are seeded as WAITING so they sit in the
+    // backlog, out of the active Today focus, until their phase is activated by moving the
+    // item to OPEN.
+    const status = item.phase === 0 ? ActionStatus.OPEN : ActionStatus.WAITING;
+    const description = `Phase ${item.phase} - ${STRATEGY_PHASE_LABELS[item.phase]}.\n\n${item.description}`;
+
     await prisma.action.create({
       data: {
         title: item.title,
-        description: item.description,
+        description,
         nextStep: item.nextStep,
         priority: item.priority as Priority,
-        status: ActionStatus.OPEN,
+        status,
         source: ActionSource.USER,
         streamId: streamByName.get(item.stream) ?? null,
         companyFunctionId: functionByName.get(item.companyFunction) ?? null,

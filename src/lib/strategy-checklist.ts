@@ -2,6 +2,14 @@ export type StrategyChecklistPhase = 0 | 1 | 2 | 3;
 
 export type StrategyChecklistPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
+/** Human-readable label for each roadmap phase, used when seeding and in any phase UI. */
+export const STRATEGY_PHASE_LABELS: Record<StrategyChecklistPhase, string> = {
+  0: "Foundations",
+  1: "Credible presence",
+  2: "Earned authority",
+  3: "Recognised company"
+};
+
 export type StrategyChecklistItem = {
   /** Phase of the authority and trust roadmap this item belongs to. */
   phase: StrategyChecklistPhase;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authorityTrustChecklist } from "./strategy-checklist";
+import { authorityTrustChecklist, STRATEGY_PHASE_LABELS } from "./strategy-checklist";
 
 // Canonical reference data seeded in prisma/seed.ts. Kept here so the checklist
 // cannot drift onto a stream or function that does not exist.
@@ -61,6 +61,12 @@ describe("authorityTrustChecklist", () => {
         authorityTrustChecklist.some((item) => item.phase === phase),
         `at least one item for phase ${phase}`
       ).toBe(true);
+    }
+  });
+
+  it("has a non-empty label for every phase", () => {
+    for (const phase of VALID_PHASES) {
+      expect((STRATEGY_PHASE_LABELS[phase as 0 | 1 | 2 | 3] ?? "").trim().length, `label for phase ${phase}`).toBeGreaterThan(0);
     }
   });
 
