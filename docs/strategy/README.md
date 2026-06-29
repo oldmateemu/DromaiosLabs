@@ -63,6 +63,16 @@ entry stays cheap and fast; medtech remains a deliberately-later, evidence-led c
 - **Entry point & market fit** — §D (fit) + §E (wedge).
 - **Strategy to move through the stream** — §J/§I (phased land-and-expand + channel).
 
+## Companion: brand authority & trust
+
+- **[`authority-and-trust-strategy.md`](authority-and-trust-strategy.md)** — the cross-cutting
+  plan for becoming a recognised, authoritative healthcare company without overclaiming: trust
+  infrastructure (security/privacy, clinical governance, regulatory readiness), the authority
+  engine (evidence ladder, cadence, channels), safe differentiation, trust-retention, and a
+  4-phase recognition roadmap. Operationalised in the Cockpit as phased, tracked actions
+  (`src/lib/strategy-checklist.ts`). Complements the market-pathway plans above: pathways say
+  *which markets and wedges*, this says *how the company earns standing across all of them*.
+
 ## Status & maintenance
 
 - Built from a **June 2026** multi-source research sweep (AU government, regulators, peak bodies,

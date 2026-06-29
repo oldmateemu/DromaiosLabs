@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createActionAction, completeActionAction, updateActionQuickEditAction } from "@/app/actions";
-import { ActionForm, ActionRegisterFilters, ActionSavedViews, CollapsiblePanel } from "@/components/forms";
+import { activatePhaseAction, createActionAction, completeActionAction, updateActionQuickEditAction } from "@/app/actions";
+import { ActionForm, ActionRegisterFilters, ActionSavedViews, CollapsiblePanel, PhaseActivation } from "@/components/forms";
 import { ActionQuickEditForm } from "@/components/quick-edit-forms";
 import { getActionRegisterData } from "@/lib/services";
 import { priorityLabel, statusLabel } from "@/lib/domain";
@@ -27,6 +27,7 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
         <p className="muted max-w-2xl">One action system across every stream and function.</p>
       </div>
       <ActionSavedViews today={today.toISOString().slice(0, 10)} weekEnd={weekEnd.toISOString().slice(0, 10)} />
+      <PhaseActivation phases={data.phaseBacklog} action={activatePhaseAction} />
       <CollapsiblePanel defaultOpen={hasFilters} eyebrow="Find the right work" summary="Open only when the saved views are not specific enough." title="Filters">
         <ActionRegisterFilters streams={data.streams} companyFunctions={data.companyFunctions} values={params} />
       </CollapsiblePanel>
@@ -39,6 +40,7 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
               <th>Priority</th>
               <th>Stream</th>
               <th>Function</th>
+              <th>Phase</th>
               <th>Due</th>
               <th>Review</th>
               <th>Control</th>
@@ -57,6 +59,7 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
                 <td>{priorityLabel(action.priority)}</td>
                 <td>{action.stream?.name ?? "Unassigned"}</td>
                 <td>{action.companyFunction?.name ?? "Unassigned"}</td>
+                <td>{action.phase === null ? "-" : `Phase ${action.phase}`}</td>
                 <td>{action.dueAt ? action.dueAt.toISOString().slice(0, 10) : "No date"}</td>
                 <td>{action.reviewAt ? action.reviewAt.toISOString().slice(0, 10) : "No date"}</td>
                 <td>

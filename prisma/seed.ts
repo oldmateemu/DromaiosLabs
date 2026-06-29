@@ -1,11 +1,12 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient, Priority, UserRole } from "@prisma/client";
+import { ActionSource, ActionStatus, PrismaClient, Priority, UserRole } from "@prisma/client";
 import { COMPANY_SETUP_CHECKLIST, SETUP_CHECKLIST_STREAM, setupDueDate } from "../src/lib/company-setup-checklist";
 import {
   launchpadSystemKey,
   loadLaunchpadSystemMetadata,
   type LaunchpadSystemMetadata
 } from "../src/lib/launchpad-system-metadata";
+import { authorityTrustChecklist } from "../src/lib/strategy-checklist";
 
 const prisma = new PrismaClient();
 
@@ -82,6 +83,7 @@ async function main() {
   }
 
   await seedGovernance();
+  await seedStrategyChecklist(admin.id);
 }
 
 async function seedGovernance() {
@@ -157,6 +159,48 @@ async function seedCompanySetupChecklist(adminId: string) {
         streamId: stream.id,
         companyFunctionId,
         createdById: adminId
+      }
+    });
+  }
+}
+
+async function seedStrategyChecklist(adminUserId: string) {
+  const [streamRecords, functionRecords] = await Promise.all([
+    prisma.stream.findMany(),
+    prisma.companyFunction.findMany()
+  ]);
+  const streamByName = new Map(streamRecords.map((stream) => [stream.name, stream.id]));
+  const functionByName = new Map(functionRecords.map((fn) => [fn.name, fn.id]));
+
+  for (const item of authorityTrustChecklist) {
+    // Phase 0 is live work (OPEN). Later phases are seeded as WAITING so they sit in the
+    // backlog, out of the active Today focus, until their phase is activated.
+    const status = item.phase === 0 ? ActionStatus.OPEN : ActionStatus.WAITING;
+
+    const existing = await prisma.action.findFirst({
+      where: { title: item.title, source: ActionSource.USER }
+    });
+    if (existing) {
+      // Backfill the phase on items seeded before the phase column existed, without
+      // disturbing any status the founder has since changed.
+      if (existing.phase === null || existing.phase === undefined) {
+        await prisma.action.update({ where: { id: existing.id }, data: { phase: item.phase } });
+      }
+      continue;
+    }
+
+    await prisma.action.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        nextStep: item.nextStep,
+        priority: item.priority as Priority,
+        status,
+        phase: item.phase,
+        source: ActionSource.USER,
+        streamId: streamByName.get(item.stream) ?? null,
+        companyFunctionId: functionByName.get(item.companyFunction) ?? null,
+        createdById: adminUserId
       }
     });
   }

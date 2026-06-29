@@ -116,6 +116,9 @@ function ActionColumn({
               <div className="mt-2 flex flex-wrap gap-2">
                 <span className="meta-pill">{priorityLabel(action.priority)}</span>
                 <span className="meta-pill">{statusLabel(action.status)}</span>
+                {action.phase !== null && action.phase !== undefined ? (
+                  <span className="meta-pill">Phase {action.phase}</span>
+                ) : null}
               </div>
             </article>
           ))

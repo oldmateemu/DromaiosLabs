@@ -46,6 +46,7 @@ import { buildQuickCaptureDraftRequest, draftActionFromQuickCapture } from "./ol
 import { buildOperatingBrief } from "./operating-brief";
 import { buildRenewalReminderRun, getLocalApprovalAutomationKind, planRenewalReminderPersistence } from "./renewal-reminders";
 import { SALES_PIPELINE_STAGES, summariseSalesPipeline } from "./sales-pipeline";
+import { STRATEGY_PHASE_LABELS, type StrategyChecklistPhase } from "./strategy-checklist";
 
 export async function getReferenceData() {
   const [streams, companyFunctions] = await Promise.all([
@@ -700,16 +701,55 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
 export async function getActionRegisterData(filters: Record<string, string | undefined>) {
   const where = buildActionRegisterWhere(filters);
 
-  const [actions, reference] = await Promise.all([
+  const [actions, reference, phaseBacklog] = await Promise.all([
     prisma.action.findMany({
       where,
       include: { stream: true, companyFunction: true, assistantDraft: true },
       orderBy: [{ status: "asc" }, { priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }]
     }),
-    getReferenceData()
+    getReferenceData(),
+    getStrategyPhaseBacklog()
   ]);
 
-  return { actions, ...reference };
+  return { actions, phaseBacklog, ...reference };
+}
+
+export type StrategyPhaseBacklog = {
+  phase: StrategyChecklistPhase;
+  label: string;
+  waiting: number;
+};
+
+/** Counts WAITING strategy items per later phase so the register can offer activation. */
+export async function getStrategyPhaseBacklog(): Promise<StrategyPhaseBacklog[]> {
+  const grouped = await prisma.action.groupBy({
+    by: ["phase"],
+    where: { status: ActionStatus.WAITING, phase: { not: null } },
+    _count: { _all: true }
+  });
+  const waitingByPhase = new Map(grouped.map((row) => [row.phase, row._count._all]));
+
+  const phases: StrategyChecklistPhase[] = [1, 2, 3];
+  return phases.map((phase) => ({
+    phase,
+    label: STRATEGY_PHASE_LABELS[phase],
+    waiting: waitingByPhase.get(phase) ?? 0
+  }));
+}
+
+export async function activateStrategyPhase(phase: number) {
+  if (!Number.isInteger(phase) || phase < 0 || phase > 3) {
+    throw new Error("Invalid strategy phase.");
+  }
+
+  const result = await prisma.action.updateMany({
+    where: { phase, status: ActionStatus.WAITING },
+    data: { status: ActionStatus.OPEN }
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
+  return result.count;
 }
 
 export async function getCompanySetupData() {

@@ -37,6 +37,19 @@ describe("buildActionRegisterWhere", () => {
     expect(where).toEqual({});
   });
 
+  it("maps a valid phase filter, including phase 0", () => {
+    expect(buildActionRegisterWhere({ phase: "0" })).toEqual({ phase: 0 });
+    expect(buildActionRegisterWhere({ phase: "2" })).toEqual({ phase: 2 });
+  });
+
+  it("ignores ALL, empty, out-of-range, and non-numeric phase filters", () => {
+    expect(buildActionRegisterWhere({ phase: "ALL" })).toEqual({});
+    expect(buildActionRegisterWhere({ phase: "" })).toEqual({});
+    expect(buildActionRegisterWhere({ phase: "4" })).toEqual({});
+    expect(buildActionRegisterWhere({ phase: "-1" })).toEqual({});
+    expect(buildActionRegisterWhere({ phase: "two" })).toEqual({});
+  });
+
   it("supports saved-view company function slugs when no id is available", () => {
     const where = buildActionRegisterWhere({
       companyFunction: "founder workload"
