@@ -1,8 +1,10 @@
 import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel } from "@prisma/client";
 import Link from "next/link";
+import { STRATEGY_PHASE_LABELS, type StrategyChecklistPhase } from "@/lib/strategy-checklist";
 
 type ReferenceItem = { id: string; name: string };
 type FilterValues = Record<string, string | undefined>;
+const STRATEGY_PHASES: StrategyChecklistPhase[] = [0, 1, 2, 3];
 
 export function CollapsiblePanel({
   eyebrow,
@@ -118,6 +120,7 @@ export function ActionRegisterFilters({
       <Select name="status" label="Status" values={["ALL", ...Object.values(ActionStatus)]} defaultValue={values.status ?? "ALL"} />
       <Select name="priority" label="Priority" values={["ALL", ...Object.values(Priority)]} defaultValue={values.priority ?? "ALL"} />
       <Select name="source" label="Source" values={["ALL", ...Object.values(ActionSource)]} defaultValue={values.source ?? "ALL"} />
+      <PhaseSelect defaultValue={values.phase ?? "ALL"} />
       <SelectItems name="streamId" label="Stream" items={streams} defaultValue={values.streamId ?? ""} emptyLabel="All streams" />
       <SelectItems name="companyFunctionId" label="Function" items={companyFunctions} defaultValue={values.companyFunctionId ?? ""} emptyLabel="All functions" />
       <Field name="dueBefore" label="Due on/before" type="date" defaultValue={values.dueBefore ?? ""} />
@@ -127,6 +130,42 @@ export function ActionRegisterFilters({
         <Link className="button button-secondary" href="/actions">Clear</Link>
       </div>
     </form>
+  );
+}
+
+export function PhaseActivation({
+  phases,
+  action
+}: {
+  phases: { phase: number; label: string; waiting: number }[];
+  action: (formData: FormData) => Promise<void>;
+}) {
+  return (
+    <section className="panel compact-panel">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="eyebrow">Roadmap</p>
+          <h2 className="text-lg font-semibold text-command-ink">Activate a strategy phase</h2>
+          <p className="muted">Moves a phase&apos;s waiting items into active work. Phase 0 is active from the start.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {phases.map((item) =>
+            item.waiting > 0 ? (
+              <form action={action} key={item.phase}>
+                <input name="phase" type="hidden" value={item.phase} />
+                <button className="button button-secondary" type="submit">
+                  Activate Phase {item.phase} - {item.label} ({item.waiting})
+                </button>
+              </form>
+            ) : (
+              <span className="meta-pill" key={item.phase}>
+                Phase {item.phase} - {item.label}: none waiting
+              </span>
+            )
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -252,6 +291,20 @@ function Select({ name, label, values, defaultValue }: { name: string; label: st
       <select className="select" defaultValue={defaultValue} id={name} name={name}>
         {values.map((value) => (
           <option key={value} value={value}>{value === "ALL" ? "All" : value.replaceAll("_", " ")}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function PhaseSelect({ defaultValue }: { defaultValue?: string }) {
+  return (
+    <div>
+      <label className="field-label" htmlFor="phase">Phase</label>
+      <select className="select" defaultValue={defaultValue} id="phase" name="phase">
+        <option value="ALL">All phases</option>
+        {STRATEGY_PHASES.map((phase) => (
+          <option key={phase} value={phase}>{`Phase ${phase} - ${STRATEGY_PHASE_LABELS[phase]}`}</option>
         ))}
       </select>
     </div>

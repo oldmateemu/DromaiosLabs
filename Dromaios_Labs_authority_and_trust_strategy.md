@@ -223,13 +223,21 @@ Leading indicators: consistent posting streak; first advisor confirmed; first in
 "tell me more" from a healthcare leader.
 
 All four phases are operationalised in the cockpit: they are seeded as tracked `Action`
-records (source USER), each tagged with its phase, from `src/lib/strategy-checklist.ts`.
-Phase 0 is seeded `OPEN` as live work. Phases 1 to 3 are seeded `WAITING`, so they sit in
-the backlog and out of the active Today focus until their phase is activated. Activating a
-phase is simply moving its items from `WAITING` to `OPEN`. In the Actions register, filter
-by status `Waiting` to see the backlog or `Open` to see active work. Re-seeding is
-idempotent and will not duplicate items, and it does not overwrite the status of items you
-have already started.
+records (source USER) carrying a first-class `phase` field, from
+`src/lib/strategy-checklist.ts`. Phase 0 is seeded `OPEN` as live work. Phases 1 to 3 are
+seeded `WAITING`, so they sit in the backlog and out of the active Today focus until their
+phase is activated.
+
+Two controls on the Actions register make the phased flow first-class:
+
+- A `Phase` filter, to view the work for any single phase.
+- An "Activate a strategy phase" panel, where one click moves a whole phase's waiting items
+  to `OPEN`. It only ever promotes `WAITING` items, so it never disturbs work you have
+  already started, paused, or completed.
+
+Re-seeding is idempotent: it will not duplicate items, it backfills the phase on any items
+seeded before the field existed, and it does not overwrite the status of items you have
+already started.
 
 ### Phase 1 - Credible presence (recognised as serious)
 

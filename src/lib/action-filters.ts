@@ -8,12 +8,14 @@ export function buildActionRegisterWhere(filters: RegisterFilters): Prisma.Actio
   const status = enumFilter(filters.status, ActionStatus);
   const priority = enumFilter(filters.priority, Priority);
   const source = enumFilter(filters.source, ActionSource);
+  const phase = phaseFilter(filters.phase);
   const dueBefore = endOfDayFilter(filters.dueBefore);
   const reviewBefore = endOfDayFilter(filters.reviewBefore);
 
   if (status) where.status = status;
   if (priority) where.priority = priority;
   if (source) where.source = source;
+  if (phase !== undefined) where.phase = phase;
   if (filters.streamId) where.streamId = filters.streamId;
   if (filters.companyFunctionId) {
     where.companyFunctionId = filters.companyFunctionId;
@@ -37,6 +39,12 @@ export function buildActionRegisterWhere(filters: RegisterFilters): Prisma.Actio
 function enumFilter<T extends Record<string, string>>(value: string | undefined, values: T): T[keyof T] | undefined {
   if (!value || value === "ALL") return undefined;
   return Object.values(values).includes(value) ? (value as T[keyof T]) : undefined;
+}
+
+function phaseFilter(value: string | undefined): number | undefined {
+  if (!value || value === "ALL") return undefined;
+  const phase = Number(value);
+  return Number.isInteger(phase) && phase >= 0 && phase <= 3 ? phase : undefined;
 }
 
 function endOfDayFilter(value: string | undefined) {

@@ -4,6 +4,7 @@ import { ActionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { loginWithPassword, logout, requireUser } from "@/lib/auth";
 import {
+  activateStrategyPhase,
   approveAssistantDraft,
   completeWeeklyReview,
   createActionFromForm,
@@ -45,6 +46,13 @@ export async function completeActionAction(formData: FormData) {
   await requireUser();
   const actionId = String(formData.get("actionId") ?? "");
   await updateActionStatus(actionId, ActionStatus.DONE);
+  redirect("/actions");
+}
+
+export async function activatePhaseAction(formData: FormData) {
+  await requireUser();
+  const phase = Number(formData.get("phase"));
+  await activateStrategyPhase(phase);
   redirect("/actions");
 }
 
