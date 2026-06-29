@@ -910,3 +910,44 @@ describe("read aggregators", () => {
     expect(prismaMock.automation.findMany).toHaveBeenCalled();
   });
 });
+
+describe("strategy phases", () => {
+  it("summarises waiting items per later phase with labels", async () => {
+    prismaMock.action.groupBy.mockResolvedValue([
+      { phase: 1, _count: { _all: 3 } },
+      { phase: 3, _count: { _all: 1 } }
+    ] as never);
+
+    const backlog = await services.getStrategyPhaseBacklog();
+
+    expect(backlog).toEqual([
+      { phase: 1, label: "Credible presence", waiting: 3 },
+      { phase: 2, label: "Earned authority", waiting: 0 },
+      { phase: 3, label: "Recognised company", waiting: 1 }
+    ]);
+    expect(prismaMock.action.groupBy).toHaveBeenCalledWith({
+      by: ["phase"],
+      where: { status: ActionStatus.WAITING, phase: { not: null } },
+      _count: { _all: true }
+    });
+  });
+
+  it("activates a phase by promoting only its waiting items to open", async () => {
+    prismaMock.action.updateMany.mockResolvedValue({ count: 4 });
+
+    const count = await services.activateStrategyPhase(2);
+
+    expect(count).toBe(4);
+    expect(prismaMock.action.updateMany).toHaveBeenCalledWith({
+      where: { phase: 2, status: ActionStatus.WAITING },
+      data: { status: ActionStatus.OPEN }
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/actions");
+  });
+
+  it("rejects invalid phases without touching the database", async () => {
+    await expect(services.activateStrategyPhase(9)).rejects.toThrow("Invalid strategy phase.");
+    await expect(services.activateStrategyPhase(1.5)).rejects.toThrow("Invalid strategy phase.");
+    expect(prismaMock.action.updateMany).not.toHaveBeenCalled();
+  });
+});
