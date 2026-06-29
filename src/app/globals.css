@@ -166,6 +166,10 @@ a {
     @apply border-command-line;
   }
 
+  .metric-success {
+    @apply border-emerald-200 bg-emerald-50;
+  }
+
   .metric-warning {
     @apply border-amber-200 bg-amber-50;
   }
@@ -236,6 +240,58 @@ a {
 
   .count-blocked {
     @apply bg-slate-200 text-command-ink;
+  }
+
+  .cmdk-trigger {
+    @apply flex items-center gap-3 rounded-md border border-command-line bg-white px-3 py-1.5 text-sm text-command-muted shadow-control transition hover:border-command-navy hover:text-command-ink;
+  }
+
+  .cmdk-kbd {
+    @apply rounded border border-command-line bg-command-panel px-1.5 py-0.5 text-xs font-semibold text-command-muted;
+  }
+
+  .cmdk-overlay {
+    @apply fixed inset-0 z-50 flex items-start justify-center bg-command-ink/40 px-4 pt-24 backdrop-blur-sm;
+  }
+
+  .cmdk-panel {
+    @apply w-full max-w-xl overflow-hidden rounded-lg border border-command-line bg-white shadow-xl;
+  }
+
+  .cmdk-input {
+    @apply w-full border-b border-command-line px-4 py-3 text-base text-command-ink outline-none placeholder:text-command-muted;
+  }
+
+  .cmdk-list {
+    @apply max-h-80 overflow-y-auto p-2;
+  }
+
+  .cmdk-empty {
+    @apply px-3 py-6 text-center text-sm text-command-muted;
+  }
+
+  .cmdk-group-label {
+    @apply px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-[0.08em] text-command-muted;
+  }
+
+  .cmdk-item {
+    @apply flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-command-ink transition;
+  }
+
+  .cmdk-item-active {
+    @apply bg-command-panel;
+  }
+
+  .cmdk-item-label {
+    @apply flex-1 truncate font-medium;
+  }
+
+  .cmdk-item-hint {
+    @apply truncate text-xs text-command-muted;
+  }
+
+  .cmdk-item-tag {
+    @apply text-xs font-semibold text-command-teal;
   }
 
   .data-table {

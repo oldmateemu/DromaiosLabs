@@ -1,4 +1,4 @@
-import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel } from "@prisma/client";
+import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel, RiskLevel } from "@prisma/client";
 import Link from "next/link";
 import { STRATEGY_PHASE_LABELS, type StrategyChecklistPhase } from "@/lib/strategy-checklist";
 
@@ -103,6 +103,68 @@ export function ActionForm({
   );
 }
 
+type EditableAction = {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  dueAt?: Date | string | null;
+  reviewAt?: Date | string | null;
+  nextStep?: string | null;
+  streamId?: string | null;
+  companyFunctionId?: string | null;
+  sensitive?: boolean | null;
+};
+
+function dateInputValue(value?: Date | string | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+export function ActionEditForm({
+  action,
+  streams,
+  companyFunctions,
+  updateAction
+}: {
+  action: EditableAction;
+  streams: ReferenceItem[];
+  companyFunctions: ReferenceItem[];
+  updateAction: (formData: FormData) => Promise<void>;
+}) {
+  return (
+    <form action={updateAction} className="grid gap-4 md:grid-cols-2">
+      <input name="actionId" type="hidden" value={action.id} />
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="title">Title</label>
+        <input className="input" defaultValue={action.title} id="title" name="title" required type="text" />
+      </div>
+      <Select name="priority" label="Priority" values={Object.values(Priority)} defaultValue={action.priority} />
+      <Select name="status" label="Status" values={Object.values(ActionStatus)} defaultValue={action.status} />
+      <SelectItems name="streamId" label="Stream" items={streams} defaultValue={action.streamId ?? ""} emptyLabel="Unassigned" />
+      <SelectItems name="companyFunctionId" label="Company function" items={companyFunctions} defaultValue={action.companyFunctionId ?? ""} emptyLabel="Unassigned" />
+      <Field name="dueAt" label="Due date" type="date" defaultValue={dateInputValue(action.dueAt)} />
+      <Field name="reviewAt" label="Review date" type="date" defaultValue={dateInputValue(action.reviewAt)} />
+      <div className="md:col-span-2">
+        <Field name="nextStep" label="Next step" defaultValue={action.nextStep ?? ""} />
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="description">Description</label>
+        <textarea className="text-area" defaultValue={action.description ?? ""} id="description" name="description" rows={3} />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-command-muted">
+        <input defaultChecked={Boolean(action.sensitive)} name="sensitive" type="checkbox" />
+        Sensitive
+      </label>
+      <div className="flex justify-end md:col-span-2">
+        <button className="button button-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  );
+}
+
 export function ActionRegisterFilters({
   streams,
   companyFunctions,
@@ -170,7 +232,13 @@ export function PhaseActivation({
   );
 }
 
-export function LaunchpadForm({ action }: { action: (formData: FormData) => Promise<void> }) {
+export function LaunchpadForm({
+  action,
+  streams = []
+}: {
+  action: (formData: FormData) => Promise<void>;
+  streams?: ReferenceItem[];
+}) {
   return (
     <form action={action} className="grid gap-4 md:grid-cols-2">
       <div className="md:col-span-2">
@@ -180,6 +248,7 @@ export function LaunchpadForm({ action }: { action: (formData: FormData) => Prom
       <Field name="name" label="Name" required />
       <Field name="url" label="URL" required />
       <Field name="group" label="Group" required placeholder="Money, Legal/Admin, AI/Workbench..." />
+      <SelectItems name="streamId" label="Stream" items={streams} emptyLabel="No stream (shared)" />
       <Select name="riskLevel" label="Risk level" values={["LOW", "MEDIUM", "HIGH", "CRITICAL"]} />
       <Field name="cost" label="Monthly/annual cost" />
       <Field name="renewalAt" label="Renewal date" type="date" />
@@ -257,6 +326,101 @@ export function AutomationForm({ action }: { action: (formData: FormData) => Pro
       </div>
       <div className="flex justify-end md:col-span-2">
         <button className="button button-primary" type="submit">Register automation</button>
+      </div>
+    </form>
+  );
+}
+
+export function RiskForm({
+  streams,
+  companyFunctions,
+  action
+}: {
+  streams: ReferenceItem[];
+  companyFunctions: ReferenceItem[];
+  action: (formData: FormData) => Promise<void>;
+}) {
+  return (
+    <form action={action} className="grid gap-4 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <p className="eyebrow">Governance</p>
+        <h2>Log Risk</h2>
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="issue">Risk</label>
+        <input className="input" id="issue" name="issue" placeholder="What could go wrong, and why it matters" required type="text" />
+      </div>
+      <Select name="severity" label="Severity" values={Object.values(RiskLevel)} defaultValue={RiskLevel.MEDIUM} />
+      <Field name="nextReviewAt" label="Next review date" type="date" />
+      <SelectItems name="streamId" label="Stream" items={streams} emptyLabel="No stream" />
+      <SelectItems name="companyFunctionId" label="Company function" items={companyFunctions} emptyLabel="No function" />
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="mitigation">Mitigation</label>
+        <textarea className="text-area" id="mitigation" name="mitigation" rows={3} placeholder="How the risk is being reduced or contained" />
+      </div>
+      <div className="flex justify-end md:col-span-2">
+        <button className="button button-primary" type="submit">Log risk</button>
+      </div>
+    </form>
+  );
+}
+
+export function DecisionForm({ action }: { action: (formData: FormData) => Promise<void> }) {
+  return (
+    <form action={action} className="grid gap-4 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <p className="eyebrow">Governance</p>
+        <h2>Record Decision</h2>
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="decision">Decision</label>
+        <input className="input" id="decision" name="decision" placeholder="The call that was made" required type="text" />
+      </div>
+      <Field name="affectedArea" label="Affected area" placeholder="Finance, Product, Legal..." />
+      <Field name="decidedAt" label="Decided on" type="date" />
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="rationale">Rationale</label>
+        <textarea className="text-area" id="rationale" name="rationale" rows={3} placeholder="Why this was the right call" />
+      </div>
+      <div className="md:col-span-2">
+        <label className="field-label" htmlFor="relatedDocs">Related docs</label>
+        <input className="input" id="relatedDocs" name="relatedDocs" placeholder="Links or references" type="text" />
+      </div>
+      <div className="flex justify-end md:col-span-2">
+        <button className="button button-primary" type="submit">Record decision</button>
+      </div>
+    </form>
+  );
+}
+
+export function InlineRiskForm({ actionId, action }: { actionId: string; action: (formData: FormData) => Promise<void> }) {
+  return (
+    <form action={action} className="mt-3 space-y-2 rounded-md border border-command-line bg-command-panel p-3">
+      <input name="actionId" type="hidden" value={actionId} />
+      <label className="field-label" htmlFor={`risk-issue-${actionId}`}>Log a risk for this action</label>
+      <input className="input" id={`risk-issue-${actionId}`} name="issue" placeholder="What could go wrong" required type="text" />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-36 flex-1">
+          <Select name="severity" label="Severity" values={Object.values(RiskLevel)} defaultValue={RiskLevel.MEDIUM} />
+        </div>
+        <button className="button button-primary" type="submit">Add risk</button>
+      </div>
+    </form>
+  );
+}
+
+export function InlineDecisionForm({ actionId, action }: { actionId: string; action: (formData: FormData) => Promise<void> }) {
+  return (
+    <form action={action} className="mt-3 space-y-2 rounded-md border border-command-line bg-command-panel p-3">
+      <input name="followUpActionId" type="hidden" value={actionId} />
+      <label className="field-label" htmlFor={`decision-${actionId}`}>Record a decision from this action</label>
+      <input className="input" id={`decision-${actionId}`} name="decision" placeholder="The call that was made" required type="text" />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-36 flex-1">
+          <label className="field-label" htmlFor="rationale">Rationale</label>
+          <input className="input" id="rationale" name="rationale" placeholder="Why" type="text" />
+        </div>
+        <button className="button button-primary" type="submit">Add decision</button>
       </div>
     </form>
   );

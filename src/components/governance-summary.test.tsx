@@ -33,6 +33,6 @@ describe("GovernanceSummaryPanel", () => {
     expect(screen.getByText("1 open risk and 1 recent decision")).toBeInTheDocument();
     expect(screen.getByText("Public claim review needed")).toBeInTheDocument();
     expect(screen.getByText("Keep public copy authority-first")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open reviews" })).toHaveAttribute("href", "/reviews");
+    expect(screen.getByRole("link", { name: "Open governance" })).toHaveAttribute("href", "/governance");
   });
 });

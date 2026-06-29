@@ -100,6 +100,42 @@ describe("AutomationRegistry", () => {
     expect(screen.getByText(/Stale task summary - draft only/)).toBeInTheDocument();
   });
 
+  it("lets the daily inbox triage automation generate a local draft", () => {
+    render(
+      <AutomationRegistry
+        automations={[
+          {
+            id: "auto-5",
+            name: "Daily inbox triage",
+            description: "Drafts the weekday inbox digest.",
+            safetyLevel: "DRAFT_ONLY",
+            status: "ACTIVE",
+            trigger: "Weekday inbox digest",
+            targetTool: "local cockpit",
+            webhookUrl: null,
+            rollbackNote: "Discard the digest.",
+            runs: [
+              {
+                id: "run-1",
+                status: "SUCCESS",
+                requestSummary: "Local draft prep for Daily inbox triage",
+                responseSummary: "Daily inbox triage - draft only\n\nAction needed\n- Reply to priority item\n\nEmail work prepared for review",
+                error: null
+              }
+            ]
+          }
+        ]}
+        prepareDraftAction={async () => {}}
+        runAction={async () => {}}
+      />
+    );
+
+    expect(screen.getByText("External execution stays blocked; this only writes a local draft run log.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Prepare draft locally" })).toBeInTheDocument();
+    expect(screen.getByText(/Daily inbox triage - draft only/)).toBeInTheDocument();
+    expect(screen.getByText(/Email work prepared for review/)).toBeInTheDocument();
+  });
+
   it("requires an explicit checkbox before a manual approval run", () => {
     render(
       <AutomationRegistry
@@ -145,7 +181,7 @@ describe("AutomationRegistry", () => {
                 id: "run-1",
                 status: "SUCCESS",
                 requestSummary: "Approved local renewal reminder run",
-                responseSummary: "Renewal reminder - approved local run\n\nReminder actions created: 4",
+                responseSummary: "Renewal reminder - approved local run\n\nReminder actions prepared: 4\n\nRun result\n- Reminder actions created this run: 4",
                 error: null
               }
             ]
@@ -160,6 +196,44 @@ describe("AutomationRegistry", () => {
     expect(screen.getByText("Approval creates local renewal reminders; no webhook is called.")).toBeInTheDocument();
     expect(screen.queryByText("Add a webhook URL before this can run.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run with approval" })).toBeInTheDocument();
-    expect(screen.getByText(/Reminder actions created: 4/)).toBeInTheDocument();
+    expect(screen.getByText(/Reminder actions prepared: 4/)).toBeInTheDocument();
+    expect(screen.getByText(/Reminder actions created this run: 4/)).toBeInTheDocument();
+  });
+
+  it("lets the company mailroom filing runner stay approval-gated without a webhook", () => {
+    render(
+      <AutomationRegistry
+        automations={[
+          {
+            id: "auto-4",
+            name: "Company mailroom filing",
+            description: "Files labelled Gmail attachments into Drive and Sheets review logs.",
+            safetyLevel: "APPROVAL_REQUIRED",
+            status: "ACTIVE",
+            trigger: "Manual Gmail/Drive/Sheets filing review",
+            targetTool: "Gmail Processor / Apps Script",
+            webhookUrl: null,
+            rollbackNote: "Disable Gmail labels or Apps Script trigger; originals remain in Gmail.",
+            runs: [
+              {
+                id: "run-1",
+                status: "SUCCESS",
+                requestSummary: "Approved local company mailroom filing run",
+                responseSummary: "Company mailroom filing - approved setup run\n\nReceipt and invoice support\n- receipt\n- invoice",
+                error: null
+              }
+            ]
+          }
+        ]}
+        prepareDraftAction={async () => {}}
+        runAction={async () => {}}
+      />
+    );
+
+    expect(screen.getByLabelText("I approve this manual run")).toBeRequired();
+    expect(screen.getByText("Approval records the mailroom filing control summary; Gmail, Drive, Sheets, OCR, payments, and Xero stay outside Cockpit.")).toBeInTheDocument();
+    expect(screen.queryByText("Add a webhook URL before this can run.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run with approval" })).toBeInTheDocument();
+    expect(screen.getByText(/Company mailroom filing - approved setup run/)).toBeInTheDocument();
   });
 });

@@ -6,9 +6,9 @@ without overclaiming, and how it keeps trust while standing out.
 This is a strategy and sequencing note, not legal, regulatory, or financial advice. It
 complements two existing documents and should be read alongside them:
 
-- `Dromaios_Labs_company_statements.md` covers the voice (what we say).
-- `Dromaios_Labs_public_posting_guardrail.md` covers the claims guardrail (what we must
-  not say yet).
+- `../../Dromaios_Labs_company_statements.md` covers the voice (what we say).
+- `../../Dromaios_Labs_public_posting_guardrail.md` covers the claims guardrail (what we
+  must not say yet).
 
 This document covers the gap between them: the **authority-and-trust engine** that earns
 the standing to be believed. The existing docs tell us how to speak safely. They do not

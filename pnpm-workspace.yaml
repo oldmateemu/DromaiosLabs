@@ -1,2 +1,14 @@
 overrides:
   postcss: 8.5.15
+  esbuild: 0.28.1
+
+# Allow these dependencies to run install/build scripts. pnpm blocks build
+# scripts by default and fails clean installs (e.g. CI) until each is approved;
+# these packages legitimately need their build steps.
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true

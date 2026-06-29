@@ -7,19 +7,26 @@
 3. Confirm it appears in action creation forms.
 4. Update `docs/OPERATING_MODEL.md`.
 
+## Edit A Setup Item
+
+1. Open `/setup`.
+2. Use the row quick-edit controls to change status, due date, priority, or next step.
+3. The checklist definition still controls item identity, category, and default wording.
+4. The backing Action row controls mutable operating state, so edits flow into Today, Actions, and weekly review surfaces.
+
 ## Add A Launchpad Group
 
 1. Create a link with the new group in the Launchpad page.
 2. Add seed entries only if the group should exist for every environment.
 3. Update `docs/OPERATING_MODEL.md` if it changes how the company is run.
 
-## Import Launchpad System Metadata
+## Edit Launchpad System Metadata
 
-1. Copy `prisma/launchpad-system-metadata.local.example.json` to `prisma/launchpad-system-metadata.local.json`.
-2. Fill exact cost, renewal date, owner, risk level, and credential-location notes for the seeded systems.
-3. Keep real credential values out of the file; store only where the credential lives.
-4. Run `pnpm db:seed`. The seed fills empty metadata on existing systems and treats the local import as authoritative for exact values.
-5. Open the Launchpad and check System health for remaining metadata gaps.
+1. For normal day-to-day changes, edit cost, renewal date, owner, group, and risk directly on `/launchpad`.
+2. For full record edits, open the system detail page from `/launchpad` and update name, URL, stream, credential-location note, description, or sensitivity.
+3. Keep real credential values out of Cockpit; store only where the credential lives.
+4. Use `prisma/launchpad-system-metadata.local.json` only for bootstrap or bulk local reseed values.
+5. After changing renewal metadata, run the Renewal reminder automation if you need open reminder actions refreshed immediately.
 
 ## Add An Automation
 

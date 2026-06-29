@@ -45,6 +45,11 @@ export type NormalisedQuickCaptureDraft = {
   error?: string;
 };
 
+const optionalDateString = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+);
+
 const assistantActionSchema = z.object({
   title: z.string().trim().min(1).max(180),
   description: z.string().trim().max(2000).optional(),
@@ -52,8 +57,8 @@ const assistantActionSchema = z.object({
   companyFunction: z.string().trim().max(80).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
   status: z.enum(["OPEN", "IN_PROGRESS", "BLOCKED", "WAITING"]).default("OPEN"),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dueDate: optionalDateString,
+  reviewDate: optionalDateString,
   nextStep: z.string().trim().max(500).optional(),
   sensitive: z.boolean().default(false)
 });
@@ -161,23 +166,33 @@ export function statusLabel(status: ActionStatus) {
     .join(" ");
 }
 
-function dateKey(date: Date) {
+// Shared date/priority helpers. Kept here (next to the Priority/ActionStatus
+// types) so date-key and priority-weight semantics can't drift across modules.
+export const priorityWeight: Record<Priority, number> = {
+  CRITICAL: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3
+};
+
+export function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function sortByPriorityAndDue<T extends ActionLike>(actions: T[]) {
-  const priorityWeight: Record<Priority, number> = {
-    CRITICAL: 0,
-    HIGH: 1,
-    MEDIUM: 2,
-    LOW: 3
-  };
+export function addDays(date: Date, days: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
 
+export function dueValue(dueAt: Date | string | null | undefined) {
+  return dueAt ? new Date(dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function sortByPriorityAndDue<T extends ActionLike>(actions: T[]) {
   return [...actions].sort((a, b) => {
     const priorityDiff = priorityWeight[a.priority] - priorityWeight[b.priority];
     if (priorityDiff !== 0) return priorityDiff;
-    const aDue = a.dueAt ? new Date(a.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
-    const bDue = b.dueAt ? new Date(b.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
-    return aDue - bDue;
+    return dueValue(a.dueAt) - dueValue(b.dueAt);
   });
 }

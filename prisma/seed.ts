@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { ActionSource, ActionStatus, PrismaClient, Priority, UserRole } from "@prisma/client";
+import { COMPANY_SETUP_CHECKLIST, SETUP_CHECKLIST_STREAM, setupDueDate } from "../src/lib/company-setup-checklist";
 import {
   launchpadSystemKey,
   loadLaunchpadSystemMetadata,
@@ -40,7 +41,7 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-  const adminUser = await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: { name: adminName, passwordHash, role: UserRole.ADMIN },
     create: { email: adminEmail, name: adminName, passwordHash, role: UserRole.ADMIN }
@@ -62,6 +63,8 @@ async function main() {
     });
   }
 
+  await seedCompanySetupChecklist(admin.id);
+
   for (const system of launchpadMetadata.systems) {
     const existing = await prisma.launchpadLink.findFirst({ where: { name: system.name, group: system.group } });
     const imported = launchpadMetadata.importedKeys.has(launchpadSystemKey(system));
@@ -79,7 +82,86 @@ async function main() {
     }
   }
 
-  await seedStrategyChecklist(adminUser.id);
+  await seedGovernance();
+  await seedStrategyChecklist(admin.id);
+}
+
+async function seedGovernance() {
+  const [riskCount, decisionCount] = await Promise.all([prisma.risk.count(), prisma.decision.count()]);
+
+  if (riskCount === 0) {
+    const riskFunction = await prisma.companyFunction.findUnique({ where: { name: "risk" } });
+    await prisma.risk.createMany({
+      data: [
+        {
+          issue: "Key supplier or platform renewal lapses without notice",
+          severity: "HIGH",
+          status: "OPEN",
+          mitigation: "Track renewals in Launchpad and run the renewal reminder automation weekly.",
+          companyFunctionId: riskFunction?.id ?? null
+        },
+        {
+          issue: "Founder workload concentration creates single point of failure",
+          severity: "MEDIUM",
+          status: "OPEN",
+          mitigation: "Capture recurring tasks as automations and document operating procedures.",
+          companyFunctionId: riskFunction?.id ?? null
+        }
+      ]
+    });
+  }
+
+  if (decisionCount === 0) {
+    await prisma.decision.createMany({
+      data: [
+        {
+          decision: "Run Dromaios Cockpit local/VPN-first before any public hardening",
+          rationale: "Keeps sensitive company data off public infrastructure while the operating model stabilises.",
+          affectedArea: "admin"
+        },
+        {
+          decision: "Default the assistant to Ollama for private company-memory work",
+          rationale: "Avoids sending sensitive context to cloud AI unless privacy rules explicitly allow it.",
+          affectedArea: "product"
+        }
+      ]
+    });
+  }
+}
+
+async function seedCompanySetupChecklist(adminId: string) {
+  const stream = await prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } });
+  if (!stream) {
+    throw new Error(`Missing setup stream: ${SETUP_CHECKLIST_STREAM}. Seed streams before the checklist.`);
+  }
+  const functions = await prisma.companyFunction.findMany();
+  const functionIdByName = new Map(functions.map((fn) => [fn.name, fn.id]));
+  const seededAt = new Date();
+
+  for (const item of COMPANY_SETUP_CHECKLIST) {
+    const existing = await prisma.action.findFirst({ where: { title: item.title } });
+    // Idempotent: never overwrite a tracked action's status, dates, or notes.
+    if (existing) continue;
+
+    const companyFunctionId = functionIdByName.get(item.companyFunction);
+    if (!companyFunctionId) {
+      throw new Error(`Missing company function "${item.companyFunction}" for setup item "${item.title}".`);
+    }
+
+    await prisma.action.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        priority: item.priority as Priority,
+        nextStep: item.nextStep,
+        sensitive: item.sensitive,
+        dueAt: setupDueDate(item, seededAt),
+        streamId: stream.id,
+        companyFunctionId,
+        createdById: adminId
+      }
+    });
+  }
 }
 
 async function seedStrategyChecklist(adminUserId: string) {

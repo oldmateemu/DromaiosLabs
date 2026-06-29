@@ -116,7 +116,7 @@ docker compose --env-file .env ps
 The app container runs:
 
 ```text
-node scripts/deployment-preflight.mjs && pnpm db:deploy && pnpm db:seed && pnpm start
+node scripts/deployment-preflight.mjs && ./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/seed.ts && ./node_modules/.bin/next start
 ```
 
 That means migrations and seed data are applied on startup after the production preflight passes.

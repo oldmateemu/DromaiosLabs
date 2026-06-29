@@ -1,6 +1,6 @@
 import { canAutomationRun, type AutomationSafetyLevel } from "@/lib/automations";
 import { getLocalDraftAutomationKind } from "@/lib/draft-automations";
-import { getLocalApprovalAutomationKind } from "@/lib/renewal-reminders";
+import { getLocalApprovalAutomationKind, type LocalApprovalAutomationKind } from "@/lib/renewal-reminders";
 
 type AutomationRunView = {
   id: string;
@@ -69,6 +69,7 @@ function AutomationCard({
   const inactive = automation.status !== "ACTIVE";
   const localDraftKind = getLocalDraftAutomationKind(automation);
   const localApprovalKind = getLocalApprovalAutomationKind(automation);
+  const localApprovalCopy = localApprovalKind ? localApprovalRunCopy(localApprovalKind) : null;
   const canPrepareLocalDraft = !inactive && automation.safetyLevel === "DRAFT_ONLY" && Boolean(localDraftKind);
   const canRunLocalApproval = Boolean(localApprovalKind);
   const canRun = runCheck.allowed && (!missingWebhook || canRunLocalApproval) && !inactive;
@@ -117,9 +118,9 @@ function AutomationCard({
               I approve this manual run
             </label>
           ) : null}
-          {canRunLocalApproval ? (
+          {localApprovalCopy ? (
             <p className="mb-3 text-sm font-medium text-command-muted">
-              Approval creates local renewal reminders; no webhook is called.
+              {localApprovalCopy}
             </p>
           ) : null}
           {canRun ? (
@@ -158,4 +159,11 @@ function AutomationCard({
       </div>
     </article>
   );
+}
+
+function localApprovalRunCopy(kind: LocalApprovalAutomationKind) {
+  if (kind === "RENEWAL_REMINDER") {
+    return "Approval creates local renewal reminders; no webhook is called.";
+  }
+  return "Approval records the mailroom filing control summary; Gmail, Drive, Sheets, OCR, payments, and Xero stay outside Cockpit.";
 }
