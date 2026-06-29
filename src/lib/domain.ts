@@ -9,6 +9,7 @@ export type ActionLike = {
   title: string;
   status: ActionStatus;
   priority: Priority;
+  phase?: number | null;
   dueAt: Date | string | null;
   stream?: { name: string } | null;
   companyFunction?: { name: string } | null;

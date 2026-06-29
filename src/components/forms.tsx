@@ -35,15 +35,16 @@ export function CollapsiblePanel({
 }
 
 export function ActionSavedViews({ today, weekEnd }: { today: string; weekEnd: string }) {
-  const links = [
+  const links: [string, string][] = [
     ["Today", `/actions?dueBefore=${today}`],
     ["This week", `/actions?dueBefore=${weekEnd}`],
     ["Waiting", "/actions?status=WAITING"],
     ["Blocked", "/actions?status=BLOCKED"],
     ["Compliance", "/actions?companyFunction=compliance"],
     ["Revenue", "/actions?companyFunction=sales"],
-    ["Founder load", "/actions?companyFunction=founder+workload"]
-  ] as const;
+    ["Founder load", "/actions?companyFunction=founder+workload"],
+    ...STRATEGY_PHASES.map((phase): [string, string] => [`Phase ${phase}`, `/actions?phase=${phase}`])
+  ];
 
   return (
     <section className="panel compact-panel">

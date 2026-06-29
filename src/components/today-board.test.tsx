@@ -41,4 +41,27 @@ describe("TodayBoard", () => {
     expect(screen.getByText("No waiting work. Check review dates or capture a loose end.")).toBeInTheDocument();
     expect(screen.getByLabelText("Quick capture")).toBeInTheDocument();
   });
+
+  it("shows a phase pill on cards that carry a strategy phase", () => {
+    render(
+      <TodayBoard
+        buckets={{
+          overdue: [],
+          dueToday: [],
+          upcoming: [],
+          blocked: [],
+          waiting: [
+            { id: "p2", title: "Pursue ISO 27001", status: "WAITING", priority: "HIGH", phase: 2, dueAt: null }
+          ],
+          completed: []
+        }}
+        focusSet={[]}
+        nextAction={{ title: "Plan the week", body: "Pick a controlled next step.", href: "/actions", label: "Open actions", tone: "neutral" }}
+        quickCaptureAction={async () => {}}
+      />
+    );
+
+    expect(screen.getByText("Pursue ISO 27001")).toBeInTheDocument();
+    expect(screen.getByText("Phase 2")).toBeInTheDocument();
+  });
 });

@@ -228,9 +228,12 @@ records (source USER) carrying a first-class `phase` field, from
 seeded `WAITING`, so they sit in the backlog and out of the active Today focus until their
 phase is activated.
 
-Two controls on the Actions register make the phased flow first-class:
+The phased flow is first-class across the cockpit:
 
-- A `Phase` filter, to view the work for any single phase.
+- A `Phase` filter and per-phase saved-view chips on the Actions register, to view the work
+  for any single phase.
+- A `Phase` column in the register and a phase pill on the Today board cards, so each item's
+  phase is visible at a glance.
 - An "Activate a strategy phase" panel, where one click moves a whole phase's waiting items
   to `OPEN`. It only ever promotes `WAITING` items, so it never disturbs work you have
   already started, paused, or completed.
