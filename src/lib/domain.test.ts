@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   bucketActionsForToday,
+  humanizeEnum,
   mapReviewAnswersToDraftActions,
   normaliseQuickCaptureDraft,
   priorityLabel,
@@ -56,6 +57,19 @@ describe("bucketActionsForToday", () => {
       "Critical no date",
       "Low soon"
     ]);
+  });
+});
+
+describe("humanizeEnum", () => {
+  it("converts single-word enum tokens to a capitalised label", () => {
+    expect(humanizeEnum("SUCCESS")).toBe("Success");
+    expect(humanizeEnum("OPEN")).toBe("Open");
+  });
+
+  it("converts SCREAMING_SNAKE_CASE tokens to Title Case labels", () => {
+    expect(humanizeEnum("DRAFT_ONLY")).toBe("Draft Only");
+    expect(humanizeEnum("APPROVAL_REQUIRED")).toBe("Approval Required");
+    expect(humanizeEnum("IN_PROGRESS")).toBe("In Progress");
   });
 });
 

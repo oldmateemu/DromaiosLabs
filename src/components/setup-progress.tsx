@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { dateKey } from "@/lib/domain";
+import { dateKey, priorityLabel } from "@/lib/domain";
 import {
   setupItemStatusLabel,
   SETUP_BAND_PILL_CLASS,
@@ -63,7 +63,7 @@ export function SetupProgressPanel({
                         : "meta-pill"
                     }
                   >
-                    {item.priority}
+                    {priorityLabel(item.priority)}
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">

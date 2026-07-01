@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updateLaunchpadLinkAction } from "@/app/actions";
 import { LaunchpadEditForm } from "@/components/quick-edit-forms";
-import { priorityLabel, statusLabel } from "@/lib/domain";
+import { humanizeEnum, priorityLabel, statusLabel } from "@/lib/domain";
 import { getLaunchpadDetail } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function LaunchpadDetailPage({ params }: { params: Params }
       <section className="panel">
         <div className="flex flex-wrap gap-2">
           <span className="meta-pill">Group: {link.group}</span>
-          <span className="meta-pill">Risk: {link.riskLevel}</span>
+          <span className="meta-pill">Risk: {humanizeEnum(link.riskLevel)}</span>
           <span className="meta-pill">Owner: {link.owner ?? "Unassigned"}</span>
           <span className="meta-pill">Stream: {link.stream?.name ?? "Shared"}</span>
           <span className="meta-pill">Renewal: {link.renewalAt ? link.renewalAt.toISOString().slice(0, 10) : "No date"}</span>

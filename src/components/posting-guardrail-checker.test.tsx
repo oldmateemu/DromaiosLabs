@@ -13,7 +13,7 @@ describe("PostingGuardrailChecker", () => {
     render(<PostingGuardrailChecker />);
 
     expect(screen.getByRole("heading", { name: "Draft Posting Checker" })).toBeInTheDocument();
-    expect(screen.getByText("DRAFT ONLY")).toBeInTheDocument();
+    expect(screen.getByText("Draft Only")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "No publish action" })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText("Draft post or website snippet"), {
@@ -23,7 +23,7 @@ describe("PostingGuardrailChecker", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Check draft" }));
 
-    expect(screen.getAllByText("RED").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Red").length).toBeGreaterThan(0);
     expect(screen.getAllByText("TGA/SaMD language").length).toBeGreaterThan(0);
     expect(screen.getByText("Suggested softened rewrite")).toBeInTheDocument();
     expect(screen.getByText(/without replacing professional judgement/i)).toBeInTheDocument();

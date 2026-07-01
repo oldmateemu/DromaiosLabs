@@ -1,5 +1,6 @@
 import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel, RiskLevel } from "@prisma/client";
 import Link from "next/link";
+import { humanizeEnum } from "@/lib/domain";
 
 type ReferenceItem = { id: string; name: string };
 type FilterValues = Record<string, string | undefined>;
@@ -415,7 +416,7 @@ function Select({ name, label, values, defaultValue }: { name: string; label: st
       <label className="field-label" htmlFor={name}>{label}</label>
       <select className="select" defaultValue={defaultValue} id={name} name={name}>
         {values.map((value) => (
-          <option key={value} value={value}>{value === "ALL" ? "All" : value.replaceAll("_", " ")}</option>
+          <option key={value} value={value}>{value === "ALL" ? "All" : humanizeEnum(value)}</option>
         ))}
       </select>
     </div>

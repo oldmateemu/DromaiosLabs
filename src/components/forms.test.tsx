@@ -100,7 +100,7 @@ describe("AutomationForm", () => {
     render(<AutomationForm action={noop} />);
 
     expect(screen.getByLabelText("Name")).toBeRequired();
-    expect(within(screen.getByLabelText("Safety level")).getByRole("option", { name: "DRAFT ONLY" })).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Safety level")).getByRole("option", { name: "Draft Only" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Register automation" })).toBeInTheDocument();
   });
 });

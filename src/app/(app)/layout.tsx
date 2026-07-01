@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import type { CommandItem } from "@/components/command-palette";
 import { requireUser } from "@/lib/auth";
+import { humanizeEnum } from "@/lib/domain";
 import { getCommandPaletteItems } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
     ...palette.actions.map((action) => ({
       id: `action-${action.id}`,
       label: action.title,
-      hint: `Action · ${action.status}`,
+      hint: `Action · ${humanizeEnum(action.status)}`,
       group: "Actions",
       href: `/actions/${action.id}`
     })),

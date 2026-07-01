@@ -1,4 +1,5 @@
 import { ActionStatus, Priority, RiskLevel } from "@prisma/client";
+import { humanizeEnum } from "@/lib/domain";
 
 type FormAction = (formData: FormData) => Promise<void>;
 type ReferenceItem = { id: string; name: string };
@@ -260,7 +261,7 @@ function SelectField({
       <label className="field-label" htmlFor={id}>{label}</label>
       <select className="select" defaultValue={defaultValue} id={id} name={name}>
         {values.map((value) => (
-          <option key={value} value={value}>{value.replaceAll("_", " ")}</option>
+          <option key={value} value={value}>{humanizeEnum(value)}</option>
         ))}
       </select>
     </div>

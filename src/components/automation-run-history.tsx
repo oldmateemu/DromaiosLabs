@@ -1,4 +1,5 @@
 import type { AutomationRunSummary } from "@/lib/automation-history";
+import { humanizeEnum } from "@/lib/domain";
 
 type RunHistoryItem = {
   id: string;
@@ -67,7 +68,7 @@ export function AutomationRunHistory({ runs, summary }: { runs: RunHistoryItem[]
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className={statusClass(run.status)}>{run.status}</span>
+                  <span className={statusClass(run.status)}>{humanizeEnum(run.status)}</span>
                   <span className="meta-pill">{formatWhen(run.createdAt)}</span>
                 </div>
               </div>
