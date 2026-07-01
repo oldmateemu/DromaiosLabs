@@ -53,8 +53,14 @@ jobs:
       - name: Test with coverage
         run: pnpm test:coverage
 
+      - name: Flow tests
+        run: pnpm test:run-flow
+
       - name: Build
         run: pnpm build
+
+      - name: Deployment preflight (local mode)
+        run: pnpm deploy:preflight
 
       - name: Upload coverage report
         if: always()
