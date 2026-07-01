@@ -28,6 +28,9 @@ export type DocumentTextResult = {
 const MAX_TEXT_LENGTH = 200_000;
 const MAX_OCR_PAGES = 10;
 const COMMAND_TIMEOUT_MS = 120_000;
+// Document-level OCR budget across all rasterised pages, so a scan of pages that
+// each hang up to COMMAND_TIMEOUT_MS cannot keep the request busy for ~20 minutes.
+const MAX_OCR_TOTAL_MS = 5 * 60_000;
 // Below this, a "digital" PDF text layer is treated as empty/scanned and we
 // fall back to OCR.
 const MIN_DIGITAL_TEXT_LENGTH = 24;
@@ -102,7 +105,17 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
     let truncated = files.length > MAX_OCR_PAGES;
     const pages: string[] = [];
     const failedPages: number[] = [];
+    // Bound total OCR wall-time. Each page has its own 120s command timeout, so a
+    // full 10-page scan of hanging pages could otherwise tie up the request for
+    // ~20 minutes. Once the deadline passes we stop before the next page (a legit
+    // fast scan finishes well within it; a pathological one degrades to partial).
+    const deadline = Date.now() + MAX_OCR_TOTAL_MS;
+    let deadlineHit = false;
     for (const file of files.slice(0, MAX_OCR_PAGES)) {
+      if (Date.now() > deadline) {
+        deadlineHit = true;
+        break;
+      }
       try {
         const page = await ocrImage(join(workDir, file));
         if (page.text) pages.push(page.text);
@@ -116,11 +129,21 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
         failedPages.push(pageNumber(file));
       }
     }
+    // Stopping early for either reason means later pages were not read.
+    if (deadlineHit) truncated = true;
     if (pages.length === 0) {
-      const error = failedPages.length > 0 ? `OCR failed on every page (e.g. page ${failedPages[0]}).` : "OCR produced no text.";
+      const error = deadlineHit
+        ? "OCR stopped at the time limit before any page could be read."
+        : failedPages.length > 0
+          ? `OCR failed on every page (e.g. page ${failedPages[0]}).`
+          : "OCR produced no text.";
       return { text: "", engine: "none", error, truncated };
     }
-    const error = failedPages.length > 0 ? `OCR failed on page(s) ${failedPages.join(", ")}; text from those pages is missing.` : undefined;
+    const errorNotes = [
+      failedPages.length > 0 ? `OCR failed on page(s) ${failedPages.join(", ")}; text from those pages is missing.` : null,
+      deadlineHit ? "OCR stopped at the time limit; later pages were not read." : null
+    ].filter(Boolean);
+    const error = errorNotes.length > 0 ? errorNotes.join(" ") : undefined;
     const joined = pages.join("\n\n");
     // Flag truncation for either reason: more pages than the OCR cap, or dense
     // pages whose combined text exceeds the character cap and gets sliced away.

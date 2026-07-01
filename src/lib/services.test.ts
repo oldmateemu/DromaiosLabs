@@ -906,6 +906,20 @@ describe("updateActionFromForm", () => {
     expect(data.companyFunctionId).toBe("fn-admin");
   });
 
+  it("realigns the description domain when an action is reclassified via the edit form", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+    const prefill = "Captured document triaged locally on 2026-07-01.\nDomain: Business (confidence 0.6).\nProposed disposition: FILE.";
+
+    await services.updateActionFromForm(
+      "act-1",
+      form({ title: "Now personal", status: "OPEN", priority: "MEDIUM", domain: "PERSONAL", description: prefill })
+    );
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.description).toContain("Domain: Personal");
+    expect(data.description).not.toContain("Domain: Business");
+  });
+
   it("syncs a linked intake document's domain on reclassification", async () => {
     prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
 

@@ -659,6 +659,10 @@ export function buildDocumentIntakeRun({
       "Run result",
       `- Documents pulled into the queue: ${ingested}.`,
       `- Duplicates skipped (same content hash): ${duplicates}.`,
+      // Persist the oversized-skip count in the run summary too (not only the
+      // review action), so /automations still shows a stuck file when an open
+      // review action already exists and no new action is created this run.
+      skippedOversize > 0 ? `- Oversized files skipped (over the 20MB limit, still in the watched folder): ${skippedOversize}.` : null,
       "",
       "Pathway",
       "- Scan/upload/email -> captured -> read (local OCR + Ollama) -> triaged (Business/Personal/Mixed) -> human review -> action, file, or archive.",
@@ -668,7 +672,9 @@ export function buildDocumentIntakeRun({
       "- No document bytes or text sent to cloud AI by default.",
       "- No payment execution, bank rules, tax lodgement, or Xero writes.",
       "- No action created from any document without explicit human approval."
-    ].join("\n")
+    ]
+      .filter(Boolean)
+      .join("\n")
   };
 }
 

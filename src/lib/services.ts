@@ -1788,12 +1788,18 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
     }
   }
 
+  // On reclassification, realign the generated "Domain:" line in the (possibly
+  // untouched, prefilled) description to the new domain so the action body doesn't
+  // contradict its reclassified domain. Hand-typed text has no such token to change.
+  const postedDescription = optionalString(formData, "description") ?? null;
+  const description = reclassified && postedDescription ? alignDescriptionDomain(postedDescription, domain) : postedDescription;
+
   await prisma.$transaction(async (tx) => {
     await tx.action.update({
       where: { id: actionId },
       data: {
         title,
-        description: optionalString(formData, "description") ?? null,
+        description,
         status,
         priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
         domain,

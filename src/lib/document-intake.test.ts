@@ -418,8 +418,16 @@ describe("buildDocumentIntakeRun", () => {
     expect(run.responseSummary).toContain("No payment execution");
   });
 
-  it("surfaces oversized skipped files in the run description", () => {
+  it("surfaces oversized skipped files in both the run description and the persisted summary", () => {
     const run = buildDocumentIntakeRun({ now: new Date("2026-06-28T09:00:00Z"), ingested: 1, duplicates: 0, skippedOversize: 2 });
     expect(run.actionsToCreate[0].description).toContain("Oversized files skipped (over the 20MB limit, still in the watched folder): 2.");
+    // The run summary is persisted even when no new review action is created, so it
+    // must also carry the oversized-skip warning.
+    expect(run.responseSummary).toContain("Oversized files skipped (over the 20MB limit, still in the watched folder): 2.");
+  });
+
+  it("omits the oversized line from the summary when nothing was skipped", () => {
+    const run = buildDocumentIntakeRun({ now: new Date("2026-06-28T09:00:00Z"), ingested: 3, duplicates: 0 });
+    expect(run.responseSummary).not.toContain("Oversized files skipped");
   });
 });
