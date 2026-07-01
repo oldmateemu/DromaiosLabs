@@ -24,11 +24,12 @@ Pure, unit-tested operating-intelligence helpers live in `src/lib`: `company-pul
 
 ## Read First
 
-1. `docs/superpowers/specs/2026-05-29-dromaios-company-cockpit-design.md` for the approved product design.
-2. `docs/OPERATING_MODEL.md` for streams, functions, and review rhythm.
-3. `docs/DATA_MODEL.md` for the core records.
-4. `docs/AUTOMATIONS.md` before changing any automation behavior.
-5. `docs/AI_GUIDE.md` before changing assistant/model behavior.
+1. `docs/DIRECTION.md` for the current SWOT, strategic direction, and binding guardrails — read before starting any new feature.
+2. `docs/superpowers/specs/2026-05-29-dromaios-company-cockpit-design.md` for the approved product design.
+3. `docs/OPERATING_MODEL.md` for streams, functions, and review rhythm.
+4. `docs/DATA_MODEL.md` for the core records.
+5. `docs/AUTOMATIONS.md` before changing any automation behavior.
+6. `docs/AI_GUIDE.md` before changing assistant/model behavior.
 
 ## Safety Defaults
 
