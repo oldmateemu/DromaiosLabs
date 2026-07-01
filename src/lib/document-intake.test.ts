@@ -190,6 +190,22 @@ describe("parseIntakeExtraction", () => {
     expect(extraction?.dueDate).toBe("2026-07-15");
   });
 
+  it("coerces a numeric amount to a string instead of discarding the extraction", () => {
+    const { extraction, error } = parseIntakeExtraction(JSON.stringify({ summary: "Invoice", domain: "BUSINESS", amount: 420.5 }));
+    expect(error).toBeUndefined();
+    expect(extraction?.amount).toBe("420.5");
+    expect(extraction?.summary).toBe("Invoice");
+    expect(extraction?.domain).toBe("BUSINESS");
+  });
+
+  it("drops a wrong-shaped optional scalar (object) rather than failing the whole object", () => {
+    const { extraction, error } = parseIntakeExtraction(JSON.stringify({ summary: "Invoice", party: { name: "Acme" }, amount: "$10" }));
+    expect(error).toBeUndefined();
+    expect(extraction?.summary).toBe("Invoice");
+    expect(extraction?.party).toBeUndefined();
+    expect(extraction?.amount).toBe("$10");
+  });
+
   it("drops an invalid optional date rather than discarding the rest of the extraction", () => {
     const { extraction, error } = parseIntakeExtraction(
       JSON.stringify({ summary: "Invoice", domain: "BUSINESS", suggestedTitle: "Pay Acme", dueDate: "2026-13-45", documentDate: "not-a-date" })

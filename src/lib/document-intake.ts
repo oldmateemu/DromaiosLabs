@@ -319,8 +319,8 @@ export function buildIntakeTriage({ filename, text, now = new Date() }: IntakeTr
 // output only enriches it. Parsing is defensive so malformed JSON never breaks
 // the queue.
 const intakeExtractionSchema = z.object({
-  summary: z.string().trim().max(1200).optional(),
-  docType: z.string().trim().max(60).optional(),
+  summary: optionalCoercedString(1200),
+  docType: optionalCoercedString(60),
   // Local models often echo the domain in lower/mixed case ("business"), which
   // is still a useful extraction. Upcase before validating so a casing mismatch
   // never rejects the whole object, and fall back to undefined for any value the
@@ -329,12 +329,12 @@ const intakeExtractionSchema = z.object({
     .preprocess((v) => (typeof v === "string" ? v.trim().toUpperCase() : v), z.enum(["BUSINESS", "PERSONAL", "MIXED", "UNKNOWN"]))
     .optional()
     .catch(undefined),
-  party: z.string().trim().max(160).optional(),
-  amount: z.string().trim().max(60).optional(),
+  party: optionalCoercedString(160),
+  amount: optionalCoercedString(60),
   documentDate: optionalDateString(),
   dueDate: optionalDateString(),
-  suggestedTitle: z.string().trim().max(160).optional(),
-  suggestedNextStep: z.string().trim().max(400).optional(),
+  suggestedTitle: optionalCoercedString(160),
+  suggestedNextStep: optionalCoercedString(400),
   sensitive: z.boolean().optional()
 });
 
@@ -681,6 +681,17 @@ function tidyFilename(filename: string): string {
   const base = filename.replace(/\.[a-z0-9]{1,5}$/i, "");
   const cleaned = base.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   return cleaned.length > 0 ? cleaned.slice(0, 80) : "document";
+}
+
+// Optional free-text field that tolerates the model returning a number for a
+// scalar (e.g. "amount": 420.5) by coercing it to a string so the value is kept,
+// and drops any other wrong-shaped value to undefined rather than failing the
+// whole extraction (mirrors the domain/date fields).
+function optionalCoercedString(max: number) {
+  return z.preprocess(
+    (value) => (typeof value === "number" && Number.isFinite(value) ? String(value) : value),
+    z.string().trim().max(max).optional().catch(undefined)
+  );
 }
 
 function optionalDateString() {
