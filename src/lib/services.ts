@@ -841,12 +841,20 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   // the workflow contract); Personal stays out of company streams entirely.
   const attachesCompanyContext = domain !== IntakeDomain.PERSONAL;
 
-  // When the operator corrects a Personal suggestion to Business but leaves the
-  // routing blank, derive sensible defaults from the document type so the action
-  // still lands in Company Core rather than outside any stream/function.
+  // Resolve the company route. An UNKNOWN (uncertain) domain is forced to the
+  // Company Core/admin fallback and deliberately ignores any route the form
+  // pre-filled from the original suggestion: when the operator downgrades a
+  // finance/legal suggestion to "unsure", the action must not still be filed
+  // into finance/legal as if it were confidently Business (the form inputs keep
+  // their stale defaults with no client JS to clear them). Business/Mixed honour
+  // the operator's route, deriving docType defaults only for a left-blank field.
   let streamName = optionalString(formData, "stream");
   let functionName = optionalString(formData, "companyFunction");
-  if (attachesCompanyContext && (!streamName || !functionName)) {
+  if (domain === IntakeDomain.UNKNOWN) {
+    const routing = suggestRouting({ docType: "unknown", domain });
+    streamName = routing.stream;
+    functionName = routing.companyFunction;
+  } else if (attachesCompanyContext && (!streamName || !functionName)) {
     const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { docType: true } });
     const routing = suggestRouting({ docType: doc?.docType ?? "unknown", domain });
     streamName = streamName ?? routing.stream;

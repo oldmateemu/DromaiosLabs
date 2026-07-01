@@ -130,6 +130,21 @@ describe("collectInboxCandidates", () => {
     // The remaining originals stay in the inbox to be drained next run.
     expect(await readdir(join(root, "inbox", "scan"))).toHaveLength(55);
   });
+
+  it("interleaves sources so a large scan backlog does not starve email", async () => {
+    await ensureIntakeDirs();
+    await Promise.all([
+      ...Array.from({ length: 55 }, (_, i) => writeFile(join(root, "inbox", "scan", `scan-${String(i).padStart(3, "0")}.pdf`), `scan-${i}`)),
+      writeFile(join(root, "inbox", "email", "urgent-a.pdf"), "email-a"),
+      writeFile(join(root, "inbox", "email", "urgent-b.pdf"), "email-b")
+    ]);
+
+    const candidates = await collectInboxCandidates();
+    expect(candidates).toHaveLength(50);
+    // Both emailed documents are picked up in the same run despite the backlog.
+    const emailNames = candidates.filter((c) => c.source === "EMAIL").map((c) => c.filename).sort();
+    expect(emailNames).toEqual(["urgent-a.pdf", "urgent-b.pdf"]);
+  });
 });
 
 describe("copyInboxCandidateToStore and discardInboxFile", () => {

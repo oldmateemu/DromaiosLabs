@@ -86,9 +86,13 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
   const parsedSettleMs = rawSettleMs == null || rawSettleMs.trim() === "" ? NaN : Number(rawSettleMs);
   const settleMs = Number.isFinite(parsedSettleMs) ? parsedSettleMs : 3000;
   const now = Date.now();
-  let batchBytes = 0;
 
-  outer: for (const [dir, source] of [
+  // Phase 1: enumerate eligible files per source (readdir + stat only; no bytes
+  // are read yet). The settle-window, oversize, and dotfile rules are applied
+  // here so the byte-reading phase only sees files worth ingesting.
+  type EligibleFile = { absPath: string; filename: string; source: IntakeSource; size: number; mtimeMs: number };
+  const perSource: EligibleFile[][] = [];
+  for (const [dir, source] of [
     [INBOX_SCAN, "FOLDER"],
     [INBOX_EMAIL, "EMAIL"]
   ] as Array<[string, IntakeSource]>) {
@@ -99,6 +103,7 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
       if (error.code === "ENOENT") return [];
       throw error;
     });
+    const eligible: EligibleFile[] = [];
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       if (entry.name.startsWith(".")) continue;
@@ -116,15 +121,27 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
       // Skip oversized files before reading them into memory (they stay in the
       // inbox for the operator to notice), consistent with the upload limit.
       if (info.size > MAX_INBOX_FILE_BYTES) continue;
-      // Stop this run once the batch caps are reached; the remaining files stay
-      // in the inbox and are drained by the next ingest run. The byte cap always
-      // admits at least one file so a run can never stall on a large backlog.
-      if (candidates.length >= MAX_INBOX_BATCH_FILES) break outer;
-      if (candidates.length > 0 && batchBytes + info.size > MAX_INBOX_BATCH_BYTES) break outer;
+      eligible.push({ absPath, filename: entry.name, source, size: info.size, mtimeMs: info.mtimeMs });
+    }
+    perSource.push(eligible);
+  }
+
+  // Phase 2: read bytes round-robin across the sources so a large scan backlog
+  // never starves emailed documents (and vice versa). Stop at the per-run
+  // file/byte caps; the byte cap always admits at least one file so a run can
+  // never stall on a backlog. Files left behind stay in the inbox for next run.
+  let batchBytes = 0;
+  const deepest = Math.max(0, ...perSource.map((files) => files.length));
+  roundRobin: for (let index = 0; index < deepest; index++) {
+    for (const files of perSource) {
+      const file = files[index];
+      if (!file) continue;
+      if (candidates.length >= MAX_INBOX_BATCH_FILES) break roundRobin;
+      if (candidates.length > 0 && batchBytes + file.size > MAX_INBOX_BATCH_BYTES) break roundRobin;
 
       let bytes: Buffer;
       try {
-        bytes = await readFile(absPath);
+        bytes = await readFile(file.absPath);
       } catch (error) {
         // Vanished between stat and read; treat only ENOENT as skippable.
         if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
@@ -132,12 +149,12 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
       }
       batchBytes += bytes.byteLength;
       candidates.push({
-        absPath,
-        filename: entry.name,
-        source,
-        mimeType: guessMimeType(entry.name),
+        absPath: file.absPath,
+        filename: file.filename,
+        source: file.source,
+        mimeType: guessMimeType(file.filename),
         byteSize: bytes.byteLength,
-        mtimeMs: info.mtimeMs,
+        mtimeMs: file.mtimeMs,
         contentHash: hashContent(bytes),
         bytes
       });

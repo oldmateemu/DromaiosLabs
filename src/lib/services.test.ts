@@ -1127,6 +1127,24 @@ describe("document intake", () => {
     expect(prismaMock.action.create).not.toHaveBeenCalled();
   });
 
+  it("routes an uncertain (UNKNOWN) domain to admin even when stale finance routing is posted", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    // The form pre-filled a finance route from the original suggestion; the
+    // operator downgraded the domain to UNKNOWN but the routing inputs still
+    // carry "finance" (no client JS clears them on domain change).
+    await services.approveIntakeDocument(
+      form({ intakeId: "d1", title: "Unsure doc", domain: "UNKNOWN", stream: "Company Core", companyFunction: "finance" }),
+      "user-1"
+    );
+
+    // The stale finance function is ignored; the uncertain document is looked up
+    // against the Company Core/admin fallback instead.
+    expect(prismaMock.companyFunction.findUnique).toHaveBeenCalledWith({ where: { name: "admin" } });
+    expect(prismaMock.companyFunction.findUnique).not.toHaveBeenCalledWith({ where: { name: "finance" } });
+    expect(prismaMock.stream.findUnique).toHaveBeenCalledWith({ where: { name: "Company Core" } });
+  });
+
   it("files a document for records without creating an action", async () => {
     prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
 
