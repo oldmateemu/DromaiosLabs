@@ -581,13 +581,11 @@ async function runCompanyMailroomFilingAutomation(automationId: string, userId: 
 // is created from a document without explicit human approval.
 // ---------------------------------------------------------------------------
 
-const INTAKE_PENDING_STATUSES = [
-  IntakeStatus.CAPTURED,
-  IntakeStatus.READ,
-  IntakeStatus.TRIAGED,
-  IntakeStatus.IN_REVIEW,
-  IntakeStatus.FAILED
-];
+// Rows that need the human in the loop: already read/triaged/in-review, or a
+// failed read that needs attention. These are fetched and shown ahead of
+// not-yet-read CAPTURED rows so a large captured backlog can never push
+// review-ready work out of the display cap.
+const INTAKE_REVIEW_READY_STATUSES = [IntakeStatus.READ, IntakeStatus.TRIAGED, IntakeStatus.IN_REVIEW, IntakeStatus.FAILED];
 const INTAKE_HISTORY_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
 const INTAKE_FINALISED_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
 const MAX_INTAKE_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -615,13 +613,20 @@ const INTAKE_CARD_SELECT = {
 } as const;
 
 export async function getIntakeQueueData() {
-  // Pending and history are fetched separately so a busy history never caps the
-  // pending queue out of view, and the summary is computed from a full groupBy
-  // so counts stay accurate regardless of any display limit.
-  const [pending, history, grouped, reference] = await Promise.all([
+  // Review-ready, captured, and history are fetched separately so a captured
+  // backlog can never push review-ready approvals out of the display cap, and the
+  // summary is computed from a full groupBy so counts stay accurate regardless of
+  // any display limit.
+  const [reviewReady, captured, history, grouped, reference] = await Promise.all([
     prisma.intakeDocument.findMany({
-      where: { status: { in: INTAKE_PENDING_STATUSES } },
+      where: { status: { in: INTAKE_REVIEW_READY_STATUSES } },
       orderBy: [{ status: "asc" }, { capturedAt: "desc" }],
+      select: INTAKE_CARD_SELECT,
+      take: 300
+    }),
+    prisma.intakeDocument.findMany({
+      where: { status: IntakeStatus.CAPTURED },
+      orderBy: { capturedAt: "desc" },
       select: INTAKE_CARD_SELECT,
       take: 300
     }),
@@ -634,6 +639,10 @@ export async function getIntakeQueueData() {
     prisma.intakeDocument.groupBy({ by: ["status", "domain"], _count: true }),
     getReferenceData()
   ]);
+
+  // Review-ready rows first, then captured, bounded to 300 total for the page so
+  // the human-in-the-loop work is always visible ahead of the read backlog.
+  const pending = [...reviewReady, ...captured].slice(0, 300);
 
   const summary = summariseIntakeQueueFromCounts(grouped.map((row) => ({ status: row.status, domain: row.domain, count: row._count })));
 

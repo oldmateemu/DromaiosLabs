@@ -248,6 +248,17 @@ describe("mergeExtractionIntoTriage", () => {
     expect(merged.disposition).toBe("ACTION");
   });
 
+  it("preserves an urgent HIGH priority from the original text when adopting an AI docType", () => {
+    const base = buildIntakeTriage({ filename: "scan.pdf", text: "final notice: overdue balance" });
+    expect(base.proposedAction.priority).toBe("HIGH");
+
+    // The recompute for "letter" has no text and would yield MEDIUM; the urgency
+    // the heuristic already found must not be downgraded away.
+    const merged = mergeExtractionIntoTriage(base, { docType: "letter" });
+    expect(merged.docType).toBe("letter");
+    expect(merged.proposedAction.priority).toBe("HIGH");
+  });
+
   it("does not override a docType the heuristics already found", () => {
     const base = buildIntakeTriage({ filename: "receipt.jpg", text: "receipt paid in full" });
     expect(base.docType).toBe("receipt");

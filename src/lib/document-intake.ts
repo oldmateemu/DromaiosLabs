@@ -390,7 +390,13 @@ export function mergeExtractionIntoTriage(triage: IntakeTriageResult, extraction
     docTypeChanged || domainChanged
       ? suggestRouting({ docType, domain })
       : { stream: triage.proposedAction.stream, companyFunction: triage.proposedAction.companyFunction };
-  const priority = docTypeChanged ? derivePriority({ docType, disposition }) : triage.proposedAction.priority;
+  // Recompute priority for the adopted type, but never downgrade below what the
+  // heuristic set: the heuristic may have seen urgent language ("overdue", "final
+  // notice") in the original text that this recompute (which has no text) cannot,
+  // and losing HIGH would bury an urgent document in the queue.
+  const priority = docTypeChanged
+    ? maxPriority(triage.proposedAction.priority, derivePriority({ docType, disposition }))
+    : triage.proposedAction.priority;
 
   const summaryParts = [
     extraction.summary,
@@ -636,6 +642,14 @@ function derivePriority({ docType, disposition, text }: { docType: string; dispo
   if (disposition === "ACTION") return "MEDIUM";
   if (disposition === "FILE") return "LOW";
   return "MEDIUM";
+}
+
+const PRIORITY_RANK: Record<IntakePriority, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
+
+/** Returns the higher of two priorities, so a recompute can never downgrade an
+ * urgency the heuristic already established. */
+function maxPriority(a: IntakePriority, b: IntakePriority): IntakePriority {
+  return PRIORITY_RANK[a] >= PRIORITY_RANK[b] ? a : b;
 }
 
 function nextStepFor(disposition: IntakeDisposition, docTypeLabel: string): string {

@@ -955,22 +955,25 @@ describe("document intake", () => {
     bytes: Buffer.from("abc")
   };
 
-  it("builds the queue summary from a full groupBy, not a capped list", async () => {
+  it("shows review-ready rows ahead of captured and builds the summary from a full groupBy", async () => {
     prismaMock.intakeDocument.findMany
-      .mockResolvedValueOnce([{ id: "p1", status: "CAPTURED", domain: "UNKNOWN", action: null }])
-      .mockResolvedValueOnce([{ id: "h1", status: "FILED", domain: "BUSINESS", action: { id: "a1", title: "Filed" } }]);
+      .mockResolvedValueOnce([{ id: "t1", status: "TRIAGED", domain: "BUSINESS", action: null }]) // review-ready
+      .mockResolvedValueOnce([{ id: "c1", status: "CAPTURED", domain: "UNKNOWN", action: null }]) // captured
+      .mockResolvedValueOnce([{ id: "h1", status: "FILED", domain: "BUSINESS", action: { id: "a1", title: "Filed" } }]); // history
     prismaMock.intakeDocument.groupBy.mockResolvedValue([
       { status: "CAPTURED", domain: "UNKNOWN", _count: 1 },
       { status: "FILED", domain: "BUSINESS", _count: 2 }
     ]);
 
     const data = await services.getIntakeQueueData();
-    expect(data.pending).toHaveLength(1);
+    // Review-ready first, then captured, so a captured backlog never hides approvals.
+    expect(data.pending.map((d) => d.id)).toEqual(["t1", "c1"]);
     expect(data.history).toHaveLength(1);
     expect(data.summary.total).toBe(3);
     expect(data.summary.byDomain.BUSINESS).toBe(2);
-    // History is ordered by reviewedAt.
-    expect(prismaMock.intakeDocument.findMany.mock.calls[1][0].orderBy).toEqual({ reviewedAt: "desc" });
+    // The captured query is filtered to CAPTURED only and the history query is ordered by reviewedAt.
+    expect(prismaMock.intakeDocument.findMany.mock.calls[1][0].where).toEqual({ status: "CAPTURED" });
+    expect(prismaMock.intakeDocument.findMany.mock.calls[2][0].orderBy).toEqual({ reviewedAt: "desc" });
   });
 
   it("ingests a new candidate, creating the row before discarding the inbox original", async () => {

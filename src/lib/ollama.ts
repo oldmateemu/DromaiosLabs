@@ -4,6 +4,24 @@ import { parseIntakeExtraction, type IntakeExtraction } from "./document-intake"
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_OLLAMA_MODEL = "gemma3:1b";
 
+// Ollama endpoints treated as "on the box": loopback and the Docker host alias
+// (Ollama running on the same physical host as the container). Anything else —
+// e.g. a VPN IP pointing at another machine — is off-box.
+const ON_BOX_OLLAMA_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]", "host.docker.internal"]);
+
+/**
+ * True when the Ollama base URL points at this machine. Used to keep intake
+ * document text on the box: OCR'd invoices/medical/ID text must not be sent to a
+ * remote Ollama unless the operator explicitly opts in.
+ */
+export function isOnBoxOllamaUrl(baseUrl: string): boolean {
+  try {
+    return ON_BOX_OLLAMA_HOSTS.has(new URL(baseUrl).hostname.toLowerCase());
+  } catch {
+    return false; // Unparseable URL: fail safe (treat as off-box).
+  }
+}
+
 export function buildQuickCaptureDraftRequest(sourceText: string) {
   const model = process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
   const baseUrl = process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL;
@@ -93,6 +111,22 @@ export type IntakeExtractionResult = {
 export async function extractIntakeFieldsFromDocument(text: string, filename: string): Promise<IntakeExtractionResult> {
   const model = process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
   const baseUrl = process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL;
+
+  // Privacy guarantee: intake document text stays on the box. If OLLAMA_BASE_URL
+  // points off-box, skip AI extraction rather than send OCR'd invoices/medical/ID
+  // text to another machine — the heuristic triage still runs and stands on its
+  // own. Operators who run a self-hosted Ollama elsewhere on their VPN can opt in
+  // with INTAKE_ALLOW_REMOTE_OLLAMA=true.
+  if (process.env.INTAKE_ALLOW_REMOTE_OLLAMA !== "true" && !isOnBoxOllamaUrl(baseUrl)) {
+    return {
+      model,
+      provider: "OLLAMA",
+      prompt: "",
+      rawOutput: "",
+      error: "AI extraction skipped: OLLAMA_BASE_URL is off-box and INTAKE_ALLOW_REMOTE_OLLAMA is not set. Heuristic triage was used to keep document text on the box."
+    };
+  }
+
   const localDate = currentLocalDateKey();
   const trimmed = text.slice(0, 8000);
   const prompt = [

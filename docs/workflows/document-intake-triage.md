@@ -13,8 +13,13 @@ until the operator approves, files, archives, or rejects it.
 
 Cockpit is the control room and the system of record for the queue, the proposed
 triage, and the approval. Reading happens entirely on the box: no document bytes
-or extracted text are sent to a cloud service. No company Action is created from
-a document without explicit human approval.
+or extracted text are sent to a cloud service. AI extraction only runs against an
+on-box Ollama (loopback or the Docker host); if `OLLAMA_BASE_URL` points off-box,
+extraction is skipped and the local heuristic triage stands alone, so document
+text never leaves the box. An operator who runs a self-hosted Ollama elsewhere on
+their VPN can opt in with `INTAKE_ALLOW_REMOTE_OLLAMA=true` (accepting that text
+then leaves this box for that machine). No company Action is created from a
+document without explicit human approval.
 
 ## Cockpit Register Entry
 
