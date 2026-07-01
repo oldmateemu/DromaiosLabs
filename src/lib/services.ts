@@ -798,14 +798,25 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
 
     const effectiveDomain = triage.domain as IntakeDomain;
     const proposedAction = triage.proposedAction;
+    // A read that reported an error but produced no text (unsupported type, a
+    // missing/failed OCR binary) is a failed read, not a success: mark it FAILED
+    // so it shows in the read-failed count instead of looking like clean triage.
+    const readFailed = Boolean(read.error) && text.trim().length === 0;
 
     // Guard the writeback: OCR/Ollama can take many seconds, during which the
-    // operator may file/archive/reject the document from another tab. Only write
-    // back if it is still pending, so triage never resurrects a finalised row.
+    // operator may file/archive/reject the document, or mark its domain, from
+    // another tab. Only write back if it is still pending AND its domain hasn't
+    // changed since we loaded it, so a domain marked during this read (a lock the
+    // stale humanLocked check above could not see) is never clobbered by triage.
     await prisma.intakeDocument.updateMany({
-      where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
+      where: {
+        id: intakeId,
+        status: { notIn: INTAKE_FINALISED_STATUSES },
+        domain: doc.domain,
+        suggestedDomain: doc.suggestedDomain
+      },
       data: {
-        status: IntakeStatus.TRIAGED,
+        status: readFailed ? IntakeStatus.FAILED : IntakeStatus.TRIAGED,
         ocrText: text.length > 0 ? text : null,
         ocrEngine: read.engine,
         summary: triage.summary,
@@ -1007,10 +1018,27 @@ export async function archiveIntakeDocument(formData: FormData, userId: string) 
   if (claim.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
 
   // The row is now ours (ARCHIVED), so no other tab can finalise it. Move the
-  // bytes and record the new path. If the move fails, the row stays ARCHIVED with
-  // its store/ path still valid (bytes not moved) — acceptable for a single
-  // operator; a manual re-run is blocked by the finalised guard above.
-  const archivedPath = await moveToArchive(doc.storedPath);
+  // bytes and record the new path. If the move fails (disk full, permissions, an
+  // unreadable file), roll the row back to its pre-archive state — guarded on our
+  // own claim — so it returns to the queue as retryable instead of being stranded
+  // ARCHIVED with its bytes still at the old store path and no way to re-archive.
+  let archivedPath: string;
+  try {
+    archivedPath = await moveToArchive(doc.storedPath);
+  } catch (error) {
+    await prisma.intakeDocument.updateMany({
+      where: { id: intakeId, status: IntakeStatus.ARCHIVED },
+      data: {
+        status: doc.status,
+        disposition: doc.disposition,
+        domain: doc.domain,
+        reviewedById: doc.reviewedById,
+        reviewedAt: doc.reviewedAt,
+        reviewerNote: doc.reviewerNote
+      }
+    });
+    throw error;
+  }
   await prisma.intakeDocument.update({ where: { id: intakeId }, data: { storedPath: archivedPath } });
 
   revalidatePath("/intake");

@@ -283,6 +283,21 @@ describe("mergeExtractionIntoTriage", () => {
     expect(merged.proposedAction.companyFunction).toBe("finance");
   });
 
+  it("rebuilds the description and summary when extraction adopts a docType/domain", () => {
+    const base = buildIntakeTriage({ filename: "scan001.pdf", text: "blurry" });
+    expect(base.proposedAction.description).toContain("Document type: Document");
+    expect(base.proposedAction.description).toContain("Proposed disposition: UNSURE");
+
+    const merged = mergeExtractionIntoTriage(base, { domain: "BUSINESS", docType: "tax invoice" });
+
+    // The generated body must not keep naming the pre-merge Unknown/Document/UNSURE.
+    expect(merged.proposedAction.description).toContain("Domain: Business");
+    expect(merged.proposedAction.description).toContain("Document type: Invoice");
+    expect(merged.proposedAction.description).not.toContain("Document type: Document");
+    expect(merged.proposedAction.description).not.toContain("Proposed disposition: UNSURE");
+    expect(merged.summary.startsWith("Business invoice")).toBe(true);
+  });
+
   it("preserves an ACTION disposition set by action-forcing language when adopting an AI docType", () => {
     const base = buildIntakeTriage({ filename: "scan.pdf", text: "please respond by Friday" });
     expect(base.docType).toBe("unknown");

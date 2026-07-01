@@ -66,6 +66,9 @@ export type IntakeTriageResult = {
   disposition: IntakeDisposition;
   summary: string;
   proposedAction: IntakeProposedAction;
+  // The triage date (YYYY-MM-DD) used in the generated description, kept so a
+  // later merge can regenerate that text with the same date when fields change.
+  triagedOn: string;
 };
 
 // Weighted keyword signals. Strong, unambiguous markers get a higher weight so
@@ -281,27 +284,21 @@ export function buildIntakeTriage({ filename, text, now = new Date(), domainOver
   const priority = derivePriority({ docType: docTypeClass.docType, disposition, text });
 
   const docTypeLabel = labelDocType(docTypeClass.docType);
-  const domainLabel = labelDomain(domainClass.domain);
   const cleanName = tidyFilename(filename);
+  const triagedOn = dateKey(now);
 
-  const summary = [
-    `${domainLabel} ${docTypeLabel.toLowerCase()}`,
-    `disposition ${disposition.toLowerCase()}`,
-    domainClass.signals.business.length > 0 ? `business signals: ${domainClass.signals.business.join(", ")}` : null,
-    domainClass.signals.personal.length > 0 ? `personal signals: ${domainClass.signals.personal.join(", ")}` : null
-  ]
-    .filter(Boolean)
-    .join(" | ");
+  const summary = buildTriageSummary({ domain: domainClass.domain, docType: docTypeClass.docType, disposition, signals: domainClass.signals });
 
   const proposedAction: IntakeProposedAction = {
     title: `${docTypeLabel}: ${cleanName}`,
-    description: [
-      `Captured document triaged locally on ${dateKey(now)}.`,
-      `Domain: ${domainLabel} (confidence ${domainClass.confidence}).`,
-      `Document type: ${docTypeLabel} (confidence ${docTypeClass.confidence}).`,
-      `Proposed disposition: ${disposition}.`,
-      "No company record is created until you approve this in the intake review queue."
-    ].join("\n"),
+    description: buildActionDescription({
+      triagedOn,
+      domain: domainClass.domain,
+      domainConfidence: domainClass.confidence,
+      docType: docTypeClass.docType,
+      docTypeConfidence: docTypeClass.confidence,
+      disposition
+    }),
     domain: domainClass.domain,
     stream: routing.stream,
     companyFunction: routing.companyFunction,
@@ -312,6 +309,7 @@ export function buildIntakeTriage({ filename, text, now = new Date(), domainOver
   };
 
   return {
+    triagedOn,
     domain: domainClass.domain,
     domainConfidence: domainClass.confidence,
     signals: domainClass.signals,
@@ -442,13 +440,26 @@ export function mergeExtractionIntoTriage(triage: IntakeTriageResult, extraction
     .filter(Boolean)
     .join("\n");
 
+  const docTypeConfidence = docTypeChanged ? Math.max(triage.docTypeConfidence, 0.6) : triage.docTypeConfidence;
+
+  // Regenerate the heuristic summary and the base description when the adopted
+  // domain/docType/disposition change, so neither keeps naming the pre-merge
+  // "Unknown document / UNSURE" while the structured fields say otherwise.
+  const fieldsChanged = docTypeChanged || domainChanged;
+  const heuristicSummary = fieldsChanged
+    ? buildTriageSummary({ domain, docType, disposition, signals: triage.signals })
+    : triage.summary;
+  const baseDescription = fieldsChanged
+    ? buildActionDescription({ triagedOn: triage.triagedOn, domain, domainConfidence: triage.domainConfidence, docType, docTypeConfidence, disposition })
+    : triage.proposedAction.description;
+
   return {
     ...triage,
     domain,
     docType,
-    docTypeConfidence: docTypeChanged ? Math.max(triage.docTypeConfidence, 0.6) : triage.docTypeConfidence,
+    docTypeConfidence,
     disposition,
-    summary: summaryParts || triage.summary,
+    summary: summaryParts || heuristicSummary,
     proposedAction: {
       ...triage.proposedAction,
       domain,
@@ -460,7 +471,7 @@ export function mergeExtractionIntoTriage(triage: IntakeTriageResult, extraction
         extraction.suggestedNextStep?.trim() || (docTypeChanged ? nextStepFor(disposition, labelDocType(docType)) : triage.proposedAction.nextStep),
       dueDate: extraction.dueDate ?? triage.proposedAction.dueDate,
       sensitive: triage.proposedAction.sensitive || extraction.sensitive === true,
-      description: descriptionExtras ? `${triage.proposedAction.description}\n\n${descriptionExtras}` : triage.proposedAction.description
+      description: descriptionExtras ? `${baseDescription}\n\n${descriptionExtras}` : baseDescription
     }
   };
 }
@@ -710,6 +721,57 @@ function labelDomain(domain: IntakeDomain): string {
  * description text is left untouched. */
 export function alignDescriptionDomain(description: string, domain: IntakeDomain): string {
   return description.replace(/(^|\n)Domain: (?:Business|Personal|Mixed|Unknown)\b/g, `$1Domain: ${labelDomain(domain)}`);
+}
+
+// The heuristic one-line summary. Shared so a later merge can regenerate it with
+// adopted domain/docType/disposition instead of leaving a stale "Unknown document".
+function buildTriageSummary({
+  domain,
+  docType,
+  disposition,
+  signals
+}: {
+  domain: IntakeDomain;
+  docType: string;
+  disposition: IntakeDisposition;
+  signals: DomainSignals;
+}): string {
+  return [
+    `${labelDomain(domain)} ${labelDocType(docType).toLowerCase()}`,
+    `disposition ${disposition.toLowerCase()}`,
+    signals.business.length > 0 ? `business signals: ${signals.business.join(", ")}` : null,
+    signals.personal.length > 0 ? `personal signals: ${signals.personal.join(", ")}` : null
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+// The generated action description. Shared so a later merge can rebuild it when
+// extraction adopts a domain/docType/disposition, instead of leaving a body that
+// says "Domain: Unknown / Document type: Document / disposition: UNSURE" beside a
+// structured domain that now says Business/finance.
+function buildActionDescription({
+  triagedOn,
+  domain,
+  domainConfidence,
+  docType,
+  docTypeConfidence,
+  disposition
+}: {
+  triagedOn: string;
+  domain: IntakeDomain;
+  domainConfidence: number;
+  docType: string;
+  docTypeConfidence: number;
+  disposition: IntakeDisposition;
+}): string {
+  return [
+    `Captured document triaged locally on ${triagedOn}.`,
+    `Domain: ${labelDomain(domain)} (confidence ${domainConfidence}).`,
+    `Document type: ${labelDocType(docType)} (confidence ${docTypeConfidence}).`,
+    `Proposed disposition: ${disposition}.`,
+    "No company record is created until you approve this in the intake review queue."
+  ].join("\n");
 }
 
 function tidyFilename(filename: string): string {

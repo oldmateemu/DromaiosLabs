@@ -1085,6 +1085,44 @@ describe("document intake", () => {
     expect(updateArg.data.summary.startsWith("Personal")).toBe(true);
   });
 
+  it("marks a read that errors with no extracted text as FAILED, not TRIAGED", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.bin",
+      mimeType: "application/octet-stream",
+      originalFilename: "x.bin",
+      domain: "UNKNOWN",
+      suggestedDomain: "UNKNOWN",
+      status: "CAPTURED"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "", engine: "none", error: "Unsupported file type for reading." });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("FAILED");
+  });
+
+  it("guards the triage writeback on the domain so a mark made during the read is not clobbered", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "x.pdf",
+      domain: "UNKNOWN",
+      suggestedDomain: "UNKNOWN",
+      status: "CAPTURED"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    // The writeback only applies while the domain/suggestedDomain are unchanged.
+    expect(updateArg.where.domain).toBe("UNKNOWN");
+    expect(updateArg.where.suggestedDomain).toBe("UNKNOWN");
+  });
+
   it("does not erase a manual lock when the first triage agrees with the marked domain", async () => {
     // Reviewer marked Business before the first read: domain=BUSINESS, the
     // captured suggestedDomain is still UNKNOWN. The OCR triage also yields
@@ -1260,6 +1298,26 @@ describe("document intake", () => {
     // The bytes are never moved, so a FILED/action record can't be left pointing
     // at a path that was archived away.
     expect(store.moveToArchive).not.toHaveBeenCalled();
+  });
+
+  it("rolls the archive claim back to a retryable state when the byte move fails", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      status: "TRIAGED",
+      storedPath: "/store/x.pdf",
+      domain: "BUSINESS",
+      disposition: "FILE",
+      reviewedById: null,
+      reviewedAt: null,
+      reviewerNote: null
+    });
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    vi.mocked(store.moveToArchive).mockRejectedValueOnce(new Error("disk full"));
+
+    await expect(services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/disk full/);
+    // The row is rolled back from ARCHIVED to its pre-archive status.
+    const rollback = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(rollback.where.status).toBe("ARCHIVED");
+    expect(rollback.data.status).toBe("TRIAGED");
   });
 
   it("rejects a document and updates the intake domain", async () => {
