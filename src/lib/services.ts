@@ -678,7 +678,7 @@ export async function getIntakeDocumentText(intakeId: string): Promise<{ text: s
 export async function getPersonalPipelineData() {
   const [openActions, recentDocuments, actionCount, documentCount] = await Promise.all([
     prisma.action.findMany({
-      where: { domain: IntakeDomain.PERSONAL, status: { not: ActionStatus.DONE } },
+      where: { domain: IntakeDomain.PERSONAL, status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
       orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
       select: { id: true, title: true, status: true, priority: true, dueAt: true, nextStep: true, sensitive: true },
       take: 100

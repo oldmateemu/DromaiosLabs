@@ -1395,8 +1395,11 @@ describe("document intake", () => {
     expect(data.recentDocuments).toHaveLength(1);
     expect(data.actionCount).toBe(3);
     expect(data.documentCount).toBe(5);
-    // Both queries are scoped to the Personal domain.
-    expect(prismaMock.action.findMany.mock.calls.at(-1)?.[0].where.domain).toBe("PERSONAL");
+    // Both queries are scoped to the Personal domain, and the to-do query
+    // excludes both DONE and CANCELLED so closed work never shows as open.
+    const actionArg = prismaMock.action.findMany.mock.calls.at(-1)?.[0];
+    expect(actionArg.where.domain).toBe("PERSONAL");
+    expect(actionArg.where.status).toEqual({ notIn: ["DONE", "CANCELLED"] });
     expect(prismaMock.intakeDocument.findMany.mock.calls.at(-1)?.[0].where.domain).toBe("PERSONAL");
   });
 });
