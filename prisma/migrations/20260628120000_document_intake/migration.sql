@@ -59,10 +59,10 @@ CREATE INDEX "IntakeDocument_status_idx" ON "IntakeDocument"("status");
 CREATE INDEX "IntakeDocument_domain_idx" ON "IntakeDocument"("domain");
 
 -- CreateIndex
-CREATE INDEX "IntakeDocument_contentHash_idx" ON "IntakeDocument"("contentHash");
+CREATE INDEX "IntakeDocument_capturedAt_idx" ON "IntakeDocument"("capturedAt");
 
 -- CreateIndex
-CREATE INDEX "IntakeDocument_capturedAt_idx" ON "IntakeDocument"("capturedAt");
+CREATE UNIQUE INDEX "IntakeDocument_contentHash_key" ON "IntakeDocument"("contentHash");
 
 -- CreateIndex
 CREATE INDEX "Action_domain_idx" ON "Action"("domain");

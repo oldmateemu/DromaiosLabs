@@ -150,7 +150,7 @@ const ACTION_KEYWORDS = [
   "deadline",
   "final notice",
   "appointment",
-  "book"
+  "booking"
 ];
 
 // Document types that, by their nature, usually need a tracked action.
@@ -352,31 +352,103 @@ export function mergeExtractionIntoTriage(triage: IntakeTriageResult, extraction
   if (!extraction) return triage;
 
   const domain: IntakeDomain = triage.domain === "UNKNOWN" && extraction.domain ? extraction.domain : triage.domain;
-  const routing = domain === triage.domain ? { stream: triage.proposedAction.stream, companyFunction: triage.proposedAction.companyFunction } : suggestRouting({ docType: triage.docType, domain });
 
-  const summaryParts = [extraction.summary, extraction.party ? `Party: ${extraction.party}` : null, extraction.amount ? `Amount: ${extraction.amount}` : null]
+  // Adopt a confident extracted document type only when the heuristics found
+  // none, then recompute the downstream disposition, routing, and priority so an
+  // AI-identified invoice/contract is no longer left as a generic admin item.
+  const extractedType = triage.docType === "unknown" ? normaliseDocType(extraction.docType) : null;
+  const docType = extractedType ?? triage.docType;
+  const docTypeChanged = docType !== triage.docType;
+  const domainChanged = domain !== triage.domain;
+
+  const disposition = docTypeChanged ? proposeDisposition({ docType, domain }) : triage.disposition;
+  const routing =
+    docTypeChanged || domainChanged
+      ? suggestRouting({ docType, domain })
+      : { stream: triage.proposedAction.stream, companyFunction: triage.proposedAction.companyFunction };
+  const priority = docTypeChanged ? derivePriority({ docType, disposition }) : triage.proposedAction.priority;
+
+  const summaryParts = [
+    extraction.summary,
+    extraction.documentDate ? `Document date: ${extraction.documentDate}` : null,
+    extraction.party ? `Party: ${extraction.party}` : null,
+    extraction.amount ? `Amount: ${extraction.amount}` : null
+  ]
     .filter(Boolean)
     .join(" | ");
+
+  // The document's own issue date is kept in the description, never mapped onto
+  // the action's review deadline (which would make it immediately stale).
+  const descriptionExtras = [
+    extraction.summary ? `Local AI summary: ${extraction.summary}` : null,
+    extraction.documentDate ? `Document date: ${extraction.documentDate}` : null
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return {
     ...triage,
     domain,
+    docType,
+    docTypeConfidence: docTypeChanged ? Math.max(triage.docTypeConfidence, 0.6) : triage.docTypeConfidence,
+    disposition,
     summary: summaryParts || triage.summary,
     proposedAction: {
       ...triage.proposedAction,
       domain,
       stream: routing.stream,
       companyFunction: routing.companyFunction,
+      priority,
       title: extraction.suggestedTitle?.trim() || triage.proposedAction.title,
-      nextStep: extraction.suggestedNextStep?.trim() || triage.proposedAction.nextStep,
+      nextStep:
+        extraction.suggestedNextStep?.trim() || (docTypeChanged ? nextStepFor(disposition, labelDocType(docType)) : triage.proposedAction.nextStep),
       dueDate: extraction.dueDate ?? triage.proposedAction.dueDate,
-      reviewDate: extraction.documentDate ?? triage.proposedAction.reviewDate,
       sensitive: triage.proposedAction.sensitive || extraction.sensitive === true,
-      description: extraction.summary
-        ? `${triage.proposedAction.description}\n\nLocal AI summary: ${extraction.summary}`
-        : triage.proposedAction.description
+      description: descriptionExtras ? `${triage.proposedAction.description}\n\n${descriptionExtras}` : triage.proposedAction.description
     }
   };
+}
+
+const KNOWN_DOC_TYPES = new Set([
+  "invoice",
+  "receipt",
+  "statement",
+  "contract",
+  "insurance",
+  "registration",
+  "utility-bill",
+  "medical",
+  "certificate",
+  "marketing",
+  "bill",
+  "letter",
+  "payslip",
+  "rates-notice"
+]);
+
+const DOC_TYPE_SYNONYMS: Record<string, string> = {
+  "tax invoice": "invoice",
+  "bank statement": "statement",
+  "account statement": "statement",
+  "pay slip": "payslip",
+  "payment summary": "payslip",
+  "rates notice": "rates-notice",
+  "council rates": "rates-notice",
+  "utility bill": "utility-bill",
+  utility: "utility-bill"
+};
+
+/** Normalises a free-text document type from the AI into one of the known
+ * routing types, or null when it cannot be confidently mapped. */
+export function normaliseDocType(value?: string | null): string | null {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  if (KNOWN_DOC_TYPES.has(v)) return v;
+  if (DOC_TYPE_SYNONYMS[v]) return DOC_TYPE_SYNONYMS[v];
+  for (const type of KNOWN_DOC_TYPES) {
+    if (v.includes(type)) return type;
+  }
+  return null;
 }
 
 export type IntakeQueueItem = {
@@ -558,8 +630,17 @@ function optionalDateString() {
     z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
+      // Reject impossible dates (e.g. 2026-13-45) that pass the shape check, so a
+      // hallucinated model date never becomes an unparseable dueAt/reviewAt.
+      .refine(isRealCalendarDate, "Invalid calendar date")
       .optional()
   );
+}
+
+function isRealCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 function round2(value: number): number {

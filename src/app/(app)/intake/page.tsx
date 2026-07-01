@@ -1,6 +1,7 @@
 import {
   approveIntakeDocumentAction,
   archiveIntakeDocumentAction,
+  fileIntakeDocumentAction,
   ingestIntakeFolderAction,
   readIntakeDocumentAction,
   rejectIntakeDocumentAction,
@@ -79,7 +80,7 @@ export default async function IntakePage() {
           <h2 className="text-base font-semibold text-command-ink">Upload a document</h2>
           <p className="muted mt-1">Drag in a PDF or photo of a document (works from your phone over VPN).</p>
           <form action={uploadIntakeDocumentAction} className="mt-3 flex flex-col gap-3">
-            <input className="input" name="file" type="file" accept=".pdf,image/*" required />
+            <input aria-label="Choose a document to upload" className="input" name="file" type="file" accept=".pdf,image/*" required />
             <div className="flex justify-end">
               <button className="button button-primary" type="submit">Upload to queue</button>
             </div>
@@ -201,7 +202,7 @@ export default async function IntakePage() {
                       <input className="input mt-1" name="reviewerNote" placeholder="Optional note recorded against this document" />
                     </label>
                     <label className="flex items-center gap-2 text-sm text-command-muted">
-                      <input name="sensitive" type="checkbox" defaultChecked={field("sensitive") !== "false"} />
+                      <input name="sensitive" type="checkbox" defaultChecked={suggested.sensitive !== false} />
                       Sensitive
                     </label>
                     <div className="flex justify-end md:col-span-2">
@@ -214,10 +215,15 @@ export default async function IntakePage() {
                       <input name="intakeId" type="hidden" value={doc.id} />
                       <button className="button button-secondary" type="submit">Re-read</button>
                     </form>
+                    <form action={fileIntakeDocumentAction}>
+                      <input name="intakeId" type="hidden" value={doc.id} />
+                      <input name="domain" type="hidden" value={doc.domain} />
+                      <button className="button button-secondary" type="submit">File for records</button>
+                    </form>
                     <form action={archiveIntakeDocumentAction}>
                       <input name="intakeId" type="hidden" value={doc.id} />
                       <input name="domain" type="hidden" value={doc.domain} />
-                      <button className="button button-secondary" type="submit">Archive for records</button>
+                      <button className="button button-secondary" type="submit">Archive</button>
                     </form>
                     <form action={rejectIntakeDocumentAction}>
                       <input name="intakeId" type="hidden" value={doc.id} />

@@ -14,6 +14,7 @@ import {
   createLaunchpadLink,
   createQuickCaptureDraft,
   createRisk,
+  fileIntakeDocument,
   ingestIntakeFolder,
   prepareDraftAutomation,
   readAndTriageIntakeDocument,
@@ -229,6 +230,12 @@ export async function readIntakeDocumentAction(formData: FormData) {
 export async function approveIntakeDocumentAction(formData: FormData) {
   const user = await requireUser();
   await approveIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function fileIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await fileIntakeDocument(formData, user.id);
   redirect("/intake");
 }
 

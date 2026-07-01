@@ -400,8 +400,8 @@ model IntakeDocument {
   reviewedBy User?   @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
   action     Action? @relation(fields: [actionId], references: [id], onDelete: SetNull)
 
+  @@unique([contentHash])
   @@index([status])
   @@index([domain])
-  @@index([contentHash])
   @@index([capturedAt])
 }

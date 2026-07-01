@@ -19,6 +19,9 @@ export type DocumentTextResult = {
   text: string;
   engine: string;
   error?: string;
+  // True when a multi-page PDF was only OCR'd up to MAX_OCR_PAGES, so a reviewer
+  // knows later pages were not read.
+  truncated?: boolean;
 };
 
 const MAX_TEXT_LENGTH = 200_000;
@@ -91,7 +94,9 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
       const page = await ocrImage(join(workDir, file));
       if (page.text) pages.push(page.text);
     }
-    return { text: capText(pages.join("\n\n")), engine: "tesseract+pdftoppm" };
+    // Hitting the page cap means the PDF may have further, unread pages.
+    const truncated = files.length >= MAX_OCR_PAGES;
+    return { text: capText(pages.join("\n\n")), engine: "tesseract+pdftoppm", truncated };
   } catch (error) {
     return { text: "", engine: "none", error: toMessage(error) };
   } finally {

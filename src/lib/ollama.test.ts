@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { draftActionFromQuickCapture } from "./ollama";
+import { draftActionFromQuickCapture, extractIntakeFieldsFromDocument } from "./ollama";
 
 const originalEnv = { ...process.env };
 
@@ -98,5 +98,68 @@ describe("draftActionFromQuickCapture", () => {
     expect(result.rawOutput).toBe("not json at all");
     expect(result.draft.state).toBe("FAILED");
     expect(result.draft.error).toBeDefined();
+  });
+});
+
+describe("extractIntakeFieldsFromDocument", () => {
+  it("returns a parsed extraction when Ollama responds with valid JSON", async () => {
+    const extractionJson = JSON.stringify({ summary: "Supplier invoice", domain: "BUSINESS", amount: "$420.00", dueDate: "2026-07-15" });
+    const fetchMock = mockFetchResponse({ ok: true, json: { response: extractionJson } });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await extractIntakeFieldsFromDocument("TAX INVOICE ...", "invoice.pdf");
+
+    expect(result.provider).toBe("OLLAMA");
+    expect(result.error).toBeUndefined();
+    expect(result.extraction?.domain).toBe("BUSINESS");
+    expect(result.extraction?.dueDate).toBe("2026-07-15");
+  });
+
+  it("posts the document text and filename to the configured model with JSON format", async () => {
+    process.env.OLLAMA_BASE_URL = "http://ollama.internal:1234";
+    const fetchMock = mockFetchResponse({ ok: true, json: { response: "{}" } });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await extractIntakeFieldsFromDocument("rates notice body text", "rates.pdf");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://ollama.internal:1234/api/generate");
+    const payload = JSON.parse(init?.body as string);
+    expect(payload).toMatchObject({ stream: false, format: "json" });
+    expect(payload.prompt).toContain("rates.pdf");
+    expect(payload.prompt).toContain("rates notice body text");
+  });
+
+  it("reports an error when Ollama returns a non-OK status", async () => {
+    const fetchMock = mockFetchResponse({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await extractIntakeFieldsFromDocument("text", "doc.pdf");
+
+    expect(result.error).toBe("Ollama returned HTTP 500.");
+    expect(result.extraction).toBeUndefined();
+  });
+
+  it("reports an error when the request throws", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("connection refused");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await extractIntakeFieldsFromDocument("text", "doc.pdf");
+
+    expect(result.error).toBe("connection refused");
+    expect(result.extraction).toBeUndefined();
+  });
+
+  it("surfaces a parse error when the model returns malformed JSON", async () => {
+    const fetchMock = mockFetchResponse({ ok: true, json: { response: "not json" } });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await extractIntakeFieldsFromDocument("text", "doc.pdf");
+
+    expect(result.rawOutput).toBe("not json");
+    expect(result.extraction).toBeUndefined();
+    expect(result.error).toBeDefined();
   });
 });

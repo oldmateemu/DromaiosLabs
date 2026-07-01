@@ -23,6 +23,7 @@ const { prismaMock } = vi.hoisted(() => ({
     review: { create: vi.fn(), findMany: vi.fn() },
     risk: { findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
     decision: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
+    intakeDocument: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), groupBy: vi.fn(), create: vi.fn(), update: vi.fn() },
     $transaction: vi.fn()
   }
 }));
@@ -35,17 +36,37 @@ vi.mock("./ollama", () => ({
     model: "gemma3:1b",
     prompt: `prompt:${sourceText}`
   })),
-  draftActionFromQuickCapture: vi.fn()
+  draftActionFromQuickCapture: vi.fn(),
+  extractIntakeFieldsFromDocument: vi.fn()
 }));
+vi.mock("./document-intake-store", () => ({
+  collectInboxCandidates: vi.fn(),
+  copyInboxCandidateToStore: vi.fn(),
+  discardInboxFile: vi.fn(),
+  hashContent: vi.fn(() => "hash-abc"),
+  moveToArchive: vi.fn(async (path: string) => `/archive/${path}`),
+  storeUploadedFile: vi.fn()
+}));
+vi.mock("./document-read", () => ({ extractDocumentText: vi.fn() }));
 
 const { revalidatePath } = await import("next/cache");
-const { draftActionFromQuickCapture } = await import("./ollama");
+const { draftActionFromQuickCapture, extractIntakeFieldsFromDocument } = await import("./ollama");
+const store = await import("./document-intake-store");
+const read = await import("./document-read");
 const services = await import("./services");
 
 function form(values: Record<string, string>) {
   const fd = new FormData();
   for (const [key, value] of Object.entries(values)) fd.set(key, value);
   return fd;
+}
+
+// jsdom's File does not implement arrayBuffer(), so provide a real File instance
+// (to satisfy `instanceof File`) with a working arrayBuffer() for upload tests.
+function fileWithBytes(name: string, content: string): File {
+  const file = new File([content], name, { type: "application/pdf" });
+  Object.defineProperty(file, "arrayBuffer", { value: async () => new TextEncoder().encode(content).buffer });
+  return file;
 }
 
 async function waitForBackgroundTasks() {
@@ -92,6 +113,18 @@ beforeEach(() => {
   prismaMock.risk.create.mockResolvedValue({ id: "risk-1" });
   prismaMock.risk.update.mockResolvedValue({ id: "risk-1" });
   prismaMock.decision.create.mockResolvedValue({ id: "decision-1" });
+  prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
+  prismaMock.intakeDocument.findUnique.mockResolvedValue(null);
+  prismaMock.intakeDocument.groupBy.mockResolvedValue([]);
+  prismaMock.intakeDocument.create.mockResolvedValue({ id: "intake-1" });
+  prismaMock.intakeDocument.update.mockResolvedValue({ id: "intake-1" });
+  const storedFile = { storedPath: "/store/hash-abc.pdf", filename: "doc.pdf", contentHash: "hash-abc", mimeType: "application/pdf", byteSize: 3 };
+  vi.mocked(store.collectInboxCandidates).mockResolvedValue([]);
+  vi.mocked(store.storeUploadedFile).mockResolvedValue(storedFile);
+  vi.mocked(store.copyInboxCandidateToStore).mockResolvedValue(storedFile);
+  vi.mocked(store.hashContent).mockReturnValue("hash-abc");
+  vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "", engine: "none" });
+  vi.mocked(extractIntakeFieldsFromDocument).mockResolvedValue({ model: "gemma3:1b", provider: "OLLAMA", prompt: "", rawOutput: "", extraction: undefined });
   prismaMock.$transaction.mockImplementation(async (cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock));
 });
 
@@ -906,5 +939,199 @@ describe("read aggregators", () => {
     expect(prismaMock.stream.findMany).toHaveBeenCalled();
     expect(prismaMock.launchpadLink.findMany).toHaveBeenCalled();
     expect(prismaMock.automation.findMany).toHaveBeenCalled();
+  });
+});
+
+describe("document intake", () => {
+  const candidate = {
+    absPath: "/inbox/scan/a.pdf",
+    filename: "a.pdf",
+    source: "FOLDER" as const,
+    mimeType: "application/pdf",
+    byteSize: 3,
+    contentHash: "h1",
+    bytes: Buffer.from("abc")
+  };
+
+  it("builds the queue summary from a full groupBy, not a capped list", async () => {
+    prismaMock.intakeDocument.findMany
+      .mockResolvedValueOnce([{ id: "p1", status: "CAPTURED", domain: "UNKNOWN", action: null }])
+      .mockResolvedValueOnce([{ id: "h1", status: "FILED", domain: "BUSINESS", action: { id: "a1", title: "Filed" } }]);
+    prismaMock.intakeDocument.groupBy.mockResolvedValue([
+      { status: "CAPTURED", domain: "UNKNOWN", _count: 1 },
+      { status: "FILED", domain: "BUSINESS", _count: 2 }
+    ]);
+
+    const data = await services.getIntakeQueueData();
+    expect(data.pending).toHaveLength(1);
+    expect(data.history).toHaveLength(1);
+    expect(data.summary.total).toBe(3);
+    expect(data.summary.byDomain.BUSINESS).toBe(2);
+    // History is ordered by reviewedAt.
+    expect(prismaMock.intakeDocument.findMany.mock.calls[1][0].orderBy).toEqual({ reviewedAt: "desc" });
+  });
+
+  it("ingests a new candidate, creating the row before discarding the inbox original", async () => {
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue([candidate]);
+    prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
+
+    const result = await services.ingestIntakeFolder();
+
+    expect(result).toEqual({ ingested: 1, duplicates: 0 });
+    expect(store.copyInboxCandidateToStore).toHaveBeenCalledWith(candidate);
+    expect(prismaMock.intakeDocument.create).toHaveBeenCalled();
+    // Order matters: the DB row is created before the inbox original is removed.
+    const createOrder = prismaMock.intakeDocument.create.mock.invocationCallOrder[0];
+    const discardOrder = vi.mocked(store.discardInboxFile).mock.invocationCallOrder[0];
+    expect(createOrder).toBeLessThan(discardOrder);
+  });
+
+  it("skips a duplicate inbox candidate without creating a row", async () => {
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue([candidate]);
+    prismaMock.intakeDocument.findFirst.mockResolvedValue({ id: "existing" });
+
+    const result = await services.ingestIntakeFolder();
+
+    expect(result).toEqual({ ingested: 0, duplicates: 1 });
+    expect(store.discardInboxFile).toHaveBeenCalledWith(candidate.absPath);
+    expect(prismaMock.intakeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it("uploads a new document, hashing before writing to the store", async () => {
+    const fd = new FormData();
+    fd.set("file", fileWithBytes("invoice.pdf", "pdf-bytes"));
+    prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
+
+    await services.uploadIntakeDocument(fd);
+
+    expect(store.hashContent).toHaveBeenCalled();
+    expect(store.storeUploadedFile).toHaveBeenCalled();
+    expect(prismaMock.intakeDocument.create).toHaveBeenCalled();
+  });
+
+  it("does not store bytes for a duplicate upload", async () => {
+    const fd = new FormData();
+    fd.set("file", fileWithBytes("invoice.pdf", "pdf-bytes"));
+    prismaMock.intakeDocument.findFirst.mockResolvedValue({ id: "existing" });
+
+    await services.uploadIntakeDocument(fd);
+
+    expect(store.storeUploadedFile).not.toHaveBeenCalled();
+    expect(prismaMock.intakeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it("reads and triages a captured document into TRIAGED", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "UNKNOWN"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "TAX INVOICE ABN GST amount due", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("TRIAGED");
+    expect(updateArg.data.docType).toBe("invoice");
+    expect(updateArg.data.domain).toBe("BUSINESS");
+  });
+
+  it("preserves a human-set domain when re-triaging", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "PERSONAL"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.domain).toBe("PERSONAL");
+    expect(updateArg.data.suggestedDomain).toBe("BUSINESS");
+  });
+
+  it("marks a failed read as FAILED", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "x.pdf",
+      domain: "UNKNOWN"
+    });
+    vi.mocked(read.extractDocumentText).mockRejectedValue(new Error("boom"));
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("FAILED");
+  });
+
+  it("approves a triaged document into an action", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "TRIAGED", actionId: null });
+
+    await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS" }), "user-1");
+
+    expect(prismaMock.action.create).toHaveBeenCalled();
+    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("FILED");
+    expect(updateArg.data.actionId).toBe("action-1");
+  });
+
+  it("does not create a second action when an already-filed document is re-approved", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "FILED", actionId: "a1" });
+
+    await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS" }), "user-1");
+
+    expect(prismaMock.action.create).not.toHaveBeenCalled();
+  });
+
+  it("files a document for records without creating an action", async () => {
+    await services.fileIntakeDocument(form({ intakeId: "d1", domain: "PERSONAL" }), "user-1");
+
+    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("FILED");
+    expect(updateArg.data.disposition).toBe("FILE");
+    expect(prismaMock.action.create).not.toHaveBeenCalled();
+  });
+
+  it("archives a pending document and rejects re-archiving a finalised one", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "TRIAGED", storedPath: "/store/x.pdf", domain: "BUSINESS" });
+    await services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1");
+    expect(store.moveToArchive).toHaveBeenCalledWith("/store/x.pdf");
+
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "ARCHIVED", storedPath: "/x", domain: "BUSINESS" });
+    await expect(services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);
+  });
+
+  it("rejects a document and updates the intake domain", async () => {
+    await services.rejectIntakeDocument(form({ intakeId: "d1" }), "user-1");
+    expect(prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0].data.status).toBe("REJECTED");
+
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ suggestedAction: { domain: "UNKNOWN", title: "x" } });
+    await services.setIntakeDomain(form({ intakeId: "d1", domain: "PERSONAL" }));
+    expect(prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0].data.domain).toBe("PERSONAL");
+  });
+
+  it("runs the document intake triage automation on approval", async () => {
+    prismaMock.automation.findUnique.mockResolvedValue({
+      id: "auto-di",
+      name: "Document intake triage",
+      safetyLevel: "APPROVAL_REQUIRED",
+      status: "ACTIVE",
+      trigger: "Manual scan triage",
+      targetTool: "local cockpit"
+    });
+
+    await services.runAutomation("auto-di", true, "user-1");
+
+    expect(store.collectInboxCandidates).toHaveBeenCalled();
+    const runArg = prismaMock.automationRun.create.mock.calls.at(-1)?.[0];
+    expect(runArg.data.status).toBe("SUCCESS");
+    expect(runArg.data.responseSummary).toContain("Document intake triage");
   });
 });

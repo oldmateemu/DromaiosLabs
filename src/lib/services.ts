@@ -9,6 +9,7 @@ import {
   IntakeDomain,
   IntakeSource,
   IntakeStatus,
+  Prisma,
   Priority,
   RiskLevel,
   ReviewType
@@ -42,14 +43,16 @@ import {
   buildDocumentIntakeRun,
   buildIntakeTriage,
   mergeExtractionIntoTriage,
+  suggestRouting,
   summariseIntakeQueue,
   type IntakeProposedAction
 } from "./document-intake";
 import { extractDocumentText } from "./document-read";
 import {
   collectInboxCandidates,
-  commitInboxCandidate,
+  copyInboxCandidateToStore,
   discardInboxFile,
+  hashContent,
   moveToArchive,
   storeUploadedFile
 } from "./document-intake-store";
@@ -586,20 +589,33 @@ const INTAKE_PENDING_STATUSES = [
   IntakeStatus.FAILED
 ];
 const INTAKE_HISTORY_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
+const INTAKE_FINALISED_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
+const MAX_INTAKE_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export async function getIntakeQueueData() {
-  const [docs, reference] = await Promise.all([
+  // Pending and history are fetched separately so a busy history never caps the
+  // pending queue out of view, and the summary is computed from a full groupBy
+  // so counts stay accurate regardless of any display limit.
+  const [pending, history, grouped, reference] = await Promise.all([
     prisma.intakeDocument.findMany({
+      where: { status: { in: INTAKE_PENDING_STATUSES } },
       orderBy: [{ status: "asc" }, { capturedAt: "desc" }],
       include: { action: { select: { id: true, title: true } } },
-      take: 200
+      take: 300
     }),
+    prisma.intakeDocument.findMany({
+      where: { status: { in: INTAKE_HISTORY_STATUSES } },
+      orderBy: { reviewedAt: "desc" },
+      include: { action: { select: { id: true, title: true } } },
+      take: 40
+    }),
+    prisma.intakeDocument.groupBy({ by: ["status", "domain"], _count: true }),
     getReferenceData()
   ]);
 
-  const summary = summariseIntakeQueue(docs.map((doc) => ({ status: doc.status, domain: doc.domain })));
-  const pending = docs.filter((doc) => (INTAKE_PENDING_STATUSES as string[]).includes(doc.status));
-  const history = docs.filter((doc) => (INTAKE_HISTORY_STATUSES as string[]).includes(doc.status)).slice(0, 40);
+  const summary = summariseIntakeQueue(
+    grouped.flatMap((row) => Array.from({ length: row._count }, () => ({ status: row.status, domain: row.domain })))
+  );
 
   return { pending, history, summary, ...reference };
 }
@@ -622,19 +638,35 @@ export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicat
       continue;
     }
 
-    const stored = await commitInboxCandidate(candidate);
-    await prisma.intakeDocument.create({
-      data: {
-        source: candidate.source as IntakeSource,
-        status: IntakeStatus.CAPTURED,
-        originalFilename: stored.filename,
-        storedPath: stored.storedPath,
-        contentHash: stored.contentHash,
-        mimeType: stored.mimeType,
-        byteSize: stored.byteSize,
-        receivedAt: candidate.source === "EMAIL" ? new Date() : null
+    // Copy to the store but keep the inbox original until the capture row
+    // exists, so a crash between the two never orphans the document.
+    const stored = await copyInboxCandidateToStore(candidate);
+    try {
+      await prisma.intakeDocument.create({
+        data: {
+          source: candidate.source as IntakeSource,
+          status: IntakeStatus.CAPTURED,
+          originalFilename: stored.filename,
+          storedPath: stored.storedPath,
+          contentHash: stored.contentHash,
+          mimeType: stored.mimeType,
+          byteSize: stored.byteSize,
+          receivedAt: candidate.source === "EMAIL" ? new Date() : null
+        }
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        // Lost a race with a concurrent capture of the same bytes; the unique
+        // contentHash constraint is the atomic dedupe guarantee.
+        await discardInboxFile(candidate.absPath);
+        duplicates += 1;
+        continue;
       }
-    });
+      // Leave the inbox original in place so the next ingest can retry it.
+      throw error;
+    }
+
+    await discardInboxFile(candidate.absPath);
     ingested += 1;
   }
 
@@ -647,21 +679,35 @@ export async function uploadIntakeDocument(formData: FormData) {
   if (!(file instanceof File) || file.size === 0) throw new Error("Choose a document to upload.");
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const stored = await storeUploadedFile(file.name, bytes);
+  // Explicit ceiling in the intake path (defence in depth alongside the Next.js
+  // server-action body limit) so an oversized upload cannot amplify OCR work.
+  if (bytes.byteLength > MAX_INTAKE_UPLOAD_BYTES) {
+    throw new Error(`Document exceeds the ${Math.round(MAX_INTAKE_UPLOAD_BYTES / (1024 * 1024))}MB upload limit.`);
+  }
 
-  const existing = await prisma.intakeDocument.findFirst({ where: { contentHash: stored.contentHash }, select: { id: true } });
+  // Hash first and only write bytes to the store when the document is new, so a
+  // re-uploaded duplicate never leaves an untracked file behind.
+  const contentHash = hashContent(bytes);
+  const existing = await prisma.intakeDocument.findFirst({ where: { contentHash }, select: { id: true } });
   if (!existing) {
-    await prisma.intakeDocument.create({
-      data: {
-        source: IntakeSource.UPLOAD,
-        status: IntakeStatus.CAPTURED,
-        originalFilename: stored.filename,
-        storedPath: stored.storedPath,
-        contentHash: stored.contentHash,
-        mimeType: stored.mimeType,
-        byteSize: stored.byteSize
-      }
-    });
+    const stored = await storeUploadedFile(file.name, bytes);
+    try {
+      await prisma.intakeDocument.create({
+        data: {
+          source: IntakeSource.UPLOAD,
+          status: IntakeStatus.CAPTURED,
+          originalFilename: stored.filename,
+          storedPath: stored.storedPath,
+          contentHash: stored.contentHash,
+          mimeType: stored.mimeType,
+          byteSize: stored.byteSize
+        }
+      });
+    } catch (error) {
+      // The unique contentHash constraint makes dedupe atomic: a concurrent
+      // upload of the same bytes is treated as a no-op rather than a failure.
+      if (!isUniqueConstraintError(error)) throw error;
+    }
   }
 
   revalidatePath("/intake");
@@ -690,7 +736,24 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
     }
 
     const triage = mergeExtractionIntoTriage(buildIntakeTriage({ filename: doc.originalFilename, text, now: new Date() }), extraction);
-    const note = [read.error, extractionError].filter(Boolean).join(" | ");
+    const note = [
+      read.error,
+      extractionError,
+      read.truncated ? "Long document: only the first pages were read (OCR page limit) — check later pages manually." : null
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    // Respect a domain the operator (or an earlier triage) already committed to:
+    // a re-read of a low-quality scan must not silently overwrite a human
+    // correction. The fresh heuristic result is still recorded as suggestedDomain.
+    const preserved = doc.domain !== IntakeDomain.UNKNOWN ? (doc.domain as IntakeDomain) : null;
+    const effectiveDomain = preserved ?? (triage.domain as IntakeDomain);
+    let proposedAction = triage.proposedAction;
+    if (preserved && preserved !== triage.domain) {
+      const routing = suggestRouting({ docType: triage.docType, domain: preserved });
+      proposedAction = { ...proposedAction, domain: preserved, stream: routing.stream, companyFunction: routing.companyFunction };
+    }
 
     await prisma.intakeDocument.update({
       where: { id: intakeId },
@@ -701,13 +764,13 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
         summary: triage.summary,
         docType: triage.docType,
         disposition: triage.disposition as IntakeDisposition,
-        domain: triage.domain as IntakeDomain,
+        domain: effectiveDomain,
         suggestedDomain: triage.domain as IntakeDomain,
         domainConfidence: triage.domainConfidence,
         signals: triage.signals,
-        suggestedAction: triage.proposedAction,
+        suggestedAction: proposedAction,
         triageNote: note.length > 0 ? note : null,
-        sensitive: triage.proposedAction.sensitive,
+        sensitive: proposedAction.sensitive,
         readAt: new Date(),
         triagedAt: new Date()
       }
@@ -737,15 +800,25 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   const title = stringValue(formData, "title");
   if (!intakeId || !title) throw new Error("Document and title are required.");
 
-  const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.BUSINESS);
+  // Default to UNKNOWN (not BUSINESS) so an omitted/invalid value never silently
+  // attaches company context. Only Business/Mixed documents route into a company
+  // stream and function; Personal/Unknown stay out of company ops.
+  const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN);
+  const attachesCompanyContext = domain === IntakeDomain.BUSINESS || domain === IntakeDomain.MIXED;
   const streamName = optionalString(formData, "stream");
   const functionName = optionalString(formData, "companyFunction");
-  // Personal documents intentionally do not attach to a company stream/function.
-  const stream = domain !== IntakeDomain.PERSONAL && streamName ? await prisma.stream.findUnique({ where: { name: streamName } }) : null;
+  const stream = attachesCompanyContext && streamName ? await prisma.stream.findUnique({ where: { name: streamName } }) : null;
   const companyFunction =
-    domain !== IntakeDomain.PERSONAL && functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
+    attachesCompanyContext && functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
 
   await prisma.$transaction(async (tx) => {
+    // Guard against a double-submit (double-click/retry): if the document is
+    // already filed or linked to an action, do nothing rather than create a
+    // second action and orphan the first.
+    const current = await tx.intakeDocument.findUnique({ where: { id: intakeId }, select: { status: true, actionId: true } });
+    if (!current) throw new Error("Intake document not found.");
+    if (current.actionId || current.status === IntakeStatus.FILED) return;
+
     const action = await tx.action.create({
       data: {
         title,
@@ -783,11 +856,40 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   revalidatePath("/actions");
 }
 
+/**
+ * Files a document for records without creating an action (the FILE disposition
+ * path). The stored copy is kept in place; the document moves to FILED with no
+ * linked action, distinct from ARCHIVED, so filed-vs-archived metrics stay clean.
+ */
+export async function fileIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+
+  await prisma.intakeDocument.update({
+    where: { id: intakeId },
+    data: {
+      status: IntakeStatus.FILED,
+      disposition: IntakeDisposition.FILE,
+      domain: enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN),
+      reviewedById: userId,
+      reviewedAt: new Date(),
+      reviewerNote: optionalString(formData, "reviewerNote")
+    }
+  });
+
+  revalidatePath("/intake");
+}
+
 export async function archiveIntakeDocument(formData: FormData, userId: string) {
   const intakeId = stringValue(formData, "intakeId");
   if (!intakeId) throw new Error("Document is required.");
   const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId } });
   if (!doc) throw new Error("Intake document not found.");
+  // Guard against re-archiving an already finalised document, which would move a
+  // file that has already moved and could clobber the stored path with a stale one.
+  if ((INTAKE_FINALISED_STATUSES as string[]).includes(doc.status)) {
+    throw new Error("This document has already been filed, archived, or rejected.");
+  }
 
   const archivedPath = await moveToArchive(doc.storedPath);
   await prisma.intakeDocument.update({
@@ -846,21 +948,24 @@ async function runDocumentIntakeTriageAutomation(automationId: string, userId: s
   const { ingested, duplicates } = await ingestIntakeFolder();
   const run = buildDocumentIntakeRun({ now: new Date(), ingested, duplicates });
 
-  const [stream, companyFunction, existingReviewAction] = await Promise.all([
+  const [stream, companyFunction] = await Promise.all([
     prisma.stream.findUnique({ where: { name: "Company Core" }, select: { id: true } }),
-    prisma.companyFunction.findUnique({ where: { name: "admin" }, select: { id: true } }),
-    prisma.action.findFirst({
+    prisma.companyFunction.findUnique({ where: { name: "admin" }, select: { id: true } })
+  ]);
+
+  await prisma.$transaction(async (tx) => {
+    // Dedupe inside the transaction so two overlapping runs can't both create
+    // the review action.
+    const existingReviewAction = await tx.action.findFirst({
       where: {
         automationId,
         title: run.actionsToCreate[0]?.title,
         status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
       },
       select: { id: true }
-    })
-  ]);
-  const actionsToCreate = existingReviewAction ? [] : run.actionsToCreate;
+    });
+    const actionsToCreate = existingReviewAction ? [] : run.actionsToCreate;
 
-  await prisma.$transaction(async (tx) => {
     for (const action of actionsToCreate) {
       await tx.action.create({
         data: {
@@ -1617,6 +1722,12 @@ function dateRank(value: Date | null) {
 function enumValue<T extends Record<string, string>>(formData: FormData, key: string, values: T, fallback: T[keyof T]) {
   const value = stringValue(formData, key);
   return Object.values(values).includes(value) ? (value as T[keyof T]) : fallback;
+}
+
+// P2002 = Prisma unique-constraint violation. Used to treat a lost dedupe race
+// (two captures of the same content hash) as a duplicate rather than an error.
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 function startOfDay(date: Date) {

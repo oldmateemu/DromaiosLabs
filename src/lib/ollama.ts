@@ -20,11 +20,26 @@ export function buildQuickCaptureDraftRequest(sourceText: string) {
   return { baseUrl, model, prompt };
 }
 
-export async function draftActionFromQuickCapture(sourceText: string) {
-  const { baseUrl, model, prompt } = buildQuickCaptureDraftRequest(sourceText);
-
+/**
+ * Shared local-Ollama call: POSTs a JSON-format generate request with an abort
+ * timeout and uniform error handling. Both quick-capture drafting and document
+ * intake extraction use this so request behaviour stays consistent in one place.
+ * The abort timer is always cleared (including the throw path) so a failed
+ * request never leaves a pending timer keeping the process/test worker alive.
+ */
+async function callOllamaGenerate({
+  baseUrl,
+  model,
+  prompt,
+  timeoutMs
+}: {
+  baseUrl: string;
+  model: string;
+  prompt: string;
+  timeoutMs: number;
+}): Promise<{ rawOutput: string; error?: string }> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${baseUrl}/api/generate`, {
       method: "POST",
@@ -34,41 +49,30 @@ export async function draftActionFromQuickCapture(sourceText: string) {
     });
 
     if (!response.ok) {
-      return {
-        model,
-        provider: "OLLAMA" as const,
-        prompt,
-        rawOutput: "",
-        draft: normaliseQuickCaptureDraft(sourceText, ""),
-        error: `Ollama returned HTTP ${response.status}.`
-      };
+      return { rawOutput: "", error: `Ollama returned HTTP ${response.status}.` };
     }
 
     const payload = (await response.json()) as { response?: string };
-    const rawOutput = payload.response ?? "";
-    return {
-      model,
-      provider: "OLLAMA" as const,
-      prompt,
-      rawOutput,
-      draft: normaliseQuickCaptureDraft(sourceText, rawOutput),
-      error: undefined
-    };
+    return { rawOutput: payload.response ?? "" };
   } catch (error) {
-    return {
-      model,
-      provider: "OLLAMA" as const,
-      prompt,
-      rawOutput: "",
-      draft: normaliseQuickCaptureDraft(sourceText, ""),
-      error: error instanceof Error ? error.message : "Ollama request failed."
-    };
+    return { rawOutput: "", error: error instanceof Error ? error.message : "Ollama request failed." };
   } finally {
-    // Always clear the abort timer, including the throw path, so a failed
-    // request never leaves a 45s timer pending (which would keep the process
-    // or a test worker alive).
     clearTimeout(timeout);
   }
+}
+
+export async function draftActionFromQuickCapture(sourceText: string) {
+  const { baseUrl, model, prompt } = buildQuickCaptureDraftRequest(sourceText);
+  const { rawOutput, error } = await callOllamaGenerate({ baseUrl, model, prompt, timeoutMs: 45_000 });
+
+  return {
+    model,
+    provider: "OLLAMA" as const,
+    prompt,
+    rawOutput,
+    draft: normaliseQuickCaptureDraft(sourceText, rawOutput),
+    error
+  };
 }
 
 export type IntakeExtractionResult = {
@@ -102,35 +106,13 @@ export async function extractIntakeFieldsFromDocument(text: string, filename: st
     `Document text:\n${trimmed}`
   ].join("\n");
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
-  try {
-    const response = await fetch(`${baseUrl}/api/generate`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model, prompt, stream: false, format: "json" }),
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      return { model, provider: "OLLAMA", prompt, rawOutput: "", error: `Ollama returned HTTP ${response.status}.` };
-    }
-
-    const payload = (await response.json()) as { response?: string };
-    const rawOutput = payload.response ?? "";
-    const { extraction, error } = parseIntakeExtraction(rawOutput);
-    return { model, provider: "OLLAMA", prompt, rawOutput, extraction, error };
-  } catch (error) {
-    return {
-      model,
-      provider: "OLLAMA",
-      prompt,
-      rawOutput: "",
-      error: error instanceof Error ? error.message : "Ollama request failed."
-    };
-  } finally {
-    clearTimeout(timeout);
+  const { rawOutput, error } = await callOllamaGenerate({ baseUrl, model, prompt, timeoutMs: 60_000 });
+  if (error) {
+    return { model, provider: "OLLAMA", prompt, rawOutput: "", error };
   }
+
+  const { extraction, error: parseError } = parseIntakeExtraction(rawOutput);
+  return { model, provider: "OLLAMA", prompt, rawOutput, extraction, error: parseError };
 }
 
 function currentLocalDateKey() {

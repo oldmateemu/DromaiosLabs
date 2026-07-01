@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 
 // Filesystem side of the document intake pathway.
 //
@@ -25,6 +25,8 @@ export type InboxCandidate = {
   mimeType: string;
   byteSize: number;
   contentHash: string;
+  // The already-read bytes, carried so the commit step does not re-read the file.
+  bytes: Buffer;
 };
 
 export type StoredFile = {
@@ -69,7 +71,12 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
     [INBOX_EMAIL, "EMAIL"]
   ] as Array<[string, IntakeSource]>) {
     const absDir = join(root, dir);
-    const entries = await readdir(absDir, { withFileTypes: true }).catch(() => []);
+    // A genuinely missing directory means "no candidates"; permission/I/O errors
+    // must surface rather than be silently treated as an empty inbox.
+    const entries = await readdir(absDir, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       if (entry.name.startsWith(".")) continue;
@@ -81,7 +88,8 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
         source,
         mimeType: guessMimeType(entry.name),
         byteSize: bytes.byteLength,
-        contentHash: hashBuffer(bytes)
+        contentHash: hashContent(bytes),
+        bytes
       });
     }
   }
@@ -89,15 +97,18 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
   return candidates;
 }
 
-/** Copies an inbox candidate into the content-addressed store and removes the
- * inbox original. Returns the stored file descriptor. */
-export async function commitInboxCandidate(candidate: InboxCandidate): Promise<StoredFile> {
+/**
+ * Copies an inbox candidate into the content-addressed store WITHOUT removing
+ * the inbox original. The caller deletes the original (via discardInboxFile)
+ * only after the database capture row exists, so a crash between copy and record
+ * leaves the file in the watched folder for the next ingest rather than orphaned.
+ */
+export async function copyInboxCandidateToStore(candidate: InboxCandidate): Promise<StoredFile> {
   const root = intakeRoot();
   const storedName = `${candidate.contentHash}${extname(candidate.filename).toLowerCase()}`;
   const storedPath = join(root, STORE, storedName);
-  const bytes = await readFile(candidate.absPath);
-  await writeFile(storedPath, bytes);
-  await rm(candidate.absPath, { force: true });
+  // Reuse the bytes already read during scanning rather than reading the file again.
+  await writeFile(storedPath, candidate.bytes);
   return {
     storedPath,
     filename: candidate.filename,
@@ -116,7 +127,7 @@ export async function discardInboxFile(absPath: string): Promise<void> {
 export async function storeUploadedFile(filename: string, bytes: Buffer): Promise<StoredFile> {
   await ensureIntakeDirs();
   const root = intakeRoot();
-  const contentHash = hashBuffer(bytes);
+  const contentHash = hashContent(bytes);
   const storedName = `${contentHash}${extname(filename).toLowerCase()}`;
   const storedPath = join(root, STORE, storedName);
   await writeFile(storedPath, bytes);
@@ -127,7 +138,7 @@ export async function storeUploadedFile(filename: string, bytes: Buffer): Promis
  * original path if the source no longer exists). */
 export async function moveToArchive(storedPath: string): Promise<string> {
   const root = intakeRoot();
-  const name = storedPath.split("/").pop() ?? `archived-${Date.now()}`;
+  const name = basename(storedPath) || `archived-${Date.now()}`;
   const target = join(root, ARCHIVE, name);
   const exists = await stat(storedPath).then(() => true).catch(() => false);
   if (!exists) return storedPath;
@@ -144,7 +155,7 @@ export async function readStoredFile(storedPath: string): Promise<Buffer> {
   return readFile(storedPath);
 }
 
-function hashBuffer(bytes: Buffer): string {
+export function hashContent(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 

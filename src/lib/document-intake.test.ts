@@ -5,6 +5,7 @@ import {
   classifyDocumentDomain,
   detectDocumentType,
   mergeExtractionIntoTriage,
+  normaliseDocType,
   parseIntakeExtraction,
   proposeDisposition,
   suggestRouting,
@@ -190,6 +191,55 @@ describe("mergeExtractionIntoTriage", () => {
   it("returns the triage unchanged when there is no extraction", () => {
     const base = buildIntakeTriage({ filename: "invoice.pdf", text: "tax invoice" });
     expect(mergeExtractionIntoTriage(base, undefined)).toEqual(base);
+  });
+
+  it("adopts a confident extracted docType when heuristics found none and recomputes routing/disposition/priority", () => {
+    const base = buildIntakeTriage({ filename: "scan001.pdf", text: "blurry text" });
+    expect(base.docType).toBe("unknown");
+    expect(base.disposition).toBe("UNSURE");
+
+    const merged = mergeExtractionIntoTriage(base, { domain: "BUSINESS", docType: "tax invoice" });
+
+    expect(merged.docType).toBe("invoice");
+    expect(merged.disposition).toBe("ACTION");
+    expect(merged.proposedAction.priority).toBe("HIGH");
+    expect(merged.proposedAction.companyFunction).toBe("finance");
+  });
+
+  it("does not override a docType the heuristics already found", () => {
+    const base = buildIntakeTriage({ filename: "receipt.jpg", text: "receipt paid in full" });
+    expect(base.docType).toBe("receipt");
+    const merged = mergeExtractionIntoTriage(base, { docType: "contract" });
+    expect(merged.docType).toBe("receipt");
+  });
+
+  it("keeps the document issue date in the description, never on the review deadline", () => {
+    const base = buildIntakeTriage({ filename: "invoice.pdf", text: "tax invoice abn gst" });
+    const merged = mergeExtractionIntoTriage(base, { summary: "Old invoice", documentDate: "2025-01-05", dueDate: "2026-07-20" });
+
+    expect(merged.proposedAction.reviewDate).toBeUndefined();
+    expect(merged.proposedAction.dueDate).toBe("2026-07-20");
+    expect(merged.proposedAction.description).toContain("Document date: 2025-01-05");
+    expect(merged.summary).toContain("Document date: 2025-01-05");
+  });
+});
+
+describe("normaliseDocType", () => {
+  it("passes through known types", () => {
+    expect(normaliseDocType("invoice")).toBe("invoice");
+    expect(normaliseDocType("CONTRACT")).toBe("contract");
+  });
+
+  it("maps synonyms", () => {
+    expect(normaliseDocType("Tax Invoice")).toBe("invoice");
+    expect(normaliseDocType("bank statement")).toBe("statement");
+    expect(normaliseDocType("council rates")).toBe("rates-notice");
+  });
+
+  it("returns null for unmappable or empty input", () => {
+    expect(normaliseDocType("gibberish")).toBeNull();
+    expect(normaliseDocType(undefined)).toBeNull();
+    expect(normaliseDocType("")).toBeNull();
   });
 });
 
