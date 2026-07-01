@@ -446,6 +446,10 @@ export function mergeExtractionIntoTriage(triage: IntakeTriageResult, extraction
     .join("\n");
 
   const docTypeConfidence = docTypeChanged ? Math.max(triage.docTypeConfidence, 0.6) : triage.docTypeConfidence;
+  // When the AI fills a previously-UNKNOWN domain, the heuristic confidence was 0;
+  // raise it so /intake does not show a routed document as "confidence 0" (which
+  // reads as unsupported) or a description saying "Domain: Business (confidence 0)".
+  const domainConfidence = domainChanged ? Math.max(triage.domainConfidence, 0.6) : triage.domainConfidence;
 
   // Regenerate the heuristic summary and the base description when the adopted
   // domain/docType/disposition change, so neither keeps naming the pre-merge
@@ -455,12 +459,13 @@ export function mergeExtractionIntoTriage(triage: IntakeTriageResult, extraction
     ? buildTriageSummary({ domain, docType, disposition, signals: triage.signals })
     : triage.summary;
   const baseDescription = fieldsChanged
-    ? buildActionDescription({ triagedOn: triage.triagedOn, domain, domainConfidence: triage.domainConfidence, docType, docTypeConfidence, disposition })
+    ? buildActionDescription({ triagedOn: triage.triagedOn, domain, domainConfidence, docType, docTypeConfidence, disposition })
     : triage.proposedAction.description;
 
   return {
     ...triage,
     domain,
+    domainConfidence,
     docType,
     docTypeConfidence,
     disposition,
@@ -736,6 +741,14 @@ function labelDomain(domain: IntakeDomain): string {
  * description text is left untouched. */
 export function alignDescriptionDomain(description: string, domain: IntakeDomain): string {
   return description.replace(/(^|\n)Domain: (?:Business|Personal|Mixed|Unknown)\b/g, `$1Domain: ${labelDomain(domain)}`);
+}
+
+/** Rewrites the leading domain label in the generated one-line triage summary
+ * ("Business invoice | ...") to the given domain, so a summary shown on the queue
+ * card matches the domain after a manual Mark. Only the leading generated token is
+ * replaced. */
+export function alignSummaryDomain(summary: string, domain: IntakeDomain): string {
+  return summary.replace(/^(?:Business|Personal|Mixed|Unknown)\b/, labelDomain(domain));
 }
 
 // The heuristic one-line summary. Shared so a later merge can regenerate it with

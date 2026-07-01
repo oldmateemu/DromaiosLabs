@@ -1490,6 +1490,23 @@ describe("document intake", () => {
     expect(prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data.domain).toBe("PERSONAL");
   });
 
+  it("realigns the suggested copy and summary when a domain is marked on a triaged row", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      suggestedAction: { domain: "BUSINESS", title: "Receipt", description: "Domain: Business (confidence 0.6).\nProposed disposition: FILE." },
+      summary: "Business receipt | disposition file"
+    });
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    await services.setIntakeDomain(form({ intakeId: "d1", domain: "PERSONAL" }));
+
+    const data = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("PERSONAL");
+    expect(data.suggestedAction.domain).toBe("PERSONAL");
+    expect(data.suggestedAction.description).toContain("Domain: Personal");
+    expect(data.suggestedAction.description).not.toContain("Domain: Business");
+    expect(data.summary.startsWith("Personal")).toBe(true);
+  });
+
   it("refuses to reject an already-finalized document", async () => {
     prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
     await expect(services.rejectIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);

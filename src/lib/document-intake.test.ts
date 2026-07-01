@@ -261,6 +261,12 @@ describe("mergeExtractionIntoTriage", () => {
     expect(merged.proposedAction.dueDate).toBe("2026-07-01");
     expect(merged.proposedAction.companyFunction).toBe("admin");
     expect(merged.proposedAction.description).toContain("Local AI summary");
+    // An AI-filled domain gets a supporting confidence, not the heuristic's 0, so
+    // the queue never shows "Domain: Business (confidence 0)".
+    expect(base.domainConfidence).toBe(0);
+    expect(merged.domainConfidence).toBeGreaterThanOrEqual(0.6);
+    expect(merged.proposedAction.description).toContain("Domain: Business (confidence 0.6)");
+    expect(merged.proposedAction.description).not.toContain("Domain: Business (confidence 0)");
   });
 
   it("never downgrades sensitivity and keeps the heuristic domain when already known", () => {

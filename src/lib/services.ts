@@ -41,6 +41,7 @@ import {
 } from "./draft-automations";
 import {
   alignDescriptionDomain,
+  alignSummaryDomain,
   buildDocumentIntakeRun,
   buildIntakeTriage,
   mergeExtractionIntoTriage,
@@ -1136,8 +1137,15 @@ export async function setIntakeDomain(formData: FormData) {
   if (!intakeId) throw new Error("Document is required.");
   const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN);
 
-  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { suggestedAction: true } });
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { suggestedAction: true, summary: true } });
   const suggested = (doc?.suggestedAction as IntakeProposedAction | null) ?? null;
+  // Realign the generated summary/description copy to the marked domain too, not
+  // just the structured field, so an already-triaged row's action text (and the
+  // approval it prefills) never contradicts the domain the operator chose.
+  const realignedSuggested = suggested
+    ? { ...suggested, domain, description: suggested.description ? alignDescriptionDomain(suggested.description, domain) : suggested.description }
+    : null;
+  const realignedSummary = doc?.summary ? alignSummaryDomain(doc.summary, domain) : doc?.summary ?? undefined;
 
   // Guarded so a stale "Mark Business/Personal" cannot rewrite the domain of a
   // document another tab already filed/archived/rejected.
@@ -1145,7 +1153,8 @@ export async function setIntakeDomain(formData: FormData) {
     where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
     data: {
       domain,
-      suggestedAction: suggested ? { ...suggested, domain } : suggested ?? undefined
+      suggestedAction: realignedSuggested ?? undefined,
+      summary: realignedSummary
     }
   });
   if (updated.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
