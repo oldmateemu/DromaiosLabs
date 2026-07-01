@@ -5,46 +5,53 @@ on:
     branches: [main]
   pull_request:
 
-# Cancel superseded runs on the same ref to save CI minutes.
+# Cancel superseded runs for the same ref to save CI minutes.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   verify:
-    name: Lint, test, build
+    name: Lint, typecheck, and test with coverage
     runs-on: ubuntu-latest
-    env:
-      # next build / prisma generate don't connect to a DB, but some modules
-      # read env at import time. Provide safe non-secret placeholders for CI.
-      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
-      SESSION_SECRET: ci-placeholder-session-secret-not-real-value
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          version: 10.33.0
+          persist-credentials: false
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
         with:
-          node-version: 22
+          # 11.x reads the overrides-only pnpm-workspace.yaml (no `packages`
+          # field), which pnpm 9.x rejects.
+          version: 11.5.2
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Tests import @prisma/client, which requires a generated client.
       - name: Generate Prisma client
         run: pnpm db:generate
 
       - name: Lint
         run: pnpm lint
 
-      - name: Unit tests
-        run: pnpm test
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test with coverage
+        run: pnpm test:coverage
 
       - name: Flow tests
         run: pnpm test:run-flow
@@ -54,3 +61,12 @@ jobs:
 
       - name: Deployment preflight (local mode)
         run: pnpm deploy:preflight
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14

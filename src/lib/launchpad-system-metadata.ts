@@ -76,6 +76,18 @@ export const CORE_LAUNCHPAD_SYSTEMS: LaunchpadSystemMetadata[] = [
     sensitive: true
   },
   {
+    name: "HubSpot",
+    url: "https://app.hubspot.com/",
+    group: "Community/Sales",
+    description: "CRM system of record: leads, deals, pipeline stages, contact records, and sales reporting.",
+    owner: "Callum",
+    cost: null,
+    renewalAt: null,
+    riskLevel: RiskLevel.HIGH,
+    loginNote: "Credential location: password manager entry for HubSpot admin; contact/PII data stays in HubSpot and out of cloud AI.",
+    sensitive: true
+  },
+  {
     name: "ChatGPT",
     url: "https://chatgpt.com/",
     group: "AI/Workbench",

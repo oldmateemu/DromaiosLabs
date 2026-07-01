@@ -18,12 +18,28 @@ const templates = [
     rollbackNote: "Discard the digest. No company records are changed by the draft loop."
   },
   {
+    name: "Daily inbox triage",
+    safetyLevel: AutomationSafetyLevel.DRAFT_ONLY,
+    trigger: "Weekday inbox digest",
+    targetTool: "local cockpit",
+    description: "Drafts a local inbox triage digest across action needed, waiting, receipt/invoice, lead, FYI, and noise buckets.",
+    rollbackNote: "Discard the digest. No Gmail draft is created, no email is sent, and no external records are changed."
+  },
+  {
     name: "Renewal reminder",
     safetyLevel: AutomationSafetyLevel.APPROVAL_REQUIRED,
     trigger: "Manual launchpad renewal check",
     targetTool: "local cockpit",
     description: "Checks launchpad renewal dates and creates reminders only after approval.",
     rollbackNote: "Mark generated reminder actions done or cancelled if the run was not useful."
+  },
+  {
+    name: "Company mailroom filing",
+    safetyLevel: AutomationSafetyLevel.APPROVAL_REQUIRED,
+    trigger: "Manual Gmail/Drive/Sheets filing review",
+    targetTool: "Gmail Processor / Apps Script",
+    description: "Files labelled Gmail attachments into Drive quarantine folders and Sheets review logs for contracts, receipts, invoices, and admin documents.",
+    rollbackNote: "Disable Gmail labels or the Apps Script trigger. Originals remain in Gmail and Drive quarantine; no payments or Xero writes are made."
   },
   {
     name: "Lead follow-up draft",
@@ -45,7 +61,7 @@ export function AutomationStarterTemplates({ action }: { action: (formData: Form
         </div>
         <p className="muted max-w-xl">Start with governed routines that prepare work or require approval before changing anything.</p>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {templates.map((template) => (
           <form action={action} className="action-row flex flex-col gap-3" key={template.name}>
             <input name="name" type="hidden" value={template.name} />

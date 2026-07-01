@@ -10,11 +10,39 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"]
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    coverage: {
+      // `all` defaults to true, so every included source file is reported even
+      // when it has no tests — keeping the coverage picture honest.
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        // Test files and type-only declarations carry no runtime behaviour.
+        "src/**/*.test.{ts,tsx}",
+        "src/**/*.d.ts",
+        // React Server Component pages and layouts are exercised through
+        // integration/runtime rather than unit tests.
+        "src/app/**/*.tsx",
+        // Prisma client singleton is thin infrastructure wiring.
+        "src/lib/db.ts"
+      ],
+      reporter: ["text", "html", "lcov"],
+      // Ratcheting floor: keep these at or just below current coverage so the
+      // suite can only get healthier over time. Raise them as coverage grows.
+      thresholds: {
+        statements: 85,
+        branches: 71,
+        functions: 82,
+        lines: 86
+      }
+    }
   },
   resolve: {
     alias: {
-      "@": srcPath
+      "@": srcPath,
+      // The real "server-only" guard throws outside an RSC bundler; alias it to
+      // a no-op so server modules can be unit tested directly.
+      "server-only": fileURLToPath(new URL("./test/server-only-stub.ts", import.meta.url))
     }
   }
 });

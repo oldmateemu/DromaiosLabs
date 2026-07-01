@@ -1,5 +1,7 @@
-import { createActionAction, completeActionAction } from "@/app/actions";
+import Link from "next/link";
+import { createActionAction, completeActionAction, updateActionQuickEditAction } from "@/app/actions";
 import { ActionForm, ActionRegisterFilters, ActionSavedViews, CollapsiblePanel } from "@/components/forms";
+import { ActionQuickEditForm } from "@/components/quick-edit-forms";
 import { getActionRegisterData } from "@/lib/services";
 import { priorityLabel, statusLabel } from "@/lib/domain";
 
@@ -38,6 +40,7 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
               <th>Stream</th>
               <th>Function</th>
               <th>Due</th>
+              <th>Review</th>
               <th>Control</th>
             </tr>
           </thead>
@@ -45,7 +48,9 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
             {data.actions.map((action) => (
               <tr key={action.id}>
                 <td>
-                  <p className="font-medium text-command-ink">{action.title}</p>
+                  <Link className="font-medium text-command-ink hover:text-command-navy hover:underline" href={`/actions/${action.id}`}>
+                    {action.title}
+                  </Link>
                   {action.nextStep ? <p className="muted">{action.nextStep}</p> : null}
                 </td>
                 <td>{statusLabel(action.status)}</td>
@@ -53,15 +58,28 @@ export default async function ActionsPage({ searchParams }: { searchParams?: Sea
                 <td>{action.stream?.name ?? "Unassigned"}</td>
                 <td>{action.companyFunction?.name ?? "Unassigned"}</td>
                 <td>{action.dueAt ? action.dueAt.toISOString().slice(0, 10) : "No date"}</td>
+                <td>{action.reviewAt ? action.reviewAt.toISOString().slice(0, 10) : "No date"}</td>
                 <td>
-                  {action.status !== "DONE" ? (
-                    <form action={completeActionAction}>
-                      <input name="actionId" type="hidden" value={action.id} />
-                      <button className="button button-secondary" type="submit">Done</button>
-                    </form>
-                  ) : (
-                    <span className="status-pill status-approved">Done</span>
-                  )}
+                  <div className="space-y-2">
+                    {action.status !== "DONE" ? (
+                      <form action={completeActionAction}>
+                        <input name="actionId" type="hidden" value={action.id} />
+                        <button className="button button-secondary w-full" type="submit">Done</button>
+                      </form>
+                    ) : (
+                      <span className="status-pill status-approved">Done</span>
+                    )}
+                    <ActionQuickEditForm
+                      action={updateActionQuickEditAction}
+                      item={{
+                        id: action.id,
+                        status: action.status,
+                        priority: action.priority,
+                        dueAt: action.dueAt,
+                        reviewAt: action.reviewAt
+                      }}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}

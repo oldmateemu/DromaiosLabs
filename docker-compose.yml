@@ -19,7 +19,7 @@ services:
   app:
     build: .
     restart: unless-stopped
-    command: sh -c "node scripts/deployment-preflight.mjs && pnpm db:deploy && pnpm db:seed && pnpm start"
+    command: sh -c "node scripts/deployment-preflight.mjs && ./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/seed.ts && ./node_modules/.bin/next start"
     depends_on:
       postgres:
         condition: service_healthy

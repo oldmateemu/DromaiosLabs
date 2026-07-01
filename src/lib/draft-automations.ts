@@ -1,7 +1,12 @@
 import { buildLaunchpadHealth, type LaunchpadHealthLink } from "./cockpit-insights";
+import {
+  setupItemStatusLabel,
+  type OutstandingSetupItem,
+  type SetupDraftContext
+} from "./company-setup-checklist";
 import { bucketActionsForToday, priorityLabel, statusLabel, type ActionLike } from "./domain";
 
-export type LocalDraftAutomationKind = "WEEKLY_REVIEW_PREP" | "STALE_TASK_SUMMARY";
+export type LocalDraftAutomationKind = "WEEKLY_REVIEW_PREP" | "STALE_TASK_SUMMARY" | "DAILY_INBOX_TRIAGE";
 
 export type LocalDraftAutomationRef = {
   name: string;
@@ -29,6 +34,7 @@ export type WeeklyReviewPrepContext = {
   risks: WeeklyReviewPrepRisk[];
   links: LaunchpadHealthLink[];
   draftsNeedingReview: number;
+  setup?: SetupDraftContext;
 };
 
 export type StaleTaskSummaryContext = {
@@ -36,12 +42,24 @@ export type StaleTaskSummaryContext = {
   actions: WeeklyReviewPrepAction[];
 };
 
+export type DailyInboxTriageAction = WeeklyReviewPrepAction & {
+  description?: string | null;
+  createdAt?: Date | string | null;
+};
+
+export type DailyInboxTriageContext = {
+  now?: Date;
+  actions: DailyInboxTriageAction[];
+};
+
 const STALE_ACTION_DAYS = 7;
+const PRIORITY_INBOX_AGE_HOURS = 48;
 
 export function getLocalDraftAutomationKind(automation: LocalDraftAutomationRef): LocalDraftAutomationKind | null {
   const text = [automation.name, automation.trigger, automation.targetTool].filter(Boolean).join(" ").toLowerCase();
   if (text.includes("weekly review prep")) return "WEEKLY_REVIEW_PREP";
   if (text.includes("stale task summary") || text.includes("stale action scan")) return "STALE_TASK_SUMMARY";
+  if (text.includes("daily inbox triage") || text.includes("weekday inbox digest")) return "DAILY_INBOX_TRIAGE";
   return null;
 }
 
@@ -50,7 +68,8 @@ export function buildWeeklyReviewPrepDraft({
   actions,
   risks,
   links,
-  draftsNeedingReview
+  draftsNeedingReview,
+  setup
 }: WeeklyReviewPrepContext) {
   const buckets = bucketActionsForToday(actions, now);
   const staleActions = actions
@@ -77,7 +96,18 @@ export function buildWeeklyReviewPrepDraft({
     `- Stale open actions: ${staleActions.length}`,
     `- Open risks in review window: ${dueRisks.length}`,
     `- Renewals due or missing owner/cost: ${launchpadHealth.renewalsDue.length + launchpadHealth.missingOwners + launchpadHealth.missingCosts}`,
+    ...(setup ? [`- Company setup readiness: ${setup.score}% (${setup.band}, ${setup.overdue} overdue, ${setup.criticalOutstanding} high-priority outstanding)`] : []),
     "",
+    ...(setup
+      ? [
+        "Company setup",
+        `- Readiness: ${setup.score}% weighted (${setup.band}).`,
+        `- Progress: ${setup.percentComplete}% (${setup.done}/${setup.total} done, ${setup.inProgress} in progress, ${setup.notStarted} not started, ${setup.overdue} overdue, ${setup.dueSoon} due soon).`,
+        "Outstanding setup items",
+        ...formatSetupList(setup.outstanding),
+        ""
+      ]
+      : []),
     "Priority review queue",
     ...formatActionList([...buckets.overdue, ...buckets.dueToday, ...buckets.blocked, ...buckets.waiting].slice(0, 8)),
     "",
@@ -97,6 +127,9 @@ export function buildWeeklyReviewPrepDraft({
     "Review prompts",
     "- What should be completed, deferred, cancelled, or moved into waiting before new work is started?",
     "- Which public claims, IP boundaries, or legal/trademark risks need a human check this week?",
+    ...(setup && setup.criticalOutstanding > 0
+      ? ["- Which outstanding company setup items (insurance, privacy, legal, tax) must move this week?"]
+      : []),
     "- Which assistant drafts are ready to become approved actions, and which should be rejected?",
     "",
     "Draft actions to consider",
@@ -106,7 +139,8 @@ export function buildWeeklyReviewPrepDraft({
       waitingCount: buckets.waiting.length,
       staleCount: staleActions.length,
       dueRiskCount: dueRisks.length,
-      draftsNeedingReview
+      draftsNeedingReview,
+      setupCriticalOutstanding: setup?.criticalOutstanding ?? 0
     })
   ].join("\n");
 }
@@ -154,13 +188,57 @@ export function buildStaleTaskSummaryDraft({ now = new Date(), actions }: StaleT
   ].join("\n");
 }
 
+export function buildDailyInboxTriageDraft({ now = new Date(), actions }: DailyInboxTriageContext) {
+  const buckets = bucketInboxActions(actions, now);
+  const priorityItemsOlderThan48Hours = actions.filter((action) => isPriorityInboxItemOlderThan(action, now, PRIORITY_INBOX_AGE_HOURS)).length;
+
+  return [
+    "Daily inbox triage - draft only",
+    "",
+    `Generated locally: ${dateKey(now)}`,
+    "Safety: DRAFT_ONLY. No webhook called. No external system contacted. No Gmail draft created. No email sent. No messages labelled, moved, deleted, unsubscribed, or replied to.",
+    "Input: local cockpit action register as inbox-work proxy until a reviewed Gmail export or connector is added.",
+    "",
+    "Snapshot",
+    `- Action needed: ${buckets.actionNeeded.length}`,
+    `- Waiting: ${buckets.waiting.length}`,
+    `- Receipt/invoice: ${buckets.receiptInvoice.length}`,
+    `- Lead: ${buckets.lead.length}`,
+    `- FYI: ${buckets.fyi.length}`,
+    `- Unsubscribe/noise: ${buckets.unsubscribeNoise.length}`,
+    `- Priority items older than 48 hours: ${priorityItemsOlderThan48Hours}`,
+    "",
+    "Action needed",
+    ...formatInboxActionList(buckets.actionNeeded),
+    "",
+    "Waiting",
+    ...formatInboxActionList(buckets.waiting),
+    "",
+    "Receipt/invoice",
+    ...formatInboxActionList(buckets.receiptInvoice),
+    "",
+    "Lead",
+    ...formatInboxActionList(buckets.lead),
+    "",
+    "FYI",
+    ...formatInboxActionList(buckets.fyi),
+    "",
+    "Unsubscribe/noise",
+    ...formatInboxActionList(buckets.unsubscribeNoise),
+    "",
+    "Email work prepared for review",
+    ...buildInboxEmailWork({ buckets, priorityItemsOlderThan48Hours })
+  ].join("\n");
+}
+
 function buildSuggestedDraftActions({
   overdueCount,
   blockedCount,
   waitingCount,
   staleCount,
   dueRiskCount,
-  draftsNeedingReview
+  draftsNeedingReview,
+  setupCriticalOutstanding
 }: {
   overdueCount: number;
   blockedCount: number;
@@ -168,8 +246,10 @@ function buildSuggestedDraftActions({
   staleCount: number;
   dueRiskCount: number;
   draftsNeedingReview: number;
+  setupCriticalOutstanding: number;
 }) {
   const suggestions: string[] = [];
+  if (setupCriticalOutstanding > 0) suggestions.push("- Schedule the highest-priority company setup items (e.g. insurance, privacy, tax) before new public commitments.");
   if (overdueCount > 0) suggestions.push("- Decide whether to complete, defer, or cancel overdue work.");
   if (blockedCount > 0) suggestions.push("- Pick one blocked item and name the dependency or next human decision.");
   if (waitingCount > 0) suggestions.push("- Review waiting items and capture the next follow-up date.");
@@ -177,6 +257,18 @@ function buildSuggestedDraftActions({
   if (dueRiskCount > 0) suggestions.push("- Review due risks before approving new public or operational commitments.");
   if (draftsNeedingReview > 0) suggestions.push("- Approve, reject, or rewrite pending assistant drafts.");
   return suggestions.length > 0 ? suggestions : ["- Capture one focused control, revenue, or strategy action for the week."];
+}
+
+function formatSetupList(items: OutstandingSetupItem[]) {
+  if (items.length === 0) return ["- None outstanding. Company setup checklist is complete."];
+  return items.map((item) => {
+    const timing = item.overdue
+      ? "overdue"
+      : item.dueAt
+        ? `due ${dateKey(new Date(item.dueAt))}`
+        : "no due date";
+    return `- ${item.title} (${priorityLabel(item.priority)}, ${setupItemStatusLabel(item.status)}, ${timing}, ${item.category}).`;
+  });
 }
 
 function formatActionList(actions: WeeklyReviewPrepAction[]) {
@@ -227,6 +319,109 @@ function buildStaleTaskFollowUps({
   if (blockedCount > 0) suggestions.push("- Name the dependency or human decision needed to unblock each blocked stale item.");
   if (staleCount > 0) suggestions.push("- Convert the digest into a short review agenda before changing records.");
   return suggestions.length > 0 ? suggestions : ["- No stale items found; keep current active actions moving."];
+}
+
+function bucketInboxActions(actions: DailyInboxTriageAction[], now: Date) {
+  const buckets = {
+    actionNeeded: [] as DailyInboxTriageAction[],
+    waiting: [] as DailyInboxTriageAction[],
+    receiptInvoice: [] as DailyInboxTriageAction[],
+    lead: [] as DailyInboxTriageAction[],
+    fyi: [] as DailyInboxTriageAction[],
+    unsubscribeNoise: [] as DailyInboxTriageAction[]
+  };
+
+  for (const action of sortInboxActions(actions.filter((item) => !isClosedAction(item)))) {
+    if (isUnsubscribeOrNoise(action)) {
+      buckets.unsubscribeNoise.push(action);
+    } else if (action.status === "WAITING") {
+      buckets.waiting.push(action);
+    } else if (isReceiptOrInvoice(action)) {
+      buckets.receiptInvoice.push(action);
+    } else if (isLeadOrPartnerFollowUp(action)) {
+      buckets.lead.push(action);
+    } else if (isInboxActionNeeded(action, now)) {
+      buckets.actionNeeded.push(action);
+    } else {
+      buckets.fyi.push(action);
+    }
+  }
+
+  return buckets;
+}
+
+function formatInboxActionList(actions: DailyInboxTriageAction[]) {
+  if (actions.length === 0) return ["- None."];
+  return actions.slice(0, 8).map((action) => {
+    const due = action.dueAt ? `due ${dateKey(new Date(action.dueAt))}` : "no due date";
+    const area = [action.stream?.name, action.companyFunction?.name].filter(Boolean).join(" / ") || "unassigned";
+    const nextStep = action.nextStep ? ` Next: ${action.nextStep}` : "";
+    return `- ${action.title} (${priorityLabel(action.priority)}, ${statusLabel(action.status)}, ${due}, ${area}).${nextStep}`;
+  });
+}
+
+function buildInboxEmailWork({
+  buckets,
+  priorityItemsOlderThan48Hours
+}: {
+  buckets: ReturnType<typeof bucketInboxActions>;
+  priorityItemsOlderThan48Hours: number;
+}) {
+  const suggestions: string[] = [];
+  if (buckets.actionNeeded.length > 0) suggestions.push("- Prepare reply notes for action-needed items; send nothing until reviewed.");
+  if (buckets.waiting.length > 0) suggestions.push("- Check whether waiting items need a follow-up date before any reply is drafted.");
+  if (buckets.receiptInvoice.length > 0) suggestions.push("- Label receipt/invoice items for finance filing review; do not pay, lodge, or post to Xero.");
+  if (buckets.lead.length > 0) suggestions.push("- Prepare lead reply drafts with claim-safe wording and human review.");
+  if (buckets.unsubscribeNoise.length > 0) suggestions.push("- Review unsubscribe/noise candidates manually; do not unsubscribe or delete automatically.");
+  if (priorityItemsOlderThan48Hours > 0) suggestions.push("- Clear or deliberately defer priority inbox items older than 48 hours.");
+  return suggestions.length > 0 ? suggestions : ["- No inbox-like cockpit items found; run a reviewed Gmail search/export before scheduling the digest."];
+}
+
+function sortInboxActions(actions: DailyInboxTriageAction[]) {
+  const priorityWeight: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+  return [...actions].sort((a, b) => {
+    const priorityDiff = (priorityWeight[a.priority] ?? 4) - (priorityWeight[b.priority] ?? 4);
+    if (priorityDiff !== 0) return priorityDiff;
+    return dateValue(a.dueAt) - dateValue(b.dueAt) || dateValue(a.createdAt) - dateValue(b.createdAt);
+  });
+}
+
+function isPriorityInboxItemOlderThan(action: DailyInboxTriageAction, now: Date, hours: number) {
+  if (isClosedAction(action) || !action.createdAt) return false;
+  if (!isInboxActionNeeded(action, now) && action.status !== "WAITING") return false;
+  const ageMs = now.getTime() - new Date(action.createdAt).getTime();
+  return ageMs >= hours * 60 * 60 * 1000;
+}
+
+function isInboxActionNeeded(action: DailyInboxTriageAction, now: Date) {
+  if (action.status === "BLOCKED") return true;
+  if (["CRITICAL", "HIGH"].includes(action.priority)) return true;
+  return Boolean(action.dueAt && dateKey(new Date(action.dueAt)) <= dateKey(now));
+}
+
+function isReceiptOrInvoice(action: DailyInboxTriageAction) {
+  return action.companyFunction?.name === "finance" || containsAny(action, ["receipt", "invoice", "supplier", "bill", "payment", "gst", "tax", "xero"]);
+}
+
+function isLeadOrPartnerFollowUp(action: DailyInboxTriageAction) {
+  return ["sales", "marketing"].includes(action.companyFunction?.name ?? "")
+    || containsAny(action, ["lead", "enquiry", "inquiry", "proposal", "partner", "waitlist", "booking"]);
+}
+
+function isUnsubscribeOrNoise(action: DailyInboxTriageAction) {
+  return containsAny(action, ["unsubscribe", "newsletter", "promo", "promotional", "spam", "noise", "cold outreach"]);
+}
+
+function containsAny(action: DailyInboxTriageAction, needles: string[]) {
+  const text = [action.title, action.description, action.nextStep, action.stream?.name, action.companyFunction?.name]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return needles.some((needle) => text.includes(needle));
+}
+
+function isClosedAction(action: DailyInboxTriageAction) {
+  return action.status === "DONE" || action.status === "CANCELLED";
 }
 
 function formatRiskList(risks: WeeklyReviewPrepRisk[]) {

@@ -74,7 +74,7 @@ For deployment-touching changes also run `pnpm deploy:preflight` and
 
 ## Architecture & Layout
 
-```
+```text
 src/
   app/
     layout.tsx               # root layout
