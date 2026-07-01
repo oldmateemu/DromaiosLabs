@@ -877,6 +877,44 @@ describe("updateActionFromForm", () => {
     expect(data.streamId).toBeNull();
     expect(data.companyFunctionId).toBeNull();
   });
+
+  it("forces Mixed reclassification to the Company Core/admin route, ignoring a stale posted route", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "admin" ? { id: "fn-admin" } : null));
+
+    await services.updateActionFromForm(
+      "act-1",
+      form({ title: "Mixed doc", status: "OPEN", priority: "MEDIUM", domain: "MIXED", streamId: "stream-finance", companyFunctionId: "fn-finance" })
+    );
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.streamId).toBe("stream-core");
+    expect(data.companyFunctionId).toBe("fn-admin");
+  });
+
+  it("falls back to the admin route when reclassified to Business without a posted route", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "PERSONAL" });
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "admin" ? { id: "fn-admin" } : null));
+
+    // Personal->Business correction posts no route (Personal had none).
+    await services.updateActionFromForm("act-1", form({ title: "Now company work", status: "OPEN", priority: "MEDIUM", domain: "BUSINESS" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.streamId).toBe("stream-core");
+    expect(data.companyFunctionId).toBe("fn-admin");
+  });
+
+  it("syncs a linked intake document's domain on reclassification", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+
+    await services.updateActionFromForm("act-1", form({ title: "Medical bill", status: "OPEN", priority: "MEDIUM", domain: "PERSONAL" }));
+
+    const docUpdate = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(docUpdate.where).toEqual({ actionId: "act-1" });
+    expect(docUpdate.data.domain).toBe("PERSONAL");
+  });
 });
 
 describe("prepareDraftAutomation", () => {

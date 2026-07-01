@@ -75,10 +75,12 @@ async function readPdf(storedPath: string): Promise<DocumentTextResult> {
   const ocr = await ocrPdfViaRaster(storedPath);
   if (ocr.text.length > 0) return ocr;
 
-  // Nothing worked: surface the most useful error.
-  const error = ocr.error ?? (digital.ok ? "PDF had no extractable text layer and OCR produced nothing." : digital.error);
-  const fallbackText = digital.ok ? digital.stdout : "";
-  return { text: capText(fallbackText), engine: digital.ok ? "pdftotext" : "none", error, truncated: fallbackText.length > MAX_TEXT_LENGTH };
+  // Nothing usable was read: the digital text (if any) was already below
+  // MIN_DIGITAL_TEXT_LENGTH and OCR produced nothing. Return empty text so the
+  // caller marks the row FAILED rather than treating a stray page number/header
+  // as a successful triage that hides a genuinely unreadable document.
+  const error = ocr.error ?? (digital.ok ? "PDF had no usable text layer and OCR produced nothing." : digital.error);
+  return { text: "", engine: "none", error };
 }
 
 async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> {

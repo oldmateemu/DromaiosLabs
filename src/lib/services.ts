@@ -1748,22 +1748,30 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
   const domain = enumValue(formData, "domain", IntakeDomain, existing.domain);
 
   // Resolve the company route for the chosen domain, matching the intake approval
-  // contract so a reclassified action never keeps a stale finance/legal route:
-  // Personal carries no route; Mixed/Unknown are forced to Company Core/admin for
-  // reclassification; Business honours the posted route.
+  // contract so a reclassified action is never mis-routed or left unrouted:
+  // Personal carries no route; Mixed/Unknown ignore any stale posted route; and
+  // every non-Personal domain falls back to the Company Core/admin default for any
+  // route field left blank (e.g. a Personal->Business correction posts no route),
+  // so corrected company work always lands in a stream/function view.
   let streamId = optionalString(formData, "streamId") ?? null;
   let companyFunctionId = optionalString(formData, "companyFunctionId") ?? null;
   if (domain === IntakeDomain.PERSONAL) {
     streamId = null;
     companyFunctionId = null;
-  } else if (domain === IntakeDomain.MIXED || domain === IntakeDomain.UNKNOWN) {
-    const routing = suggestRouting({ docType: "unknown", domain });
-    const [stream, companyFunction] = await Promise.all([
-      routing.stream ? prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }) : null,
-      routing.companyFunction ? prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }) : null
-    ]);
-    streamId = stream?.id ?? null;
-    companyFunctionId = companyFunction?.id ?? null;
+  } else {
+    if (domain === IntakeDomain.MIXED || domain === IntakeDomain.UNKNOWN) {
+      streamId = null;
+      companyFunctionId = null;
+    }
+    if (!streamId || !companyFunctionId) {
+      const routing = suggestRouting({ docType: "unknown", domain });
+      if (!streamId && routing.stream) {
+        streamId = (await prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }))?.id ?? null;
+      }
+      if (!companyFunctionId && routing.companyFunction) {
+        companyFunctionId = (await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }))?.id ?? null;
+      }
+    }
   }
 
   await prisma.$transaction(async (tx) => {
@@ -1912,7 +1920,9 @@ export async function getActivityData() {
 export async function getCommandPaletteItems() {
   const [actions, links] = await Promise.all([
     prisma.action.findMany({
-      where: { status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
+      // The command palette is a company-wide search rendered on every page, so
+      // keep Personal-domain task titles out of it (they live in /personal).
+      where: { domain: { not: IntakeDomain.PERSONAL }, status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
       orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
       select: { id: true, title: true, status: true, priority: true, dueAt: true, updatedAt: true }
     }),
