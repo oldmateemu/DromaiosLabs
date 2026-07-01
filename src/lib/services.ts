@@ -5,6 +5,11 @@ import {
   AssistantProvider,
   AutomationRunStatus,
   AutomationSafetyLevel,
+  IntakeDisposition,
+  IntakeDomain,
+  IntakeSource,
+  IntakeStatus,
+  Prisma,
   Priority,
   RiskLevel,
   ReviewType
@@ -34,6 +39,26 @@ import {
   buildWeeklyReviewPrepDraft,
   getLocalDraftAutomationKind
 } from "./draft-automations";
+import {
+  alignDescriptionDomain,
+  alignSummaryDomain,
+  buildDocumentIntakeRun,
+  buildIntakeTriage,
+  mergeExtractionIntoTriage,
+  suggestRouting,
+  summariseIntakeQueueFromCounts,
+  type IntakeProposedAction
+} from "./document-intake";
+import { extractDocumentText } from "./document-read";
+import {
+  archiveTargetPath,
+  collectInboxCandidates,
+  copyInboxCandidateToStore,
+  discardInboxFile,
+  hashContent,
+  moveToArchive,
+  storeUploadedFile
+} from "./document-intake-store";
 import { buildOperatingDigest } from "./operating-digest";
 import { buildRenewalCalendar } from "./renewal-calendar";
 import { buildReviewMomentum } from "./review-momentum";
@@ -42,7 +67,7 @@ import { buildStreamSpend } from "./stream-spend";
 import { bucketActionsForToday, mapReviewAnswersToDraftActions, normaliseQuickCaptureDraft } from "./domain";
 import { buildCompanyMailroomFilingRun } from "./mailroom-filing";
 import { prisma } from "./db";
-import { buildQuickCaptureDraftRequest, draftActionFromQuickCapture } from "./ollama";
+import { buildQuickCaptureDraftRequest, draftActionFromQuickCapture, extractIntakeFieldsFromDocument } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
 import { buildRenewalReminderRun, getLocalApprovalAutomationKind, planRenewalReminderPersistence } from "./renewal-reminders";
 import { SALES_PIPELINE_STAGES, summariseSalesPipeline } from "./sales-pipeline";
@@ -58,6 +83,9 @@ export async function getReferenceData() {
 export async function getTodayData() {
   const [actions, links, automations, drafts, risks, decisions, setupSummary] = await Promise.all([
     prisma.action.findMany({
+      // Personal-domain actions live in the /personal pipeline, not the company
+      // Today board, so keep private tasks out of the company work view.
+      where: { domain: { not: IntakeDomain.PERSONAL } },
       orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
       include: { stream: true, companyFunction: true },
       take: 80
@@ -89,6 +117,8 @@ export async function getTodayData() {
   const [pulseActions, pulseRuns, pulseLinks, streamRefs, portfolioActions, portfolioRisks] = await Promise.all([
     prisma.action.findMany({
       where: {
+        // Company Pulse metrics (overdue/throughput) are company work only.
+        domain: { not: IntakeDomain.PERSONAL },
         OR: [
           { completedAt: { gte: pulseSince } },
           { createdAt: { gte: weekStart } },
@@ -107,6 +137,9 @@ export async function getTodayData() {
     prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     prisma.action.findMany({
       where: {
+        // Stream Portfolio is a per-stream company view; Personal actions carry no
+        // stream and are not company work, so keep them out.
+        domain: { not: IntakeDomain.PERSONAL },
         OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
       },
       select: { status: true, streamId: true, dueAt: true, completedAt: true }
@@ -450,6 +483,10 @@ export async function runAutomation(automationId: string, approved: boolean, use
       await runCompanyMailroomFilingAutomation(automationId, userId);
       return;
     }
+    if (localApprovalKind === "DOCUMENT_INTAKE_TRIAGE") {
+      await runDocumentIntakeTriageAutomation(automationId, userId);
+      return;
+    }
 
     if (!automation.webhookUrl) {
       throw new Error("Automation has no webhook URL configured.");
@@ -543,6 +580,650 @@ async function runCompanyMailroomFilingAutomation(automationId: string, userId: 
 
   revalidatePath("/");
   revalidatePath("/actions");
+  revalidatePath("/automations");
+}
+
+// ---------------------------------------------------------------------------
+// Document intake & triage pathway
+//
+// Scan/upload/email -> captured -> read (local OCR + Ollama) -> triaged into a
+// Business/Personal/Mixed domain -> human review -> action, file, or archive.
+// Reading is local-only; no document bytes or text leave the box, and no Action
+// is created from a document without explicit human approval.
+// ---------------------------------------------------------------------------
+
+// Rows that need the human in the loop: already read/triaged/in-review, or a
+// failed read that needs attention. These are fetched and shown ahead of
+// not-yet-read CAPTURED rows so a large captured backlog can never push
+// review-ready work out of the display cap.
+const INTAKE_REVIEW_READY_STATUSES = [IntakeStatus.READ, IntakeStatus.TRIAGED, IntakeStatus.IN_REVIEW, IntakeStatus.FAILED];
+const INTAKE_HISTORY_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
+const INTAKE_FINALISED_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
+const MAX_INTAKE_UPLOAD_BYTES = 20 * 1024 * 1024;
+// Matches the OCR text cap in document-read.ts; stored text at this length was
+// sliced, so the on-demand viewer flags it as truncated.
+const MAX_OCR_TEXT_PREVIEW = 200_000;
+
+// The queue/history cards render only these columns. Selecting them explicitly
+// keeps the heavy columns (ocrText, up to 200k chars, plus the signals JSON) out
+// of a query that can return hundreds of pending rows, so opening /intake never
+// pulls tens of MB of OCR text that the UI does not display.
+const INTAKE_CARD_SELECT = {
+  id: true,
+  source: true,
+  status: true,
+  domain: true,
+  domainConfidence: true,
+  disposition: true,
+  docType: true,
+  originalFilename: true,
+  summary: true,
+  triageNote: true,
+  reviewerNote: true,
+  suggestedAction: true,
+  capturedAt: true,
+  reviewedAt: true,
+  action: { select: { id: true, title: true } }
+} as const;
+
+export async function getIntakeQueueData() {
+  // Review-ready, captured, and history are fetched separately so a captured
+  // backlog can never push review-ready approvals out of the display cap, and the
+  // summary is computed from a full groupBy so counts stay accurate regardless of
+  // any display limit.
+  const [reviewReady, captured, history, grouped, reference] = await Promise.all([
+    prisma.intakeDocument.findMany({
+      where: { status: { in: INTAKE_REVIEW_READY_STATUSES } },
+      orderBy: [{ status: "asc" }, { capturedAt: "desc" }],
+      select: INTAKE_CARD_SELECT,
+      take: 300
+    }),
+    prisma.intakeDocument.findMany({
+      where: { status: IntakeStatus.CAPTURED },
+      orderBy: { capturedAt: "desc" },
+      select: INTAKE_CARD_SELECT,
+      take: 300
+    }),
+    prisma.intakeDocument.findMany({
+      where: { status: { in: INTAKE_HISTORY_STATUSES } },
+      orderBy: { reviewedAt: "desc" },
+      select: INTAKE_CARD_SELECT,
+      take: 40
+    }),
+    prisma.intakeDocument.groupBy({ by: ["status", "domain"], _count: true }),
+    getReferenceData()
+  ]);
+
+  // Review-ready rows first, then captured, bounded to 300 total for the page so
+  // the human-in-the-loop work is always visible ahead of the read backlog.
+  const pending = [...reviewReady, ...captured].slice(0, 300);
+
+  const summary = summariseIntakeQueueFromCounts(grouped.map((row) => ({ status: row.status, domain: row.domain, count: row._count })));
+
+  return { pending, history, summary, ...reference };
+}
+
+/**
+ * Loads a single document's extracted OCR/AI text on demand. The queue query
+ * deliberately omits ocrText (up to 200k chars per row); this fetches it for one
+ * document so a reviewer can inspect what was read before approving, without
+ * bloating the list. Local-only: the text never leaves the box.
+ */
+export async function getIntakeDocumentText(intakeId: string): Promise<{ text: string; engine: string | null; truncated: boolean }> {
+  const doc = await prisma.intakeDocument.findUnique({
+    where: { id: intakeId },
+    select: { ocrText: true, ocrEngine: true }
+  });
+  if (!doc) throw new Error("Intake document not found.");
+  const text = doc.ocrText ?? "";
+  return { text, engine: doc.ocrEngine, truncated: text.length >= MAX_OCR_TEXT_PREVIEW };
+}
+
+/**
+ * The Personal pipeline view: documents and actions triaged into the PERSONAL
+ * domain, kept deliberately out of the company streams/functions. Business flows
+ * into company ops; this is the orthogonal destination for household, medical,
+ * vehicle, school, and private-finance items.
+ */
+export async function getPersonalPipelineData() {
+  const [openActions, recentDocuments, actionCount, documentCount] = await Promise.all([
+    prisma.action.findMany({
+      where: { domain: IntakeDomain.PERSONAL, status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      select: { id: true, title: true, status: true, priority: true, dueAt: true, nextStep: true, sensitive: true },
+      take: 100
+    }),
+    prisma.intakeDocument.findMany({
+      where: { domain: IntakeDomain.PERSONAL, status: { in: [IntakeStatus.FILED, IntakeStatus.ARCHIVED] } },
+      orderBy: { reviewedAt: "desc" },
+      select: {
+        id: true,
+        originalFilename: true,
+        status: true,
+        docType: true,
+        reviewedAt: true,
+        action: { select: { id: true, title: true } }
+      },
+      take: 50
+    }),
+    prisma.action.count({ where: { domain: IntakeDomain.PERSONAL } }),
+    prisma.intakeDocument.count({ where: { domain: IntakeDomain.PERSONAL } })
+  ]);
+
+  return { openActions, recentDocuments, actionCount, documentCount };
+}
+
+/**
+ * Pulls newly scanned/emailed files from the watched inbox folders into the
+ * review queue as CAPTURED documents, deduplicating by content hash. No reading
+ * or action creation happens here.
+ */
+export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicates: number; skippedOversize: number }> {
+  const { candidates, skippedOversize } = await collectInboxCandidates();
+  let ingested = 0;
+  let duplicates = 0;
+
+  for (const candidate of candidates) {
+    const existing = await prisma.intakeDocument.findFirst({ where: { contentHash: candidate.contentHash }, select: { id: true } });
+    if (existing) {
+      await discardInboxFile(candidate);
+      duplicates += 1;
+      continue;
+    }
+
+    // Copy to the store but keep the inbox original until the capture row
+    // exists, so a crash between the two never orphans the document.
+    const stored = await copyInboxCandidateToStore(candidate);
+    try {
+      await prisma.intakeDocument.create({
+        data: {
+          source: candidate.source as IntakeSource,
+          status: IntakeStatus.CAPTURED,
+          originalFilename: stored.filename,
+          storedPath: stored.storedPath,
+          contentHash: stored.contentHash,
+          mimeType: stored.mimeType,
+          byteSize: stored.byteSize,
+          receivedAt: candidate.source === "EMAIL" ? new Date() : null
+        }
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        // Lost a race with a concurrent capture of the same bytes; the unique
+        // contentHash constraint is the atomic dedupe guarantee.
+        await discardInboxFile(candidate);
+        duplicates += 1;
+        continue;
+      }
+      // Leave the inbox original in place so the next ingest can retry it.
+      throw error;
+    }
+
+    await discardInboxFile(candidate);
+    ingested += 1;
+  }
+
+  revalidatePath("/intake");
+  return { ingested, duplicates, skippedOversize: skippedOversize.length };
+}
+
+export async function uploadIntakeDocument(formData: FormData) {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Choose a document to upload.");
+
+  // Reject oversized uploads before materialising the buffer (defence in depth
+  // alongside the Next.js server-action body limit) so a large payload cannot
+  // spike memory or amplify OCR work.
+  if (file.size > MAX_INTAKE_UPLOAD_BYTES) {
+    throw new Error(`Document exceeds the ${Math.round(MAX_INTAKE_UPLOAD_BYTES / (1024 * 1024))}MB upload limit.`);
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  // Hash first and only write bytes to the store when the document is new, so a
+  // re-uploaded duplicate never leaves an untracked file behind.
+  const contentHash = hashContent(bytes);
+  const existing = await prisma.intakeDocument.findFirst({ where: { contentHash }, select: { id: true } });
+  if (!existing) {
+    const stored = await storeUploadedFile(file.name, bytes, file.type);
+    try {
+      await prisma.intakeDocument.create({
+        data: {
+          source: IntakeSource.UPLOAD,
+          status: IntakeStatus.CAPTURED,
+          originalFilename: stored.filename,
+          storedPath: stored.storedPath,
+          contentHash: stored.contentHash,
+          mimeType: stored.mimeType,
+          byteSize: stored.byteSize
+        }
+      });
+    } catch (error) {
+      // The unique contentHash constraint makes dedupe atomic: a concurrent
+      // upload of the same bytes is treated as a no-op rather than a failure.
+      if (!isUniqueConstraintError(error)) throw error;
+    }
+  }
+
+  revalidatePath("/intake");
+}
+
+/**
+ * Reads a captured document locally (OCR) and triages it (heuristics enriched
+ * by a local Ollama extraction). Updates the document with the extracted text,
+ * proposed domain, document type, disposition, and a proposed Action draft. It
+ * never creates an Action; the result waits for human approval.
+ */
+export async function readAndTriageIntakeDocument(intakeId: string) {
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId } });
+  if (!doc) throw new Error("Intake document not found.");
+  // A stale re-read must not resurrect a filed/archived/rejected document.
+  if ((INTAKE_FINALISED_STATUSES as string[]).includes(doc.status)) {
+    throw new Error("This document has already been filed, archived, or rejected.");
+  }
+
+  try {
+    const read = await extractDocumentText({ storedPath: doc.storedPath, mimeType: doc.mimeType, filename: doc.originalFilename });
+    const text = read.text ?? "";
+
+    let extractionError: string | undefined;
+    let extraction;
+    if (text.trim().length > 0) {
+      const result = await extractIntakeFieldsFromDocument(text, doc.originalFilename);
+      extraction = result.extraction;
+      extractionError = result.error;
+    }
+
+    // Respect a domain the operator manually corrected, but let a re-read update
+    // a domain that only a prior heuristic set. A human override is detectable
+    // because setIntakeDomain changes `domain` without touching `suggestedDomain`,
+    // so a human-locked row has domain !== suggestedDomain; a heuristic row has
+    // them equal. For a locked row we deliberately do NOT refresh suggestedDomain
+    // below, otherwise a triage that happens to agree with the manual choice would
+    // make them equal again and a later re-read could silently overwrite it.
+    const humanLocked = doc.domain !== IntakeDomain.UNKNOWN && doc.domain !== doc.suggestedDomain;
+    const preserved = humanLocked ? (doc.domain as IntakeDomain) : null;
+
+    // Force the locked domain into triage so the disposition, routing, AND all
+    // user-facing action text (title/description/summary) reflect the operator's
+    // choice — never a mix where the stored domain and the description disagree.
+    const triage = mergeExtractionIntoTriage(
+      buildIntakeTriage({ filename: doc.originalFilename, text, now: new Date(), domainOverride: preserved ?? undefined }),
+      extraction
+    );
+    const note = [
+      read.error,
+      extractionError,
+      read.truncated ? "Long document: only the first pages were read (OCR page limit) — check later pages manually." : null
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const effectiveDomain = triage.domain as IntakeDomain;
+    const proposedAction = triage.proposedAction;
+    // A read that reported an error but produced no text (unsupported type, a
+    // missing/failed OCR binary) is a failed read, not a success: mark it FAILED
+    // so it shows in the read-failed count instead of looking like clean triage.
+    const readFailed = Boolean(read.error) && text.trim().length === 0;
+
+    // Guard the writeback: OCR/Ollama can take many seconds, during which the
+    // operator may file/archive/reject the document, or mark its domain, from
+    // another tab. Only write back if it is still pending AND its domain hasn't
+    // changed since we loaded it, so a domain marked during this read (a lock the
+    // stale humanLocked check above could not see) is never clobbered by triage.
+    await prisma.intakeDocument.updateMany({
+      where: {
+        id: intakeId,
+        status: { notIn: INTAKE_FINALISED_STATUSES },
+        domain: doc.domain,
+        suggestedDomain: doc.suggestedDomain
+      },
+      data: {
+        status: readFailed ? IntakeStatus.FAILED : IntakeStatus.TRIAGED,
+        ocrText: text.length > 0 ? text : null,
+        ocrEngine: read.engine,
+        summary: triage.summary,
+        docType: triage.docType,
+        disposition: triage.disposition as IntakeDisposition,
+        domain: effectiveDomain,
+        // Keep the existing suggestedDomain for a human-locked row so the lock
+        // marker (domain !== suggestedDomain) survives a matching re-read.
+        suggestedDomain: preserved ? doc.suggestedDomain : (triage.domain as IntakeDomain),
+        domainConfidence: triage.domainConfidence,
+        signals: triage.signals,
+        suggestedAction: proposedAction,
+        triageNote: note.length > 0 ? note : null,
+        sensitive: proposedAction.sensitive,
+        readAt: new Date(),
+        triagedAt: new Date()
+      }
+    });
+  } catch (error) {
+    await prisma.intakeDocument.updateMany({
+      where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
+      data: {
+        status: IntakeStatus.FAILED,
+        readAt: new Date(),
+        triageNote: error instanceof Error ? error.message : "Read and triage failed."
+      }
+    });
+  }
+
+  revalidatePath("/intake");
+}
+
+/**
+ * Human approval: turns a triaged document into a tracked Action carrying the
+ * chosen Business/Personal/Mixed domain, then files the document. Mirrors the
+ * assistant draft approval flow. Source is ASSISTANT (AI proposed, human
+ * approved) so no new ActionSource value is needed.
+ */
+export async function approveIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  const title = stringValue(formData, "title");
+  if (!intakeId || !title) throw new Error("Document and title are required.");
+
+  // Default to UNKNOWN (not BUSINESS) so an omitted/invalid value never silently
+  // attaches company context. Only Business/Mixed documents route into a company
+  // stream and function; Personal/Unknown stay out of company ops.
+  const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN);
+  // Everything except Personal routes into company ops. Business/Mixed/Unknown
+  // get a stream + function (Unknown lands in Company Core/admin for review per
+  // the workflow contract); Personal stays out of company streams entirely.
+  const attachesCompanyContext = domain !== IntakeDomain.PERSONAL;
+
+  // Load the triaged document once: its docType feeds the routing fallback and
+  // its suggestedAction domain tells us whether the reviewer changed the domain
+  // (so the prefilled description can be realigned below).
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { docType: true, suggestedAction: true } });
+
+  // Resolve the company route. An UNKNOWN (uncertain) domain is forced to the
+  // Company Core/admin fallback and deliberately ignores any route the form
+  // pre-filled from the original suggestion: when the operator downgrades a
+  // finance/legal suggestion to "unsure", the action must not still be filed
+  // into finance/legal as if it were confidently Business (the form inputs keep
+  // their stale defaults with no client JS to clear them).
+  let streamName = optionalString(formData, "stream");
+  let functionName = optionalString(formData, "companyFunction");
+  let stream: { id: string } | null = null;
+  let companyFunction: { id: string } | null = null;
+  if (attachesCompanyContext) {
+    if (domain === IntakeDomain.UNKNOWN || domain === IntakeDomain.MIXED) {
+      // Ambiguous domains are forced to the admin fallback and ignore any route
+      // the form pre-filled from the original suggestion, per the contract that
+      // Mixed/Unknown documents land in Company Core/admin for reclassification.
+      const routing = suggestRouting({ docType: "unknown", domain });
+      streamName = routing.stream;
+      functionName = routing.companyFunction;
+    }
+    stream = streamName ? await prisma.stream.findUnique({ where: { name: streamName } }) : null;
+    companyFunction = functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
+
+    // A blank OR unresolved route falls back to the docType-derived default. The
+    // /intake route controls are free-text datalist inputs, so a typo/case
+    // mismatch like "Finance" resolves to nothing; without this fallback the
+    // action would be created with no stream/function and drop out of the finance/
+    // legal/admin views entirely.
+    if (!stream || !companyFunction) {
+      const routing = suggestRouting({ docType: doc?.docType ?? "unknown", domain });
+      if (!stream && routing.stream) stream = await prisma.stream.findUnique({ where: { name: routing.stream } });
+      if (!companyFunction && routing.companyFunction) {
+        companyFunction = await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction } });
+      }
+    }
+  }
+
+  // When the reviewer changed only the domain dropdown, the prefilled description
+  // still names the original triage domain. Realign the generated "Domain:" line
+  // to the chosen domain so the created action does not contradict its own domain
+  // field (hand-typed description text is left untouched).
+  const suggested = (doc?.suggestedAction as IntakeProposedAction | null) ?? null;
+  const postedDescription = optionalString(formData, "description");
+  const description =
+    postedDescription && suggested && suggested.domain !== domain
+      ? alignDescriptionDomain(postedDescription, domain)
+      : postedDescription;
+
+  await prisma.$transaction(async (tx) => {
+    // Atomically claim the row with a single guarded UPDATE: only a not-yet-filed,
+    // not-yet-finalised, unlinked document is moved to FILED. A concurrent or
+    // stale resubmit (double-click, back-button, another tab that archived it)
+    // matches nothing, so no duplicate/orphan Action is created.
+    const claim = await tx.intakeDocument.updateMany({
+      where: { id: intakeId, actionId: null, status: { notIn: INTAKE_FINALISED_STATUSES } },
+      data: {
+        status: IntakeStatus.FILED,
+        domain,
+        disposition: IntakeDisposition.ACTION,
+        reviewedById: userId,
+        reviewedAt: new Date(),
+        reviewerNote: optionalString(formData, "reviewerNote")
+      }
+    });
+    if (claim.count === 0) return;
+
+    const action = await tx.action.create({
+      data: {
+        title,
+        description,
+        status: enumValue(formData, "status", ActionStatus, ActionStatus.OPEN),
+        priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+        source: ActionSource.ASSISTANT,
+        domain,
+        dueAt: dateValue(formData, "dueDate"),
+        reviewAt: dateValue(formData, "reviewDate"),
+        nextStep: optionalString(formData, "nextStep"),
+        sensitive: formData.get("sensitive") === "on",
+        streamId: stream?.id,
+        companyFunctionId: companyFunction?.id,
+        createdById: userId
+      }
+    });
+
+    await tx.intakeDocument.update({ where: { id: intakeId }, data: { actionId: action.id } });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/intake");
+  revalidatePath("/actions");
+}
+
+/**
+ * Files a document for records without creating an action (the FILE disposition
+ * path). The stored copy is kept in place; the document moves to FILED with no
+ * linked action, distinct from ARCHIVED, so filed-vs-archived metrics stay clean.
+ */
+export async function fileIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+
+  // Atomically file only a not-yet-finalised document, so a stale form cannot
+  // turn an archived/rejected/action-filed record into a records-only file.
+  const updated = await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
+    data: {
+      status: IntakeStatus.FILED,
+      disposition: IntakeDisposition.FILE,
+      domain: enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN),
+      reviewedById: userId,
+      reviewedAt: new Date(),
+      reviewerNote: optionalString(formData, "reviewerNote")
+    }
+  });
+  if (updated.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
+
+  revalidatePath("/intake");
+}
+
+export async function archiveIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId } });
+  if (!doc) throw new Error("Intake document not found.");
+  // Guard against re-archiving an already finalised document, which would move a
+  // file that has already moved and could clobber the stored path with a stale one.
+  if ((INTAKE_FINALISED_STATUSES as string[]).includes(doc.status)) {
+    throw new Error("This document has already been filed, archived, or rejected.");
+  }
+
+  // Claim the row AND record its archive path in one guarded update, BEFORE
+  // moving any bytes. Claiming first means a concurrent Approve/File matches zero
+  // rows and we stop without touching the file; recording the (deterministic)
+  // archive path in the same write means there is no separate post-move update
+  // that could fail and leave the stored path out of sync with the file location.
+  const archivedPath = archiveTargetPath(doc.storedPath);
+  const claim = await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
+    data: {
+      status: IntakeStatus.ARCHIVED,
+      storedPath: archivedPath,
+      disposition: IntakeDisposition.ARCHIVE,
+      domain: enumValue(formData, "domain", IntakeDomain, doc.domain),
+      reviewedById: userId,
+      reviewedAt: new Date(),
+      reviewerNote: optionalString(formData, "reviewerNote")
+    }
+  });
+  if (claim.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
+
+  // The row is now ours (ARCHIVED). Move the bytes to the recorded path. If the
+  // move fails (disk full, permissions, an unreadable file), roll the row AND its
+  // stored path back together — guarded on our own claim — so it returns to the
+  // queue as retryable instead of being stranded ARCHIVED with its path pointing
+  // at a location the bytes never reached.
+  try {
+    await moveToArchive(doc.storedPath);
+  } catch (error) {
+    await prisma.intakeDocument.updateMany({
+      where: { id: intakeId, status: IntakeStatus.ARCHIVED },
+      data: {
+        status: doc.status,
+        storedPath: doc.storedPath,
+        disposition: doc.disposition,
+        domain: doc.domain,
+        reviewedById: doc.reviewedById,
+        reviewedAt: doc.reviewedAt,
+        reviewerNote: doc.reviewerNote
+      }
+    });
+    throw error;
+  }
+
+  revalidatePath("/intake");
+}
+
+export async function rejectIntakeDocument(formData: FormData, userId: string) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+
+  // Guarded so a stale form cannot reject an already filed/archived/rejected
+  // document (which could detach it from an action created in another tab).
+  const updated = await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
+    data: {
+      status: IntakeStatus.REJECTED,
+      reviewedById: userId,
+      reviewedAt: new Date(),
+      reviewerNote: optionalString(formData, "reviewerNote")
+    }
+  });
+  if (updated.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
+
+  revalidatePath("/intake");
+}
+
+export async function setIntakeDomain(formData: FormData) {
+  const intakeId = stringValue(formData, "intakeId");
+  if (!intakeId) throw new Error("Document is required.");
+  const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN);
+
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { suggestedAction: true, summary: true } });
+  const suggested = (doc?.suggestedAction as IntakeProposedAction | null) ?? null;
+  // Realign the generated summary/description copy to the marked domain too, not
+  // just the structured field, so an already-triaged row's action text (and the
+  // approval it prefills) never contradicts the domain the operator chose.
+  const realignedSuggested = suggested
+    ? { ...suggested, domain, description: suggested.description ? alignDescriptionDomain(suggested.description, domain) : suggested.description }
+    : null;
+  const realignedSummary = doc?.summary ? alignSummaryDomain(doc.summary, domain) : doc?.summary ?? undefined;
+
+  // Guarded so a stale "Mark Business/Personal" cannot rewrite the domain of a
+  // document another tab already filed/archived/rejected.
+  const updated = await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
+    data: {
+      domain,
+      suggestedAction: realignedSuggested ?? undefined,
+      summary: realignedSummary
+    }
+  });
+  if (updated.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
+
+  revalidatePath("/intake");
+}
+
+async function runDocumentIntakeTriageAutomation(automationId: string, userId: string) {
+  const { ingested, duplicates, skippedOversize } = await ingestIntakeFolder();
+  const run = buildDocumentIntakeRun({ now: new Date(), ingested, duplicates, skippedOversize });
+
+  const [stream, companyFunction] = await Promise.all([
+    prisma.stream.findUnique({ where: { name: "Company Core" }, select: { id: true } }),
+    prisma.companyFunction.findUnique({ where: { name: "admin" }, select: { id: true } })
+  ]);
+
+  await prisma.$transaction(async (tx) => {
+    // Dedupe inside the transaction so two overlapping runs can't both create
+    // the review action.
+    const existingReviewAction = await tx.action.findFirst({
+      where: {
+        automationId,
+        title: run.actionsToCreate[0]?.title,
+        status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] }
+      },
+      select: { id: true }
+    });
+    const actionsToCreate = existingReviewAction ? [] : run.actionsToCreate;
+
+    for (const action of actionsToCreate) {
+      await tx.action.create({
+        data: {
+          title: action.title,
+          description: action.description,
+          status: ActionStatus.OPEN,
+          priority: action.priority,
+          source: ActionSource.AUTOMATION,
+          dueAt: dateFromKey(action.dueAt),
+          reviewAt: dateFromKey(action.reviewAt),
+          nextStep: action.nextStep,
+          sensitive: action.sensitive,
+          createdById: userId,
+          automationId,
+          streamId: stream?.id,
+          companyFunctionId: companyFunction?.id
+        }
+      });
+    }
+
+    await tx.automationRun.create({
+      data: {
+        automationId,
+        triggeredById: userId,
+        status: AutomationRunStatus.SUCCESS,
+        requestSummary: "Approved local document intake triage run",
+        responseSummary: [
+          run.responseSummary,
+          "",
+          "Cockpit result",
+          `- Review actions created this run: ${actionsToCreate.length}`,
+          `- Existing open review actions skipped: ${existingReviewAction ? 1 : 0}`
+        ].join("\n")
+      }
+    });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath("/intake");
   revalidatePath("/automations");
 }
 
@@ -645,6 +1326,9 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
 
     const now = new Date();
     const actions = await prisma.action.findMany({
+      // Company draft summaries (weekly review / stale tasks / daily inbox) are
+      // company work only; Personal-domain actions belong to the /personal pipeline.
+      where: { domain: { not: IntakeDomain.PERSONAL } },
       include: { stream: true, companyFunction: true },
       orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { updatedAt: "asc" }],
       take: 120
@@ -909,8 +1593,9 @@ export async function getReviewData() {
   const sinceFilter = lastReviewAt ? { gte: lastReviewAt } : undefined;
 
   const [completedCount, createdCount, newRiskCount, decisionCount] = await Promise.all([
-    prisma.action.count({ where: { completedAt: lastReviewAt ? { gte: lastReviewAt } : { not: null } } }),
-    prisma.action.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
+    // Review momentum tracks company throughput; Personal actions are excluded.
+    prisma.action.count({ where: { domain: { not: IntakeDomain.PERSONAL }, completedAt: lastReviewAt ? { gte: lastReviewAt } : { not: null } } }),
+    prisma.action.count({ where: { domain: { not: IntakeDomain.PERSONAL }, ...(sinceFilter ? { createdAt: sinceFilter } : {}) } }),
     prisma.risk.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
     prisma.decision.count({ where: sinceFilter ? { decidedAt: sinceFilter } : undefined })
   ]);
@@ -1019,6 +1704,9 @@ export async function getPortfolioData() {
     prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     prisma.action.findMany({
       where: {
+        // Company portfolio is per-stream company work; Personal actions have no
+        // stream and belong to the /personal pipeline.
+        domain: { not: IntakeDomain.PERSONAL },
         OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
       },
       select: { status: true, streamId: true, dueAt: true, completedAt: true }
@@ -1059,26 +1747,75 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
   const title = stringValue(formData, "title");
   if (!title) throw new Error("Action title is required.");
 
-  const existing = await prisma.action.findUnique({ where: { id: actionId }, select: { completedAt: true } });
+  const existing = await prisma.action.findUnique({ where: { id: actionId }, select: { completedAt: true, domain: true } });
   if (!existing) throw new Error("Action not found.");
 
   const status = enumValue(formData, "status", ActionStatus, ActionStatus.OPEN);
+  // Domain is editable so a misclassified intake approval (e.g. Personal set by
+  // mistake, or a Mixed/Unknown item that admin later reclassifies) can be
+  // corrected; without this it would be stuck in the wrong pipeline.
+  const domain = enumValue(formData, "domain", IntakeDomain, existing.domain);
 
-  await prisma.action.update({
-    where: { id: actionId },
-    data: {
-      title,
-      description: optionalString(formData, "description") ?? null,
-      status,
-      priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
-      dueAt: dateValue(formData, "dueAt") ?? null,
-      reviewAt: dateValue(formData, "reviewAt") ?? null,
-      nextStep: optionalString(formData, "nextStep") ?? null,
-      streamId: optionalString(formData, "streamId") ?? null,
-      companyFunctionId: optionalString(formData, "companyFunctionId") ?? null,
-      sensitive: formData.get("sensitive") === "on",
-      completedAt: completedAtForStatus(status, existing.completedAt)
+  // Resolve the company route. Route adjustments only apply to a genuine domain
+  // change (reclassification); a plain edit honours the operator's posted route,
+  // including an explicit "Unassigned", so a normal Business action is never
+  // silently pulled into admin. On reclassification, match the intake contract:
+  // Personal carries no route; Mixed/Unknown are forced to Company Core/admin; and
+  // a Personal->company correction (which posts no route) falls back to that same
+  // admin default so corrected work is not left unrouted.
+  const reclassified = domain !== existing.domain;
+  let streamId = optionalString(formData, "streamId") ?? null;
+  let companyFunctionId = optionalString(formData, "companyFunctionId") ?? null;
+  if (domain === IntakeDomain.PERSONAL) {
+    // Personal never carries a company route, regardless of reclassification.
+    streamId = null;
+    companyFunctionId = null;
+  } else if (reclassified && (domain === IntakeDomain.MIXED || domain === IntakeDomain.UNKNOWN)) {
+    const routing = suggestRouting({ docType: "unknown", domain });
+    streamId = routing.stream ? (await prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }))?.id ?? null : null;
+    companyFunctionId = routing.companyFunction
+      ? (await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }))?.id ?? null
+      : null;
+  } else if (reclassified && existing.domain === IntakeDomain.PERSONAL) {
+    // Personal->Business/etc.: the form posts no route, so fill blanks with the
+    // admin default; keep any route the operator did provide.
+    const routing = suggestRouting({ docType: "unknown", domain });
+    if (!streamId && routing.stream) {
+      streamId = (await prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }))?.id ?? null;
     }
+    if (!companyFunctionId && routing.companyFunction) {
+      companyFunctionId = (await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }))?.id ?? null;
+    }
+  }
+
+  // On reclassification, realign the generated "Domain:" line in the (possibly
+  // untouched, prefilled) description to the new domain so the action body doesn't
+  // contradict its reclassified domain. Hand-typed text has no such token to change.
+  const postedDescription = optionalString(formData, "description") ?? null;
+  const description = reclassified && postedDescription ? alignDescriptionDomain(postedDescription, domain) : postedDescription;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.action.update({
+      where: { id: actionId },
+      data: {
+        title,
+        description,
+        status,
+        priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+        domain,
+        dueAt: dateValue(formData, "dueAt") ?? null,
+        reviewAt: dateValue(formData, "reviewAt") ?? null,
+        nextStep: optionalString(formData, "nextStep") ?? null,
+        streamId,
+        companyFunctionId,
+        sensitive: formData.get("sensitive") === "on",
+        completedAt: completedAtForStatus(status, existing.completedAt)
+      }
+    });
+    // Keep a linked intake document's domain in sync so the /personal pipeline
+    // (queried from IntakeDocument.domain) reflects the reclassification. Matches
+    // zero rows for actions that did not come from intake.
+    await tx.intakeDocument.updateMany({ where: { actionId }, data: { domain } });
   });
 
   revalidatePath("/");
@@ -1166,12 +1903,15 @@ export async function getActivityData() {
   const [completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews, completedForTrend] =
     await Promise.all([
       prisma.action.findMany({
-        where: { completedAt: { not: null } },
+        // Activity feed + throughput are company signals; Personal actions live in
+        // the /personal pipeline and must not inflate company activity.
+        where: { domain: { not: IntakeDomain.PERSONAL }, completedAt: { not: null } },
         orderBy: { completedAt: "desc" },
         take: 20,
         select: { id: true, title: true, completedAt: true, stream: { select: { name: true } } }
       }),
       prisma.action.findMany({
+        where: { domain: { not: IntakeDomain.PERSONAL } },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: { id: true, title: true, createdAt: true, source: true }
@@ -1185,7 +1925,11 @@ export async function getActivityData() {
       }),
       prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, sourceSummary: true, state: true, createdAt: true } }),
       prisma.review.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { id: true, type: true, createdAt: true } }),
-      prisma.action.findMany({ where: { completedAt: { gte: trendWindowStart } }, orderBy: { completedAt: "desc" }, select: { completedAt: true } })
+      prisma.action.findMany({
+        where: { domain: { not: IntakeDomain.PERSONAL }, completedAt: { gte: trendWindowStart } },
+        orderBy: { completedAt: "desc" },
+        select: { completedAt: true }
+      })
     ]);
 
   const feed = buildActivityFeed({ completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews }, 40);
@@ -1196,7 +1940,9 @@ export async function getActivityData() {
 export async function getCommandPaletteItems() {
   const [actions, links] = await Promise.all([
     prisma.action.findMany({
-      where: { status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
+      // The command palette is a company-wide search rendered on every page, so
+      // keep Personal-domain task titles out of it (they live in /personal).
+      where: { domain: { not: IntakeDomain.PERSONAL }, status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } },
       orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
       select: { id: true, title: true, status: true, priority: true, dueAt: true, updatedAt: true }
     }),
@@ -1259,6 +2005,12 @@ function dateRank(value: Date | null) {
 function enumValue<T extends Record<string, string>>(formData: FormData, key: string, values: T, fallback: T[keyof T]) {
   const value = stringValue(formData, key);
   return Object.values(values).includes(value) ? (value as T[keyof T]) : fallback;
+}
+
+// P2002 = Prisma unique-constraint violation. Used to treat a lost dedupe race
+// (two captures of the same content hash) as a duplicate rather than an error.
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 function startOfDay(date: Date) {

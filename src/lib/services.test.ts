@@ -23,6 +23,16 @@ const { prismaMock } = vi.hoisted(() => ({
     review: { create: vi.fn(), findMany: vi.fn() },
     risk: { findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
     decision: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
+    intakeDocument: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      groupBy: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn()
+    },
     $transaction: vi.fn()
   }
 }));
@@ -35,17 +45,38 @@ vi.mock("./ollama", () => ({
     model: "gemma3:1b",
     prompt: `prompt:${sourceText}`
   })),
-  draftActionFromQuickCapture: vi.fn()
+  draftActionFromQuickCapture: vi.fn(),
+  extractIntakeFieldsFromDocument: vi.fn()
 }));
+vi.mock("./document-intake-store", () => ({
+  archiveTargetPath: vi.fn((path: string) => `/archive/${String(path).split("/").pop()}`),
+  collectInboxCandidates: vi.fn(),
+  copyInboxCandidateToStore: vi.fn(),
+  discardInboxFile: vi.fn(),
+  hashContent: vi.fn(() => "hash-abc"),
+  moveToArchive: vi.fn(async (path: string) => `/archive/${path}`),
+  storeUploadedFile: vi.fn()
+}));
+vi.mock("./document-read", () => ({ extractDocumentText: vi.fn() }));
 
 const { revalidatePath } = await import("next/cache");
-const { draftActionFromQuickCapture } = await import("./ollama");
+const { draftActionFromQuickCapture, extractIntakeFieldsFromDocument } = await import("./ollama");
+const store = await import("./document-intake-store");
+const read = await import("./document-read");
 const services = await import("./services");
 
 function form(values: Record<string, string>) {
   const fd = new FormData();
   for (const [key, value] of Object.entries(values)) fd.set(key, value);
   return fd;
+}
+
+// jsdom's File does not implement arrayBuffer(), so provide a real File instance
+// (to satisfy `instanceof File`) with a working arrayBuffer() for upload tests.
+function fileWithBytes(name: string, content: string): File {
+  const file = new File([content], name, { type: "application/pdf" });
+  Object.defineProperty(file, "arrayBuffer", { value: async () => new TextEncoder().encode(content).buffer });
+  return file;
 }
 
 async function waitForBackgroundTasks() {
@@ -92,6 +123,20 @@ beforeEach(() => {
   prismaMock.risk.create.mockResolvedValue({ id: "risk-1" });
   prismaMock.risk.update.mockResolvedValue({ id: "risk-1" });
   prismaMock.decision.create.mockResolvedValue({ id: "decision-1" });
+  prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
+  prismaMock.intakeDocument.findUnique.mockResolvedValue(null);
+  prismaMock.intakeDocument.groupBy.mockResolvedValue([]);
+  prismaMock.intakeDocument.count.mockResolvedValue(0);
+  prismaMock.intakeDocument.create.mockResolvedValue({ id: "intake-1" });
+  prismaMock.intakeDocument.update.mockResolvedValue({ id: "intake-1" });
+  prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+  const storedFile = { storedPath: "/store/hash-abc.pdf", filename: "doc.pdf", contentHash: "hash-abc", mimeType: "application/pdf", byteSize: 3 };
+  vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [], skippedOversize: [] });
+  vi.mocked(store.storeUploadedFile).mockResolvedValue(storedFile);
+  vi.mocked(store.copyInboxCandidateToStore).mockResolvedValue(storedFile);
+  vi.mocked(store.hashContent).mockReturnValue("hash-abc");
+  vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "", engine: "none" });
+  vi.mocked(extractIntakeFieldsFromDocument).mockResolvedValue({ model: "gemma3:1b", provider: "OLLAMA", prompt: "", rawOutput: "", extraction: undefined });
   prismaMock.$transaction.mockImplementation(async (cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock));
 });
 
@@ -800,6 +845,107 @@ function companyMailroomAutomation({ webhookUrl = null }: { webhookUrl?: string 
   };
 }
 
+describe("updateActionFromForm", () => {
+  it("writes an edited domain so a misclassified action can be reclassified", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "PERSONAL" });
+
+    await services.updateActionFromForm("act-1", form({ title: "Renew rego", status: "OPEN", priority: "MEDIUM", domain: "BUSINESS" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("BUSINESS");
+  });
+
+  it("keeps the existing domain when the form omits it", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "PERSONAL" });
+
+    await services.updateActionFromForm("act-1", form({ title: "Renew rego", status: "OPEN", priority: "MEDIUM" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("PERSONAL");
+  });
+
+  it("clears the company route when an action is reclassified to Personal", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+
+    await services.updateActionFromForm(
+      "act-1",
+      form({ title: "Medical bill", status: "OPEN", priority: "MEDIUM", domain: "PERSONAL", streamId: "stream-1", companyFunctionId: "fn-1" })
+    );
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("PERSONAL");
+    expect(data.streamId).toBeNull();
+    expect(data.companyFunctionId).toBeNull();
+  });
+
+  it("forces Mixed reclassification to the Company Core/admin route, ignoring a stale posted route", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "admin" ? { id: "fn-admin" } : null));
+
+    await services.updateActionFromForm(
+      "act-1",
+      form({ title: "Mixed doc", status: "OPEN", priority: "MEDIUM", domain: "MIXED", streamId: "stream-finance", companyFunctionId: "fn-finance" })
+    );
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.streamId).toBe("stream-core");
+    expect(data.companyFunctionId).toBe("fn-admin");
+  });
+
+  it("falls back to the admin route when reclassified to Business without a posted route", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "PERSONAL" });
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "admin" ? { id: "fn-admin" } : null));
+
+    // Personal->Business correction posts no route (Personal had none).
+    await services.updateActionFromForm("act-1", form({ title: "Now company work", status: "OPEN", priority: "MEDIUM", domain: "BUSINESS" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.streamId).toBe("stream-core");
+    expect(data.companyFunctionId).toBe("fn-admin");
+  });
+
+  it("realigns the description domain when an action is reclassified via the edit form", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+    const prefill = "Captured document triaged locally on 2026-07-01.\nDomain: Business (confidence 0.6).\nProposed disposition: FILE.";
+
+    await services.updateActionFromForm(
+      "act-1",
+      form({ title: "Now personal", status: "OPEN", priority: "MEDIUM", domain: "PERSONAL", description: prefill })
+    );
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.description).toContain("Domain: Personal");
+    expect(data.description).not.toContain("Domain: Business");
+  });
+
+  it("syncs a linked intake document's domain on reclassification", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+
+    await services.updateActionFromForm("act-1", form({ title: "Medical bill", status: "OPEN", priority: "MEDIUM", domain: "PERSONAL" }));
+
+    const docUpdate = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(docUpdate.where).toEqual({ actionId: "act-1" });
+    expect(docUpdate.data.domain).toBe("PERSONAL");
+  });
+
+  it("preserves an explicitly unassigned route on a normal (non-reclassifying) Business edit", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+    // If the admin fallback wrongly fired, these would resolve the route.
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "admin" ? { id: "fn-admin" } : null));
+
+    await services.updateActionFromForm("act-1", form({ title: "Just a title edit", status: "OPEN", priority: "MEDIUM", domain: "BUSINESS" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.streamId).toBeNull();
+    expect(data.companyFunctionId).toBeNull();
+    // The fallback must not have run for a same-domain edit.
+    expect(prismaMock.stream.findUnique).not.toHaveBeenCalled();
+  });
+});
+
 describe("prepareDraftAutomation", () => {
   it("throws when the automation does not exist", async () => {
     prismaMock.automation.findUnique.mockResolvedValue(null);
@@ -819,6 +965,9 @@ describe("prepareDraftAutomation", () => {
     const run = prismaMock.automationRun.create.mock.calls[0][0].data;
     expect(run.status).toBe(AutomationRunStatus.SUCCESS);
     expect(run.responseSummary).toContain("Weekly review prep - draft only");
+    // The company draft summary reads company actions only, not Personal ones.
+    const actionQuery = prismaMock.action.findMany.mock.calls.find((call) => call[0]?.take === 120);
+    expect(actionQuery?.[0].where).toEqual({ domain: { not: "PERSONAL" } });
   });
 
   it("produces a stale task summary draft", async () => {
@@ -890,10 +1039,48 @@ describe("read aggregators", () => {
     expect(today.actions).toEqual([]);
   });
 
-  it("builds the action register query from filters", async () => {
+  it("builds the action register query from filters, excluding Personal by default", async () => {
     await services.getActionRegisterData({ status: "OPEN" });
     const call = prismaMock.action.findMany.mock.calls.at(-1)?.[0];
-    expect(call.where).toEqual({ status: "OPEN" });
+    expect(call.where).toEqual({ status: "OPEN", domain: { not: "PERSONAL" } });
+  });
+
+  it("keeps Personal-domain actions off the Today board and its company rollups", async () => {
+    await services.getTodayData();
+    // getTodayData also queries setup actions by title; find the domain-scoped one.
+    const todayCall = prismaMock.action.findMany.mock.calls.find((call) => call[0]?.where?.domain && !call[0]?.where?.OR);
+    expect(todayCall?.[0].where).toEqual({ domain: { not: "PERSONAL" } });
+    // Company Pulse and Stream Portfolio rollup queries (those with an OR) must
+    // also exclude Personal, or private tasks would count as company work.
+    const rollupCalls = prismaMock.action.findMany.mock.calls.filter((call) => call[0]?.where?.OR);
+    expect(rollupCalls.length).toBeGreaterThan(0);
+    for (const call of rollupCalls) {
+      expect(call[0].where.domain).toEqual({ not: "PERSONAL" });
+    }
+  });
+
+  it("excludes Personal actions from the company portfolio", async () => {
+    await services.getPortfolioData();
+    const call = prismaMock.action.findMany.mock.calls.find((c) => c[0]?.where?.OR);
+    expect(call?.[0].where.domain).toEqual({ not: "PERSONAL" });
+  });
+
+  it("excludes Personal actions from activity and throughput", async () => {
+    await services.getActivityData();
+    const actionCalls = prismaMock.action.findMany.mock.calls;
+    expect(actionCalls.length).toBeGreaterThan(0);
+    for (const call of actionCalls) {
+      expect(call[0]?.where?.domain).toEqual({ not: "PERSONAL" });
+    }
+  });
+
+  it("excludes Personal actions from review momentum counts", async () => {
+    await services.getReviewData();
+    const countCalls = prismaMock.action.count.mock.calls;
+    expect(countCalls.length).toBeGreaterThan(0);
+    for (const call of countCalls) {
+      expect(call[0]?.where?.domain).toEqual({ not: "PERSONAL" });
+    }
   });
 
   it("loads reference, launchpad, review, draft, and automation data", async () => {
@@ -906,5 +1093,493 @@ describe("read aggregators", () => {
     expect(prismaMock.stream.findMany).toHaveBeenCalled();
     expect(prismaMock.launchpadLink.findMany).toHaveBeenCalled();
     expect(prismaMock.automation.findMany).toHaveBeenCalled();
+  });
+});
+
+describe("document intake", () => {
+  const candidate = {
+    absPath: "/inbox/scan/a.pdf",
+    filename: "a.pdf",
+    source: "FOLDER" as const,
+    mimeType: "application/pdf",
+    byteSize: 3,
+    mtimeMs: 1000,
+    contentHash: "h1",
+    bytes: Buffer.from("abc")
+  };
+
+  it("shows review-ready rows ahead of captured and builds the summary from a full groupBy", async () => {
+    prismaMock.intakeDocument.findMany
+      .mockResolvedValueOnce([{ id: "t1", status: "TRIAGED", domain: "BUSINESS", action: null }]) // review-ready
+      .mockResolvedValueOnce([{ id: "c1", status: "CAPTURED", domain: "UNKNOWN", action: null }]) // captured
+      .mockResolvedValueOnce([{ id: "h1", status: "FILED", domain: "BUSINESS", action: { id: "a1", title: "Filed" } }]); // history
+    prismaMock.intakeDocument.groupBy.mockResolvedValue([
+      { status: "CAPTURED", domain: "UNKNOWN", _count: 1 },
+      { status: "FILED", domain: "BUSINESS", _count: 2 }
+    ]);
+
+    const data = await services.getIntakeQueueData();
+    // Review-ready first, then captured, so a captured backlog never hides approvals.
+    expect(data.pending.map((d) => d.id)).toEqual(["t1", "c1"]);
+    expect(data.history).toHaveLength(1);
+    expect(data.summary.total).toBe(3);
+    expect(data.summary.byDomain.BUSINESS).toBe(2);
+    // The captured query is filtered to CAPTURED only and the history query is ordered by reviewedAt.
+    expect(prismaMock.intakeDocument.findMany.mock.calls[1][0].where).toEqual({ status: "CAPTURED" });
+    expect(prismaMock.intakeDocument.findMany.mock.calls[2][0].orderBy).toEqual({ reviewedAt: "desc" });
+  });
+
+  it("ingests a new candidate, creating the row before discarding the inbox original", async () => {
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [candidate], skippedOversize: [] });
+    prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
+
+    const result = await services.ingestIntakeFolder();
+
+    expect(result).toEqual({ ingested: 1, duplicates: 0, skippedOversize: 0 });
+    expect(store.copyInboxCandidateToStore).toHaveBeenCalledWith(candidate);
+    expect(prismaMock.intakeDocument.create).toHaveBeenCalled();
+    // Order matters: the DB row is created before the inbox original is removed.
+    const createOrder = prismaMock.intakeDocument.create.mock.invocationCallOrder[0];
+    const discardOrder = vi.mocked(store.discardInboxFile).mock.invocationCallOrder[0];
+    expect(createOrder).toBeLessThan(discardOrder);
+  });
+
+  it("skips a duplicate inbox candidate without creating a row", async () => {
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [candidate], skippedOversize: [] });
+    prismaMock.intakeDocument.findFirst.mockResolvedValue({ id: "existing" });
+
+    const result = await services.ingestIntakeFolder();
+
+    expect(result).toEqual({ ingested: 0, duplicates: 1, skippedOversize: 0 });
+    expect(store.discardInboxFile).toHaveBeenCalledWith(candidate);
+    expect(prismaMock.intakeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it("reports oversized files skipped during an ingest run", async () => {
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [], skippedOversize: ["huge.pdf", "big.tiff"] });
+
+    const result = await services.ingestIntakeFolder();
+
+    expect(result).toEqual({ ingested: 0, duplicates: 0, skippedOversize: 2 });
+  });
+
+  it("uploads a new document, hashing before writing to the store", async () => {
+    const fd = new FormData();
+    fd.set("file", fileWithBytes("invoice.pdf", "pdf-bytes"));
+    prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
+
+    await services.uploadIntakeDocument(fd);
+
+    expect(store.hashContent).toHaveBeenCalled();
+    expect(store.storeUploadedFile).toHaveBeenCalled();
+    expect(prismaMock.intakeDocument.create).toHaveBeenCalled();
+  });
+
+  it("rejects an oversized upload before reading its bytes", async () => {
+    const file = new File(["x"], "big.pdf", { type: "application/pdf" });
+    const arrayBuffer = vi.fn(async () => new TextEncoder().encode("x").buffer);
+    Object.defineProperty(file, "arrayBuffer", { value: arrayBuffer });
+    Object.defineProperty(file, "size", { value: 21 * 1024 * 1024 });
+    const fd = new FormData();
+    fd.set("file", file);
+
+    await expect(services.uploadIntakeDocument(fd)).rejects.toThrow(/upload limit/);
+    // The oversized file is rejected before its bytes are ever materialized.
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(store.storeUploadedFile).not.toHaveBeenCalled();
+  });
+
+  it("does not store bytes for a duplicate upload", async () => {
+    const fd = new FormData();
+    fd.set("file", fileWithBytes("invoice.pdf", "pdf-bytes"));
+    prismaMock.intakeDocument.findFirst.mockResolvedValue({ id: "existing" });
+
+    await services.uploadIntakeDocument(fd);
+
+    expect(store.storeUploadedFile).not.toHaveBeenCalled();
+    expect(prismaMock.intakeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it("reads and triages a captured document into TRIAGED", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "UNKNOWN"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "TAX INVOICE ABN GST amount due", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("TRIAGED");
+    expect(updateArg.data.docType).toBe("invoice");
+    expect(updateArg.data.domain).toBe("BUSINESS");
+    // Writeback is guarded so a concurrently-finalised doc is never resurrected.
+    expect(updateArg.where.status).toEqual({ notIn: ["FILED", "ARCHIVED", "REJECTED"] });
+  });
+
+  it("preserves a human-locked domain when re-triaging (domain != suggestedDomain)", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "PERSONAL",
+      suggestedDomain: "UNKNOWN"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.domain).toBe("PERSONAL");
+    // The lock marker (domain != suggestedDomain) is kept intact, not refreshed
+    // to the fresh heuristic, so the manual choice survives future re-reads.
+    expect(updateArg.data.suggestedDomain).toBe("UNKNOWN");
+    // The user-facing action text must reflect the preserved Personal domain, not
+    // the OCR-derived Business one, so an approved action never self-contradicts.
+    expect(updateArg.data.suggestedAction.domain).toBe("PERSONAL");
+    expect(updateArg.data.suggestedAction.description).toContain("Domain: Personal");
+    expect(updateArg.data.suggestedAction.description).not.toContain("Domain: Business");
+    expect(updateArg.data.summary.startsWith("Personal")).toBe(true);
+  });
+
+  it("marks a read that errors with no extracted text as FAILED, not TRIAGED", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.bin",
+      mimeType: "application/octet-stream",
+      originalFilename: "x.bin",
+      domain: "UNKNOWN",
+      suggestedDomain: "UNKNOWN",
+      status: "CAPTURED"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "", engine: "none", error: "Unsupported file type for reading." });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("FAILED");
+  });
+
+  it("guards the triage writeback on the domain so a mark made during the read is not clobbered", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "x.pdf",
+      domain: "UNKNOWN",
+      suggestedDomain: "UNKNOWN",
+      status: "CAPTURED"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    // The writeback only applies while the domain/suggestedDomain are unchanged.
+    expect(updateArg.where.domain).toBe("UNKNOWN");
+    expect(updateArg.where.suggestedDomain).toBe("UNKNOWN");
+  });
+
+  it("does not erase a manual lock when the first triage agrees with the marked domain", async () => {
+    // Reviewer marked Business before the first read: domain=BUSINESS, the
+    // captured suggestedDomain is still UNKNOWN. The OCR triage also yields
+    // BUSINESS, which must NOT collapse domain == suggestedDomain (that would
+    // let a later re-read overwrite the manual choice).
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "BUSINESS",
+      suggestedDomain: "UNKNOWN"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.domain).toBe("BUSINESS");
+    expect(updateArg.data.suggestedDomain).toBe("UNKNOWN");
+  });
+
+  it("updates a heuristic-set domain on re-read (domain == suggestedDomain)", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "PERSONAL",
+      suggestedDomain: "PERSONAL"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.domain).toBe("BUSINESS");
+  });
+
+  it("marks a failed read as FAILED", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "x.pdf",
+      domain: "UNKNOWN"
+    });
+    vi.mocked(read.extractDocumentText).mockRejectedValue(new Error("boom"));
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.status).toBe("FAILED");
+  });
+
+  it("approves a triaged document into an action via an atomic claim", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS" }), "user-1");
+
+    const claimArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(claimArg.data.status).toBe("FILED");
+    expect(prismaMock.action.create).toHaveBeenCalled();
+    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.actionId).toBe("action-1");
+  });
+
+  it("does not create an action when the claim matches nothing (already finalized)", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
+
+    await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS" }), "user-1");
+
+    expect(prismaMock.action.create).not.toHaveBeenCalled();
+  });
+
+  it("routes an uncertain (UNKNOWN) domain to admin even when stale finance routing is posted", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    // The form pre-filled a finance route from the original suggestion; the
+    // operator downgraded the domain to UNKNOWN but the routing inputs still
+    // carry "finance" (no client JS clears them on domain change).
+    await services.approveIntakeDocument(
+      form({ intakeId: "d1", title: "Unsure doc", domain: "UNKNOWN", stream: "Company Core", companyFunction: "finance" }),
+      "user-1"
+    );
+
+    // The stale finance function is ignored; the uncertain document is looked up
+    // against the Company Core/admin fallback instead.
+    expect(prismaMock.companyFunction.findUnique).toHaveBeenCalledWith({ where: { name: "admin" } });
+    expect(prismaMock.companyFunction.findUnique).not.toHaveBeenCalledWith({ where: { name: "finance" } });
+    expect(prismaMock.stream.findUnique).toHaveBeenCalledWith({ where: { name: "Company Core" } });
+  });
+
+  it("routes a MIXED approval to admin, ignoring stale finance routing", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    await services.approveIntakeDocument(
+      form({ intakeId: "d1", title: "Mixed doc", domain: "MIXED", stream: "Company Core", companyFunction: "finance" }),
+      "user-1"
+    );
+
+    expect(prismaMock.companyFunction.findUnique).toHaveBeenCalledWith({ where: { name: "admin" } });
+    expect(prismaMock.companyFunction.findUnique).not.toHaveBeenCalledWith({ where: { name: "finance" } });
+  });
+
+  it("falls back to the docType route when a posted free-text route name does not resolve", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    // Operator typed invalid route names into the free-text datalist inputs.
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ docType: "invoice" });
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "finance" ? { id: "fn-finance" } : null));
+
+    await services.approveIntakeDocument(
+      form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS", stream: "Finance", companyFunction: "Payroll" }),
+      "user-1"
+    );
+
+    // The invalid names resolved to null, so the invoice's docType route
+    // (Company Core / finance) is used instead of leaving the action unrouted.
+    const action = prismaMock.action.create.mock.calls.at(-1)?.[0];
+    expect(action.data.streamId).toBe("stream-core");
+    expect(action.data.companyFunctionId).toBe("fn-finance");
+  });
+
+  it("realigns the action description domain when the reviewer changes only the dropdown", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    const prefill = "Captured document triaged locally on 2026-07-01.\nDomain: Business (confidence 0.9).\nProposed disposition: ACTION.";
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ docType: "invoice", suggestedAction: { domain: "BUSINESS", description: prefill } });
+
+    // Reviewer flipped the domain to Personal but left the prefilled description.
+    await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "PERSONAL", description: prefill }), "user-1");
+
+    const action = prismaMock.action.create.mock.calls.at(-1)?.[0];
+    expect(action.data.domain).toBe("PERSONAL");
+    expect(action.data.description).toContain("Domain: Personal");
+    expect(action.data.description).not.toContain("Domain: Business");
+  });
+
+  it("files a document for records without creating an action", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    await services.fileIntakeDocument(form({ intakeId: "d1", domain: "PERSONAL" }), "user-1");
+
+    const arg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(arg.data.status).toBe("FILED");
+    expect(arg.data.disposition).toBe("FILE");
+    expect(prismaMock.action.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses to file an already-finalized document", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(services.fileIntakeDocument(form({ intakeId: "d1", domain: "PERSONAL" }), "user-1")).rejects.toThrow(/already been filed/);
+  });
+
+  it("refuses to re-read a finalized document", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "x.pdf",
+      domain: "BUSINESS",
+      status: "ARCHIVED"
+    });
+
+    await expect(services.readAndTriageIntakeDocument("d1")).rejects.toThrow(/already been filed/);
+  });
+
+  it("archives a pending document and rejects re-archiving a finalised one", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "TRIAGED", storedPath: "/store/x.pdf", domain: "BUSINESS" });
+    await services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1");
+    expect(store.moveToArchive).toHaveBeenCalledWith("/store/x.pdf");
+
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "ARCHIVED", storedPath: "/x", domain: "BUSINESS" });
+    await expect(services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);
+  });
+
+  it("does not move archived bytes when the claim loses a race with another finaliser", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "TRIAGED", storedPath: "/store/x.pdf", domain: "BUSINESS" });
+    // The guarded claim matches nothing (another tab finalised it first).
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
+    vi.mocked(store.moveToArchive).mockClear();
+
+    await expect(services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);
+    // The bytes are never moved, so a FILED/action record can't be left pointing
+    // at a path that was archived away.
+    expect(store.moveToArchive).not.toHaveBeenCalled();
+  });
+
+  it("rolls the archive claim back to a retryable state when the byte move fails", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      status: "TRIAGED",
+      storedPath: "/store/x.pdf",
+      domain: "BUSINESS",
+      disposition: "FILE",
+      reviewedById: null,
+      reviewedAt: null,
+      reviewerNote: null
+    });
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    vi.mocked(store.moveToArchive).mockRejectedValueOnce(new Error("disk full"));
+
+    await expect(services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/disk full/);
+    // The row is rolled back from ARCHIVED to its pre-archive status.
+    const rollback = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(rollback.where.status).toBe("ARCHIVED");
+    expect(rollback.data.status).toBe("TRIAGED");
+  });
+
+  it("rejects a document and updates the intake domain", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    await services.rejectIntakeDocument(form({ intakeId: "d1" }), "user-1");
+    expect(prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data.status).toBe("REJECTED");
+
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ suggestedAction: { domain: "UNKNOWN", title: "x" } });
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    await services.setIntakeDomain(form({ intakeId: "d1", domain: "PERSONAL" }));
+    expect(prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data.domain).toBe("PERSONAL");
+  });
+
+  it("realigns the suggested copy and summary when a domain is marked on a triaged row", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      suggestedAction: { domain: "BUSINESS", title: "Receipt", description: "Domain: Business (confidence 0.6).\nProposed disposition: FILE." },
+      summary: "Business receipt | disposition file"
+    });
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    await services.setIntakeDomain(form({ intakeId: "d1", domain: "PERSONAL" }));
+
+    const data = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("PERSONAL");
+    expect(data.suggestedAction.domain).toBe("PERSONAL");
+    expect(data.suggestedAction.description).toContain("Domain: Personal");
+    expect(data.suggestedAction.description).not.toContain("Domain: Business");
+    expect(data.summary.startsWith("Personal")).toBe(true);
+  });
+
+  it("refuses to reject an already-finalized document", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
+    await expect(services.rejectIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);
+  });
+
+  it("runs the document intake triage automation on approval", async () => {
+    prismaMock.automation.findUnique.mockResolvedValue({
+      id: "auto-di",
+      name: "Document intake triage",
+      safetyLevel: "APPROVAL_REQUIRED",
+      status: "ACTIVE",
+      trigger: "Manual scan triage",
+      targetTool: "local cockpit"
+    });
+
+    await services.runAutomation("auto-di", true, "user-1");
+
+    expect(store.collectInboxCandidates).toHaveBeenCalled();
+    const runArg = prismaMock.automationRun.create.mock.calls.at(-1)?.[0];
+    expect(runArg.data.status).toBe("SUCCESS");
+    expect(runArg.data.responseSummary).toContain("Document intake triage");
+  });
+
+  it("loads a single document's extracted text on demand", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ ocrText: "TAX INVOICE ABN GST", ocrEngine: "pdftotext" });
+
+    const result = await services.getIntakeDocumentText("d1");
+
+    expect(result.text).toBe("TAX INVOICE ABN GST");
+    expect(result.engine).toBe("pdftotext");
+    expect(result.truncated).toBe(false);
+  });
+
+  it("throws when the on-demand text is requested for a missing document", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue(null);
+    await expect(services.getIntakeDocumentText("missing")).rejects.toThrow(/not found/);
+  });
+
+  it("builds the personal pipeline from personal-domain actions and documents", async () => {
+    prismaMock.action.findMany.mockResolvedValue([
+      { id: "a1", title: "Renew car rego", status: "OPEN", priority: "HIGH", dueAt: null, nextStep: "Pay online", sensitive: false }
+    ]);
+    prismaMock.intakeDocument.findMany.mockResolvedValue([
+      { id: "d1", originalFilename: "medicare.pdf", status: "FILED", docType: "medical", reviewedAt: new Date("2026-06-01"), action: null }
+    ]);
+    prismaMock.action.count.mockResolvedValue(3);
+    prismaMock.intakeDocument.count.mockResolvedValue(5);
+
+    const data = await services.getPersonalPipelineData();
+
+    expect(data.openActions).toHaveLength(1);
+    expect(data.recentDocuments).toHaveLength(1);
+    expect(data.actionCount).toBe(3);
+    expect(data.documentCount).toBe(5);
+    // Both queries are scoped to the Personal domain, and the to-do query
+    // excludes both DONE and CANCELLED so closed work never shows as open.
+    const actionArg = prismaMock.action.findMany.mock.calls.at(-1)?.[0];
+    expect(actionArg.where.domain).toBe("PERSONAL");
+    expect(actionArg.where.status).toEqual({ notIn: ["DONE", "CANCELLED"] });
+    expect(prismaMock.intakeDocument.findMany.mock.calls.at(-1)?.[0].where.domain).toBe("PERSONAL");
   });
 });

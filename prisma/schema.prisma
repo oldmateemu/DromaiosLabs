@@ -82,6 +82,37 @@ enum AutomationRunStatus {
   BLOCKED
 }
 
+enum IntakeDomain {
+  BUSINESS
+  PERSONAL
+  MIXED
+  UNKNOWN
+}
+
+enum IntakeSource {
+  FOLDER
+  UPLOAD
+  EMAIL
+}
+
+enum IntakeStatus {
+  CAPTURED
+  READ
+  TRIAGED
+  IN_REVIEW
+  FILED
+  ARCHIVED
+  REJECTED
+  FAILED
+}
+
+enum IntakeDisposition {
+  ACTION
+  FILE
+  ARCHIVE
+  UNSURE
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -96,6 +127,7 @@ model User {
   assistantDrafts AssistantDraft[]
   reviews         Review[]
   automationRuns  AutomationRun[]
+  intakeReviews   IntakeDocument[]
 }
 
 model Session {
@@ -141,6 +173,7 @@ model Action {
   status            ActionStatus @default(OPEN)
   priority          Priority     @default(MEDIUM)
   source            ActionSource @default(USER)
+  domain            IntakeDomain @default(BUSINESS)
   dueAt             DateTime?
   reviewAt          DateTime?
   nextStep          String?
@@ -166,6 +199,7 @@ model Action {
   automation      Automation?      @relation(fields: [automationId], references: [id], onDelete: SetNull)
   risks           Risk[]
   decisions       Decision[]
+  intakeDocument  IntakeDocument?
 
   @@index([status])
   @@index([priority])
@@ -173,6 +207,7 @@ model Action {
   @@index([reviewAt])
   @@index([streamId])
   @@index([companyFunctionId])
+  @@index([domain])
 }
 
 model LaunchpadLink {
@@ -322,4 +357,51 @@ model AutomationRun {
 
   @@index([automationId])
   @@index([status])
+}
+
+// A scanned/uploaded/emailed document captured into the review queue. It is
+// read locally (OCR + Ollama), triaged into a Business/Personal/Mixed domain
+// with a proposed disposition, and held for human approval before any company
+// Action is created. Nothing leaves the box: stored bytes live on the intake
+// volume and reading uses the local OCR + Ollama path only.
+model IntakeDocument {
+  id               String             @id @default(cuid())
+  source           IntakeSource
+  status           IntakeStatus       @default(CAPTURED)
+  domain           IntakeDomain       @default(UNKNOWN)
+  suggestedDomain  IntakeDomain       @default(UNKNOWN)
+  domainConfidence Float?
+  disposition      IntakeDisposition?
+  docType          String?
+  originalFilename String
+  storedPath       String
+  contentHash      String
+  mimeType         String?
+  byteSize         Int?
+  ocrText          String?
+  ocrEngine        String?
+  summary          String?
+  triageNote       String?
+  reviewerNote     String?
+  sensitive        Boolean            @default(true)
+  signals          Json?
+  suggestedAction  Json?
+  readAt           DateTime?
+  triagedAt        DateTime?
+  reviewedAt       DateTime?
+  capturedAt       DateTime           @default(now())
+  receivedAt       DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  reviewedById String?
+  actionId     String? @unique
+
+  reviewedBy User?   @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  action     Action? @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@unique([contentHash])
+  @@index([status])
+  @@index([domain])
+  @@index([capturedAt])
 }

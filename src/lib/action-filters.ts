@@ -1,4 +1,4 @@
-import { ActionSource, ActionStatus, Priority, type Prisma } from "@prisma/client";
+import { ActionSource, ActionStatus, IntakeDomain, Priority, type Prisma } from "@prisma/client";
 
 type RegisterFilters = Record<string, string | undefined>;
 
@@ -8,9 +8,14 @@ export function buildActionRegisterWhere(filters: RegisterFilters): Prisma.Actio
   const status = enumFilter(filters.status, ActionStatus);
   const priority = enumFilter(filters.priority, Priority);
   const source = enumFilter(filters.source, ActionSource);
+  const domain = enumFilter(filters.domain, IntakeDomain);
   const dueBefore = endOfDayFilter(filters.dueBefore);
   const reviewBefore = endOfDayFilter(filters.reviewBefore);
 
+  // The register is the company action view: exclude Personal-domain actions by
+  // default (they belong to the /personal pipeline), unless a domain is explicitly
+  // requested, so private household/medical tasks never surface as company work.
+  where.domain = domain ?? { not: IntakeDomain.PERSONAL };
   if (status) where.status = status;
   if (priority) where.priority = priority;
   if (source) where.source = source;

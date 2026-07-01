@@ -4,6 +4,7 @@ import {
   ClipboardList,
   FileText,
   Gauge,
+  Inbox,
   LayoutGrid,
   Link as LinkIcon,
   ListChecks,
@@ -11,7 +12,8 @@ import {
   Repeat,
   ShieldAlert,
   ShieldCheck,
-  Target
+  Target,
+  UserRound
 } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 import { CommandPalette, type CommandItem } from "@/components/command-palette";
@@ -24,6 +26,8 @@ const navItems = [
   { href: "/actions", label: "Actions", icon: ClipboardList },
   { href: "/pipeline", label: "Pipeline", icon: Target },
   { href: "/launchpad", label: "Launchpad", icon: LinkIcon },
+  { href: "/intake", label: "Intake", icon: Inbox },
+  { href: "/personal", label: "Personal", icon: UserRound },
   { href: "/governance", label: "Governance", icon: ShieldAlert },
   { href: "/reviews", label: "Reviews", icon: ShieldCheck },
   { href: "/activity", label: "Activity", icon: Activity },

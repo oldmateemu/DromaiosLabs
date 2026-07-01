@@ -14,12 +14,13 @@ Operating surfaces:
 - Reviews (`/reviews`) open with a "since last review" momentum panel (completions, new actions, new risks, decisions since the prior review).
 - Activity (`/activity`) is a single company timeline across actions, governance, automations, drafts, and reviews, plus a weekly completion-trend chart.
 - Launchpad (`/launchpad`) includes a renewals + spend forecast: upcoming renewals grouped by month with cost totals, overdue renewals, and untracked-cost gaps.
+- Intake (`/intake`) is the document pathway: scan/upload/email a document, read it locally (Tesseract OCR + Ollama), triage it into a Business/Personal/Mixed domain with a proposed action, and hold it in a review queue for human approval, filing, or archiving. See `docs/workflows/document-intake-triage.md`.
 - Governance (`/governance`) manages the risk register and decision log directly.
 - Automations include a cross-loop run history with success/failure/blocked counts.
 - A command palette (Cmd/Ctrl+K) jumps to any page, open action, or launchpad system.
 - `/digest` returns a board/records-ready Markdown operating digest (auth-gated download).
 
-Pure, unit-tested operating-intelligence helpers live in `src/lib`: `company-pulse`, `stream-portfolio`, `stream-spend`, `automation-history`, `renewal-calendar`, `review-momentum`, `completion-trend`, `activity-feed`, and `operating-digest`. Keep new aggregation logic in pure helpers with tests, and assemble data in `src/lib/services.ts`.
+Pure, unit-tested operating-intelligence helpers live in `src/lib`: `company-pulse`, `stream-portfolio`, `stream-spend`, `automation-history`, `renewal-calendar`, `review-momentum`, `completion-trend`, `activity-feed`, `operating-digest`, and `document-intake` (document triage/domain classification). Keep new aggregation logic in pure helpers with tests, and assemble data in `src/lib/services.ts`. Side-effectful intake modules (`document-read` for local OCR, `document-intake-store` for the filesystem) are `server-only`.
 
 ## Read First
 

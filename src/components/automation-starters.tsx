@@ -42,6 +42,14 @@ const templates = [
     rollbackNote: "Disable Gmail labels or the Apps Script trigger. Originals remain in Gmail and Drive quarantine; no payments or Xero writes are made."
   },
   {
+    name: "Document intake triage",
+    safetyLevel: AutomationSafetyLevel.APPROVAL_REQUIRED,
+    trigger: "Manual scan triage",
+    targetTool: "local cockpit",
+    description: "Pulls scanned/emailed documents into the intake review queue, reads them locally (OCR + Ollama), and triages Business vs Personal for approval.",
+    rollbackNote: "Documents stay in the queue until you approve, archive, or reject them. No action is created without approval and nothing leaves the box."
+  },
+  {
     name: "Lead follow-up draft",
     safetyLevel: AutomationSafetyLevel.DRAFT_ONLY,
     trigger: "Manual sales follow-up prep",

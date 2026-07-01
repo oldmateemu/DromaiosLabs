@@ -35,9 +35,18 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-Dromaios Admin}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:1b}
+      # Off-box intake extraction is skipped by default to keep document text on
+      # the box; set true to allow a self-hosted Ollama elsewhere on your VPN.
+      INTAKE_ALLOW_REMOTE_OLLAMA: ${INTAKE_ALLOW_REMOTE_OLLAMA:-false}
+      INTAKE_DIR: ${INTAKE_DIR:-/data/intake}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Captured document storage and the watched inbox/scan + inbox/email
+      # folders. To drop scans straight from the host, bind a host path here:
+      #   - /srv/dromaios/intake:/data/intake
+      - intake_data:/data/intake
     ports:
       - "${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-3300}:3000"
 
@@ -57,3 +66,4 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+  intake_data:

@@ -24,7 +24,11 @@ export default defineConfig({
         // integration/runtime rather than unit tests.
         "src/app/**/*.tsx",
         // Prisma client singleton is thin infrastructure wiring.
-        "src/lib/db.ts"
+        "src/lib/db.ts",
+        // Thin wrapper around external OCR binaries (Tesseract/poppler) that only
+        // exist in the Docker runtime image, not the CI runner, so its
+        // happy-path OCR cannot be exercised in unit tests.
+        "src/lib/document-read.ts"
       ],
       reporter: ["text", "html", "lcov"],
       // Ratcheting floor: keep these at or just below current coverage so the

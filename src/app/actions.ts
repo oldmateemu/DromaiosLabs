@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { loginWithPassword, logout, requireUser } from "@/lib/auth";
 import {
   approveAssistantDraft,
+  approveIntakeDocument,
+  archiveIntakeDocument,
   completeWeeklyReview,
   createActionFromForm,
   createAutomation,
@@ -12,16 +14,23 @@ import {
   createLaunchpadLink,
   createQuickCaptureDraft,
   createRisk,
+  fileIntakeDocument,
+  getIntakeDocumentText,
+  ingestIntakeFolder,
   prepareDraftAutomation,
+  readAndTriageIntakeDocument,
+  rejectIntakeDocument,
   runAutomation,
+  setIntakeDomain,
   setSetupItemStatus,
   updateActionFromForm,
   updateActionQuickEditFromForm,
   updateActionStatus,
   updateLaunchpadLinkFromForm,
   updateLaunchpadQuickFieldsFromForm,
+  updateRiskStatus,
   updateSetupItemFromForm,
-  updateRiskStatus
+  uploadIntakeDocument
 } from "@/lib/services";
 
 export async function loginAction(formData: FormData) {
@@ -197,4 +206,62 @@ export async function prepareDraftAutomationAction(formData: FormData) {
   const automationId = String(formData.get("automationId") ?? "");
   await prepareDraftAutomation(automationId, user.id);
   redirect("/automations");
+}
+
+export async function ingestIntakeFolderAction() {
+  await requireUser();
+  const { skippedOversize } = await ingestIntakeFolder();
+  // Surface oversized files that were skipped so the operator knows a document is
+  // stuck in the watched folder rather than seeing an unchanged/empty queue.
+  redirect(skippedOversize > 0 ? `/intake?skippedOversize=${skippedOversize}` : "/intake");
+}
+
+export async function uploadIntakeDocumentAction(formData: FormData) {
+  await requireUser();
+  await uploadIntakeDocument(formData);
+  redirect("/intake");
+}
+
+export async function readIntakeDocumentAction(formData: FormData) {
+  await requireUser();
+  const intakeId = String(formData.get("intakeId") ?? "").trim();
+  if (!intakeId) throw new Error("Document is required.");
+  await readAndTriageIntakeDocument(intakeId);
+  redirect("/intake");
+}
+
+export async function approveIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await approveIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function fileIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await fileIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function archiveIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await archiveIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function rejectIntakeDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  await rejectIntakeDocument(formData, user.id);
+  redirect("/intake");
+}
+
+export async function setIntakeDomainAction(formData: FormData) {
+  await requireUser();
+  await setIntakeDomain(formData);
+  redirect("/intake");
+}
+
+export async function getIntakeDocumentTextAction(intakeId: string) {
+  await requireUser();
+  if (!intakeId) throw new Error("Document is required.");
+  return getIntakeDocumentText(intakeId);
 }

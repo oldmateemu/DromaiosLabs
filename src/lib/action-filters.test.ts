@@ -17,11 +17,18 @@ describe("buildActionRegisterWhere", () => {
       status: "OPEN",
       priority: "HIGH",
       source: "ASSISTANT",
+      domain: { not: "PERSONAL" },
       streamId: "stream-1",
       companyFunctionId: "function-1",
       dueAt: { lte: new Date("2026-06-01T23:59:59.999") },
       reviewAt: { lte: new Date("2026-06-07T23:59:59.999") }
     });
+  });
+
+  it("excludes Personal-domain actions by default and honours an explicit domain filter", () => {
+    expect(buildActionRegisterWhere({})).toEqual({ domain: { not: "PERSONAL" } });
+    expect(buildActionRegisterWhere({ domain: "PERSONAL" })).toEqual({ domain: "PERSONAL" });
+    expect(buildActionRegisterWhere({ domain: "BUSINESS" })).toEqual({ domain: "BUSINESS" });
   });
 
   it("ignores empty, ALL, and invalid enum filters", () => {
@@ -34,7 +41,8 @@ describe("buildActionRegisterWhere", () => {
       dueBefore: "not-a-date"
     });
 
-    expect(where).toEqual({});
+    // Personal is still excluded by default even when every other filter is empty.
+    expect(where).toEqual({ domain: { not: "PERSONAL" } });
   });
 
   it("supports saved-view company function slugs when no id is available", () => {
@@ -43,6 +51,7 @@ describe("buildActionRegisterWhere", () => {
     });
 
     expect(where).toEqual({
+      domain: { not: "PERSONAL" },
       companyFunction: {
         name: {
           equals: "founder workload",

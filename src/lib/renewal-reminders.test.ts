@@ -43,7 +43,31 @@ describe("getLocalApprovalAutomationKind", () => {
         trigger: "Manual Gmail/Drive/Sheets filing review",
         targetTool: "Gmail Processor / Apps Script"
       })
-    ).toBeNull();
+    ).toBe(null);
+  });
+
+  it("recognises the approval-gated document intake triage runner by its exact name", () => {
+    expect(
+      getLocalApprovalAutomationKind({
+        name: "Document intake triage",
+        safetyLevel: "APPROVAL_REQUIRED",
+        trigger: "Manual scan triage",
+        targetTool: "local cockpit"
+      })
+    ).toBe("DOCUMENT_INTAKE_TRIAGE");
+  });
+
+  it("does not hijack a custom automation that merely mentions document intake / scan triage", () => {
+    // An operator's external webhook workflow whose name/trigger/target references
+    // scanning must reach the webhook branch, not be replaced by local ingest.
+    expect(
+      getLocalApprovalAutomationKind({
+        name: "Document intake reconciliation (Zapier)",
+        safetyLevel: "APPROVAL_REQUIRED",
+        trigger: "Nightly scan triage export",
+        targetTool: "https://hooks.zapier.com/document-intake"
+      })
+    ).toBe(null);
   });
 });
 

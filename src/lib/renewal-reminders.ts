@@ -1,6 +1,6 @@
 import { buildLaunchpadHealth, type LaunchpadHealthLink } from "./cockpit-insights";
 
-export type LocalApprovalAutomationKind = "RENEWAL_REMINDER" | "COMPANY_MAILROOM_FILING";
+export type LocalApprovalAutomationKind = "RENEWAL_REMINDER" | "COMPANY_MAILROOM_FILING" | "DOCUMENT_INTAKE_TRIAGE";
 
 export type LocalApprovalAutomationRef = {
   name: string;
@@ -49,6 +49,12 @@ export function getLocalApprovalAutomationKind(automation: LocalApprovalAutomati
   const text = [automation.name, automation.trigger, automation.targetTool].filter(Boolean).join(" ").toLowerCase();
   if (text.includes("renewal reminder") || text.includes("launchpad renewal check")) return "RENEWAL_REMINDER";
   if (text.includes("company mailroom filing") || text.includes("gmail/drive/sheets filing")) return "COMPANY_MAILROOM_FILING";
+  // Match the local scan-folder runner by the starter's exact name only. A broad
+  // substring ("document intake"/"scan triage") would hijack any custom
+  // APPROVAL_REQUIRED automation that merely mentions those words — e.g. an
+  // operator's external webhook workflow — silently replacing it with local
+  // folder ingest so its webhook never runs.
+  if (automation.name.trim().toLowerCase() === "document intake triage") return "DOCUMENT_INTAKE_TRIAGE";
   return null;
 }
 

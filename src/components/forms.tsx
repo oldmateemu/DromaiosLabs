@@ -1,4 +1,4 @@
-import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel, RiskLevel } from "@prisma/client";
+import { ActionSource, Priority, ActionStatus, AutomationSafetyLevel, IntakeDomain, RiskLevel } from "@prisma/client";
 import Link from "next/link";
 
 type ReferenceItem = { id: string; name: string };
@@ -111,6 +111,7 @@ type EditableAction = {
   nextStep?: string | null;
   streamId?: string | null;
   companyFunctionId?: string | null;
+  domain?: string | null;
   sensitive?: boolean | null;
 };
 
@@ -140,6 +141,7 @@ export function ActionEditForm({
       </div>
       <Select name="priority" label="Priority" values={Object.values(Priority)} defaultValue={action.priority} />
       <Select name="status" label="Status" values={Object.values(ActionStatus)} defaultValue={action.status} />
+      <Select name="domain" label="Domain (Business / Personal)" values={Object.values(IntakeDomain)} defaultValue={action.domain ?? IntakeDomain.BUSINESS} />
       <SelectItems name="streamId" label="Stream" items={streams} defaultValue={action.streamId ?? ""} emptyLabel="Unassigned" />
       <SelectItems name="companyFunctionId" label="Company function" items={companyFunctions} defaultValue={action.companyFunctionId ?? ""} emptyLabel="Unassigned" />
       <Field name="dueAt" label="Due date" type="date" defaultValue={dateInputValue(action.dueAt)} />
