@@ -23,7 +23,7 @@ const { prismaMock } = vi.hoisted(() => ({
     review: { create: vi.fn(), findMany: vi.fn() },
     risk: { findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
     decision: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
-    intakeDocument: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), groupBy: vi.fn(), create: vi.fn(), update: vi.fn() },
+    intakeDocument: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), groupBy: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn()
   }
 }));
@@ -118,6 +118,7 @@ beforeEach(() => {
   prismaMock.intakeDocument.groupBy.mockResolvedValue([]);
   prismaMock.intakeDocument.create.mockResolvedValue({ id: "intake-1" });
   prismaMock.intakeDocument.update.mockResolvedValue({ id: "intake-1" });
+  prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
   const storedFile = { storedPath: "/store/hash-abc.pdf", filename: "doc.pdf", contentHash: "hash-abc", mimeType: "application/pdf", byteSize: 3 };
   vi.mocked(store.collectInboxCandidates).mockResolvedValue([]);
   vi.mocked(store.storeUploadedFile).mockResolvedValue(storedFile);
@@ -1009,6 +1010,16 @@ describe("document intake", () => {
     expect(prismaMock.intakeDocument.create).toHaveBeenCalled();
   });
 
+  it("rejects an oversized upload before reading its bytes", async () => {
+    const file = fileWithBytes("big.pdf", "x");
+    Object.defineProperty(file, "size", { value: 21 * 1024 * 1024 });
+    const fd = new FormData();
+    fd.set("file", file);
+
+    await expect(services.uploadIntakeDocument(fd)).rejects.toThrow(/upload limit/);
+    expect(store.storeUploadedFile).not.toHaveBeenCalled();
+  });
+
   it("does not store bytes for a duplicate upload", async () => {
     const fd = new FormData();
     fd.set("file", fileWithBytes("invoice.pdf", "pdf-bytes"));
@@ -1071,19 +1082,20 @@ describe("document intake", () => {
     expect(updateArg.data.status).toBe("FAILED");
   });
 
-  it("approves a triaged document into an action", async () => {
-    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "TRIAGED", actionId: null });
+  it("approves a triaged document into an action via an atomic claim", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
 
     await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS" }), "user-1");
 
+    const claimArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(claimArg.data.status).toBe("FILED");
     expect(prismaMock.action.create).toHaveBeenCalled();
     const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
-    expect(updateArg.data.status).toBe("FILED");
     expect(updateArg.data.actionId).toBe("action-1");
   });
 
-  it("does not create a second action when an already-filed document is re-approved", async () => {
-    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "FILED", actionId: "a1" });
+  it("does not create an action when the claim matches nothing (already finalized)", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
 
     await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS" }), "user-1");
 
@@ -1091,12 +1103,33 @@ describe("document intake", () => {
   });
 
   it("files a document for records without creating an action", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
     await services.fileIntakeDocument(form({ intakeId: "d1", domain: "PERSONAL" }), "user-1");
 
-    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
-    expect(updateArg.data.status).toBe("FILED");
-    expect(updateArg.data.disposition).toBe("FILE");
+    const arg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(arg.data.status).toBe("FILED");
+    expect(arg.data.disposition).toBe("FILE");
     expect(prismaMock.action.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses to file an already-finalized document", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(services.fileIntakeDocument(form({ intakeId: "d1", domain: "PERSONAL" }), "user-1")).rejects.toThrow(/already been filed/);
+  });
+
+  it("refuses to re-read a finalized document", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "x.pdf",
+      domain: "BUSINESS",
+      status: "ARCHIVED"
+    });
+
+    await expect(services.readAndTriageIntakeDocument("d1")).rejects.toThrow(/already been filed/);
   });
 
   it("archives a pending document and rejects re-archiving a finalised one", async () => {

@@ -65,6 +65,11 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
   await ensureIntakeDirs();
   const root = intakeRoot();
   const candidates: InboxCandidate[] = [];
+  // Skip files whose mtime is within the settle window: a scanner/sync may still
+  // be writing them, and reading now would capture a truncated document. They are
+  // picked up on the next ingest. Set INTAKE_SETTLE_MS=0 to disable (used in tests).
+  const settleMs = Number(process.env.INTAKE_SETTLE_MS ?? 3000);
+  const now = Date.now();
 
   for (const [dir, source] of [
     [INBOX_SCAN, "FOLDER"],
@@ -81,7 +86,25 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
       if (!entry.isFile()) continue;
       if (entry.name.startsWith(".")) continue;
       const absPath = join(absDir, entry.name);
-      const bytes = await readFile(absPath);
+
+      let info;
+      try {
+        info = await stat(absPath);
+      } catch (error) {
+        // Vanished between readdir and stat (moved/removed by the producer).
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
+      }
+      if (settleMs > 0 && now - info.mtimeMs < settleMs) continue;
+
+      let bytes: Buffer;
+      try {
+        bytes = await readFile(absPath);
+      } catch (error) {
+        // Vanished between stat and read; treat only ENOENT as skippable.
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
+      }
       candidates.push({
         absPath,
         filename: entry.name,
@@ -140,8 +163,20 @@ export async function moveToArchive(storedPath: string): Promise<string> {
   const root = intakeRoot();
   const name = basename(storedPath) || `archived-${Date.now()}`;
   const target = join(root, ARCHIVE, name);
-  const exists = await stat(storedPath).then(() => true).catch(() => false);
-  if (!exists) return storedPath;
+  const exists = await stat(storedPath).then(() => true).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  });
+  if (!exists) {
+    // Source already gone (e.g. a retry after a prior move succeeded): return the
+    // archive target if it now holds the file, so the caller persists the correct
+    // path rather than a stale store path.
+    const archived = await stat(target).then(() => true).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return false;
+      throw error;
+    });
+    return archived ? target : storedPath;
+  }
   await rename(storedPath, target).catch(async () => {
     // rename can fail across devices; fall back to copy+delete.
     const bytes = await readFile(storedPath);

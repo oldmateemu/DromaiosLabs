@@ -678,12 +678,14 @@ export async function uploadIntakeDocument(formData: FormData) {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) throw new Error("Choose a document to upload.");
 
-  const bytes = Buffer.from(await file.arrayBuffer());
-  // Explicit ceiling in the intake path (defence in depth alongside the Next.js
-  // server-action body limit) so an oversized upload cannot amplify OCR work.
-  if (bytes.byteLength > MAX_INTAKE_UPLOAD_BYTES) {
+  // Reject oversized uploads before materialising the buffer (defence in depth
+  // alongside the Next.js server-action body limit) so a large payload cannot
+  // spike memory or amplify OCR work.
+  if (file.size > MAX_INTAKE_UPLOAD_BYTES) {
     throw new Error(`Document exceeds the ${Math.round(MAX_INTAKE_UPLOAD_BYTES / (1024 * 1024))}MB upload limit.`);
   }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
 
   // Hash first and only write bytes to the store when the document is new, so a
   // re-uploaded duplicate never leaves an untracked file behind.
@@ -722,6 +724,10 @@ export async function uploadIntakeDocument(formData: FormData) {
 export async function readAndTriageIntakeDocument(intakeId: string) {
   const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId } });
   if (!doc) throw new Error("Intake document not found.");
+  // A stale re-read must not resurrect a filed/archived/rejected document.
+  if ((INTAKE_FINALISED_STATUSES as string[]).includes(doc.status)) {
+    throw new Error("This document has already been filed, archived, or rejected.");
+  }
 
   try {
     const read = await extractDocumentText({ storedPath: doc.storedPath, mimeType: doc.mimeType, filename: doc.originalFilename });
@@ -812,12 +818,22 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
     attachesCompanyContext && functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
 
   await prisma.$transaction(async (tx) => {
-    // Guard against a double-submit (double-click/retry): if the document is
-    // already filed or linked to an action, do nothing rather than create a
-    // second action and orphan the first.
-    const current = await tx.intakeDocument.findUnique({ where: { id: intakeId }, select: { status: true, actionId: true } });
-    if (!current) throw new Error("Intake document not found.");
-    if (current.actionId || current.status === IntakeStatus.FILED) return;
+    // Atomically claim the row with a single guarded UPDATE: only a not-yet-filed,
+    // not-yet-finalised, unlinked document is moved to FILED. A concurrent or
+    // stale resubmit (double-click, back-button, another tab that archived it)
+    // matches nothing, so no duplicate/orphan Action is created.
+    const claim = await tx.intakeDocument.updateMany({
+      where: { id: intakeId, actionId: null, status: { notIn: INTAKE_FINALISED_STATUSES } },
+      data: {
+        status: IntakeStatus.FILED,
+        domain,
+        disposition: IntakeDisposition.ACTION,
+        reviewedById: userId,
+        reviewedAt: new Date(),
+        reviewerNote: optionalString(formData, "reviewerNote")
+      }
+    });
+    if (claim.count === 0) return;
 
     const action = await tx.action.create({
       data: {
@@ -837,18 +853,7 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
       }
     });
 
-    await tx.intakeDocument.update({
-      where: { id: intakeId },
-      data: {
-        status: IntakeStatus.FILED,
-        domain,
-        disposition: IntakeDisposition.ACTION,
-        actionId: action.id,
-        reviewedById: userId,
-        reviewedAt: new Date(),
-        reviewerNote: optionalString(formData, "reviewerNote")
-      }
-    });
+    await tx.intakeDocument.update({ where: { id: intakeId }, data: { actionId: action.id } });
   });
 
   revalidatePath("/");
@@ -865,8 +870,10 @@ export async function fileIntakeDocument(formData: FormData, userId: string) {
   const intakeId = stringValue(formData, "intakeId");
   if (!intakeId) throw new Error("Document is required.");
 
-  await prisma.intakeDocument.update({
-    where: { id: intakeId },
+  // Atomically file only a not-yet-finalised document, so a stale form cannot
+  // turn an archived/rejected/action-filed record into a records-only file.
+  const updated = await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
     data: {
       status: IntakeStatus.FILED,
       disposition: IntakeDisposition.FILE,
@@ -876,6 +883,7 @@ export async function fileIntakeDocument(formData: FormData, userId: string) {
       reviewerNote: optionalString(formData, "reviewerNote")
     }
   });
+  if (updated.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
 
   revalidatePath("/intake");
 }

@@ -20,6 +20,9 @@ let root: string;
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "intake-store-test-"));
   process.env.INTAKE_DIR = root;
+  // Disable the "still being written" settle window so freshly-created test
+  // files are collected immediately.
+  process.env.INTAKE_SETTLE_MS = "0";
 });
 
 afterEach(async () => {
@@ -108,6 +111,21 @@ describe("collectInboxCandidates", () => {
     await ensureIntakeDirs();
     expect(await collectInboxCandidates()).toEqual([]);
   });
+
+  it("propagates non-ENOENT readdir errors instead of swallowing them", async () => {
+    await ensureIntakeDirs();
+    // Replace the scan directory with a file so readdir fails with ENOTDIR.
+    await rm(join(root, "inbox", "scan"), { recursive: true, force: true });
+    await writeFile(join(root, "inbox", "scan"), "not a directory");
+    await expect(collectInboxCandidates()).rejects.toBeTruthy();
+  });
+
+  it("skips files still within the settle window", async () => {
+    process.env.INTAKE_SETTLE_MS = "60000";
+    await ensureIntakeDirs();
+    await writeFile(join(root, "inbox", "scan", "still-writing.pdf"), "partial");
+    expect(await collectInboxCandidates()).toEqual([]);
+  });
 });
 
 describe("copyInboxCandidateToStore and discardInboxFile", () => {
@@ -153,5 +171,13 @@ describe("moveToArchive", () => {
     await mkdir(join(root, "archive"), { recursive: true });
     const missing = join(root, "store", "does-not-exist.pdf");
     expect(await moveToArchive(missing)).toBe(missing);
+  });
+
+  it("returns the archive target when the source was already moved", async () => {
+    await ensureIntakeDirs();
+    const name = "abc123.pdf";
+    await writeFile(join(root, "archive", name), "already archived");
+    const result = await moveToArchive(join(root, "store", name));
+    expect(result).toBe(join(root, "archive", name));
   });
 });
