@@ -73,10 +73,19 @@ export async function ensureIntakeDirs(): Promise<void> {
  * found, tagged with its source. Hidden files and the ".gitkeep" placeholder
  * are ignored. Candidates are not yet committed to the store.
  */
-export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
+export type InboxCollection = {
+  candidates: InboxCandidate[];
+  // Filenames skipped for exceeding MAX_INBOX_FILE_BYTES, surfaced so the operator
+  // is told a real document is stuck in the watched folder rather than seeing an
+  // empty queue.
+  skippedOversize: string[];
+};
+
+export async function collectInboxCandidates(): Promise<InboxCollection> {
   await ensureIntakeDirs();
   const root = intakeRoot();
   const candidates: InboxCandidate[] = [];
+  const skippedOversize: string[] = [];
   // Skip files whose mtime is within the settle window: a scanner/sync may still
   // be writing them, and reading now would capture a truncated document. They are
   // picked up on the next ingest. Set INTAKE_SETTLE_MS=0 to disable (used in tests).
@@ -119,8 +128,12 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
       }
       if (settleMs > 0 && now - info.mtimeMs < settleMs) continue;
       // Skip oversized files before reading them into memory (they stay in the
-      // inbox for the operator to notice), consistent with the upload limit.
-      if (info.size > MAX_INBOX_FILE_BYTES) continue;
+      // inbox), consistent with the upload limit, but record them so the ingest
+      // result can tell the operator a document is stuck in the watched folder.
+      if (info.size > MAX_INBOX_FILE_BYTES) {
+        skippedOversize.push(entry.name);
+        continue;
+      }
       eligible.push({ absPath, filename: entry.name, source, size: info.size, mtimeMs: info.mtimeMs });
     }
     perSource.push(eligible);
@@ -161,7 +174,7 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
     }
   }
 
-  return candidates;
+  return { candidates, skippedOversize };
 }
 
 /**

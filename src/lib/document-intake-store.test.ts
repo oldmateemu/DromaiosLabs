@@ -97,7 +97,7 @@ describe("collectInboxCandidates", () => {
     await writeFile(join(root, "inbox", "email", "contract.pdf"), "email-bytes");
     await writeFile(join(root, "inbox", "scan", ".gitkeep"), "");
 
-    const candidates = await collectInboxCandidates();
+    const { candidates } = await collectInboxCandidates();
     const byName = Object.fromEntries(candidates.map((c) => [c.filename, c]));
 
     expect(candidates).toHaveLength(2);
@@ -109,14 +109,14 @@ describe("collectInboxCandidates", () => {
 
   it("returns nothing when inboxes are empty", async () => {
     await ensureIntakeDirs();
-    expect(await collectInboxCandidates()).toEqual([]);
+    expect(await collectInboxCandidates()).toEqual({ candidates: [], skippedOversize: [] });
   });
 
   it("skips files still within the settle window", async () => {
     process.env.INTAKE_SETTLE_MS = "60000";
     await ensureIntakeDirs();
     await writeFile(join(root, "inbox", "scan", "still-writing.pdf"), "partial");
-    expect(await collectInboxCandidates()).toEqual([]);
+    expect((await collectInboxCandidates()).candidates).toEqual([]);
   });
 
   it("caps a single run to at most 50 files, leaving the rest for the next run", async () => {
@@ -125,7 +125,7 @@ describe("collectInboxCandidates", () => {
       Array.from({ length: 55 }, (_, i) => writeFile(join(root, "inbox", "scan", `scan-${String(i).padStart(3, "0")}.pdf`), `doc-${i}`))
     );
 
-    const candidates = await collectInboxCandidates();
+    const { candidates } = await collectInboxCandidates();
     expect(candidates).toHaveLength(50);
     // The remaining originals stay in the inbox to be drained next run.
     expect(await readdir(join(root, "inbox", "scan"))).toHaveLength(55);
@@ -139,11 +139,23 @@ describe("collectInboxCandidates", () => {
       writeFile(join(root, "inbox", "email", "urgent-b.pdf"), "email-b")
     ]);
 
-    const candidates = await collectInboxCandidates();
+    const { candidates } = await collectInboxCandidates();
     expect(candidates).toHaveLength(50);
     // Both emailed documents are picked up in the same run despite the backlog.
     const emailNames = candidates.filter((c) => c.source === "EMAIL").map((c) => c.filename).sort();
     expect(emailNames).toEqual(["urgent-a.pdf", "urgent-b.pdf"]);
+  });
+
+  it("reports oversized files as skipped instead of silently dropping them", async () => {
+    await ensureIntakeDirs();
+    // 21MB file, just over the 20MB inbox cap.
+    await writeFile(join(root, "inbox", "scan", "huge-scan.pdf"), Buffer.alloc(21 * 1024 * 1024, 1));
+    await writeFile(join(root, "inbox", "scan", "ok.pdf"), "small");
+
+    const { candidates, skippedOversize } = await collectInboxCandidates();
+
+    expect(candidates.map((c) => c.filename)).toEqual(["ok.pdf"]);
+    expect(skippedOversize).toEqual(["huge-scan.pdf"]);
   });
 });
 
@@ -151,7 +163,7 @@ describe("copyInboxCandidateToStore and discardInboxFile", () => {
   it("copies a candidate into the store but leaves the inbox original until discarded", async () => {
     await ensureIntakeDirs();
     await writeFile(join(root, "inbox", "scan", "receipt.pdf"), "receipt-content");
-    const [candidate] = await collectInboxCandidates();
+    const { candidates: [candidate] } = await collectInboxCandidates();
 
     const stored = await copyInboxCandidateToStore(candidate);
 
@@ -168,7 +180,7 @@ describe("copyInboxCandidateToStore and discardInboxFile", () => {
   it("discardInboxFile removes a duplicate original", async () => {
     await ensureIntakeDirs();
     await writeFile(join(root, "inbox", "scan", "dup.pdf"), "dup");
-    const [candidate] = await collectInboxCandidates();
+    const { candidates: [candidate] } = await collectInboxCandidates();
     await discardInboxFile(candidate);
     expect(await readdir(join(root, "inbox", "scan"))).toEqual([]);
   });
@@ -177,7 +189,7 @@ describe("copyInboxCandidateToStore and discardInboxFile", () => {
     await ensureIntakeDirs();
     const path = join(root, "inbox", "scan", "reused-name.pdf");
     await writeFile(path, "original-bytes");
-    const [candidate] = await collectInboxCandidates();
+    const { candidates: [candidate] } = await collectInboxCandidates();
 
     // A scanner/email sync reuses the filename and drops a different document
     // at the same path after we captured the original's bytes.

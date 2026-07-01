@@ -30,8 +30,9 @@ function dayKey(value: Date | string | null) {
   return value ? new Date(value).toISOString().slice(0, 10) : "";
 }
 
-export default async function IntakePage() {
-  const { pending, history, summary, streams, companyFunctions } = await getIntakeQueueData();
+export default async function IntakePage({ searchParams }: { searchParams: Promise<{ skippedOversize?: string }> }) {
+  const [{ pending, history, summary, streams, companyFunctions }, params] = await Promise.all([getIntakeQueueData(), searchParams]);
+  const skippedOversize = Number(params.skippedOversize) || 0;
 
   return (
     <div className="space-y-6">
@@ -46,6 +47,13 @@ export default async function IntakePage() {
           no action is created until you say so.
         </p>
       </div>
+
+      {skippedOversize > 0 ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-command-amber">
+          {skippedOversize} file{skippedOversize === 1 ? "" : "s"} over the 20MB limit {skippedOversize === 1 ? "was" : "were"} skipped and left in
+          the watched folder. Split or compress the document, then run ingest again.
+        </p>
+      ) : null}
 
       <section className="panel">
         <p className="eyebrow">Pipeline</p>

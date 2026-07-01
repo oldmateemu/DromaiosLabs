@@ -717,8 +717,8 @@ export async function getPersonalPipelineData() {
  * review queue as CAPTURED documents, deduplicating by content hash. No reading
  * or action creation happens here.
  */
-export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicates: number }> {
-  const candidates = await collectInboxCandidates();
+export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicates: number; skippedOversize: number }> {
+  const { candidates, skippedOversize } = await collectInboxCandidates();
   let ingested = 0;
   let duplicates = 0;
 
@@ -763,7 +763,7 @@ export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicat
   }
 
   revalidatePath("/intake");
-  return { ingested, duplicates };
+  return { ingested, duplicates, skippedOversize: skippedOversize.length };
 }
 
 export async function uploadIntakeDocument(formData: FormData) {
@@ -1154,8 +1154,8 @@ export async function setIntakeDomain(formData: FormData) {
 }
 
 async function runDocumentIntakeTriageAutomation(automationId: string, userId: string) {
-  const { ingested, duplicates } = await ingestIntakeFolder();
-  const run = buildDocumentIntakeRun({ now: new Date(), ingested, duplicates });
+  const { ingested, duplicates, skippedOversize } = await ingestIntakeFolder();
+  const run = buildDocumentIntakeRun({ now: new Date(), ingested, duplicates, skippedOversize });
 
   const [stream, companyFunction] = await Promise.all([
     prisma.stream.findUnique({ where: { name: "Company Core" }, select: { id: true } }),
@@ -1746,26 +1746,48 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
   // mistake, or a Mixed/Unknown item that admin later reclassifies) can be
   // corrected; without this it would be stuck in the wrong pipeline.
   const domain = enumValue(formData, "domain", IntakeDomain, existing.domain);
-  // Personal actions must carry no company stream/function per the pipeline
-  // contract, so reclassifying to Personal clears any posted route.
-  const isPersonal = domain === IntakeDomain.PERSONAL;
 
-  await prisma.action.update({
-    where: { id: actionId },
-    data: {
-      title,
-      description: optionalString(formData, "description") ?? null,
-      status,
-      priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
-      domain,
-      dueAt: dateValue(formData, "dueAt") ?? null,
-      reviewAt: dateValue(formData, "reviewAt") ?? null,
-      nextStep: optionalString(formData, "nextStep") ?? null,
-      streamId: isPersonal ? null : optionalString(formData, "streamId") ?? null,
-      companyFunctionId: isPersonal ? null : optionalString(formData, "companyFunctionId") ?? null,
-      sensitive: formData.get("sensitive") === "on",
-      completedAt: completedAtForStatus(status, existing.completedAt)
-    }
+  // Resolve the company route for the chosen domain, matching the intake approval
+  // contract so a reclassified action never keeps a stale finance/legal route:
+  // Personal carries no route; Mixed/Unknown are forced to Company Core/admin for
+  // reclassification; Business honours the posted route.
+  let streamId = optionalString(formData, "streamId") ?? null;
+  let companyFunctionId = optionalString(formData, "companyFunctionId") ?? null;
+  if (domain === IntakeDomain.PERSONAL) {
+    streamId = null;
+    companyFunctionId = null;
+  } else if (domain === IntakeDomain.MIXED || domain === IntakeDomain.UNKNOWN) {
+    const routing = suggestRouting({ docType: "unknown", domain });
+    const [stream, companyFunction] = await Promise.all([
+      routing.stream ? prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }) : null,
+      routing.companyFunction ? prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }) : null
+    ]);
+    streamId = stream?.id ?? null;
+    companyFunctionId = companyFunction?.id ?? null;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.action.update({
+      where: { id: actionId },
+      data: {
+        title,
+        description: optionalString(formData, "description") ?? null,
+        status,
+        priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+        domain,
+        dueAt: dateValue(formData, "dueAt") ?? null,
+        reviewAt: dateValue(formData, "reviewAt") ?? null,
+        nextStep: optionalString(formData, "nextStep") ?? null,
+        streamId,
+        companyFunctionId,
+        sensitive: formData.get("sensitive") === "on",
+        completedAt: completedAtForStatus(status, existing.completedAt)
+      }
+    });
+    // Keep a linked intake document's domain in sync so the /personal pipeline
+    // (queried from IntakeDocument.domain) reflects the reclassification. Matches
+    // zero rows for actions that did not come from intake.
+    await tx.intakeDocument.updateMany({ where: { actionId }, data: { domain } });
   });
 
   revalidatePath("/");

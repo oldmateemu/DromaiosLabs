@@ -210,8 +210,10 @@ export async function prepareDraftAutomationAction(formData: FormData) {
 
 export async function ingestIntakeFolderAction() {
   await requireUser();
-  await ingestIntakeFolder();
-  redirect("/intake");
+  const { skippedOversize } = await ingestIntakeFolder();
+  // Surface oversized files that were skipped so the operator knows a document is
+  // stuck in the watched folder rather than seeing an unchanged/empty queue.
+  redirect(skippedOversize > 0 ? `/intake?skippedOversize=${skippedOversize}` : "/intake");
 }
 
 export async function uploadIntakeDocumentAction(formData: FormData) {

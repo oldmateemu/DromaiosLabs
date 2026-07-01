@@ -131,7 +131,7 @@ beforeEach(() => {
   prismaMock.intakeDocument.update.mockResolvedValue({ id: "intake-1" });
   prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
   const storedFile = { storedPath: "/store/hash-abc.pdf", filename: "doc.pdf", contentHash: "hash-abc", mimeType: "application/pdf", byteSize: 3 };
-  vi.mocked(store.collectInboxCandidates).mockResolvedValue([]);
+  vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [], skippedOversize: [] });
   vi.mocked(store.storeUploadedFile).mockResolvedValue(storedFile);
   vi.mocked(store.copyInboxCandidateToStore).mockResolvedValue(storedFile);
   vi.mocked(store.hashContent).mockReturnValue("hash-abc");
@@ -1063,12 +1063,12 @@ describe("document intake", () => {
   });
 
   it("ingests a new candidate, creating the row before discarding the inbox original", async () => {
-    vi.mocked(store.collectInboxCandidates).mockResolvedValue([candidate]);
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [candidate], skippedOversize: [] });
     prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
 
     const result = await services.ingestIntakeFolder();
 
-    expect(result).toEqual({ ingested: 1, duplicates: 0 });
+    expect(result).toEqual({ ingested: 1, duplicates: 0, skippedOversize: 0 });
     expect(store.copyInboxCandidateToStore).toHaveBeenCalledWith(candidate);
     expect(prismaMock.intakeDocument.create).toHaveBeenCalled();
     // Order matters: the DB row is created before the inbox original is removed.
@@ -1078,14 +1078,22 @@ describe("document intake", () => {
   });
 
   it("skips a duplicate inbox candidate without creating a row", async () => {
-    vi.mocked(store.collectInboxCandidates).mockResolvedValue([candidate]);
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [candidate], skippedOversize: [] });
     prismaMock.intakeDocument.findFirst.mockResolvedValue({ id: "existing" });
 
     const result = await services.ingestIntakeFolder();
 
-    expect(result).toEqual({ ingested: 0, duplicates: 1 });
+    expect(result).toEqual({ ingested: 0, duplicates: 1, skippedOversize: 0 });
     expect(store.discardInboxFile).toHaveBeenCalledWith(candidate);
     expect(prismaMock.intakeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it("reports oversized files skipped during an ingest run", async () => {
+    vi.mocked(store.collectInboxCandidates).mockResolvedValue({ candidates: [], skippedOversize: ["huge.pdf", "big.tiff"] });
+
+    const result = await services.ingestIntakeFolder();
+
+    expect(result).toEqual({ ingested: 0, duplicates: 0, skippedOversize: 2 });
   });
 
   it("uploads a new document, hashing before writing to the store", async () => {

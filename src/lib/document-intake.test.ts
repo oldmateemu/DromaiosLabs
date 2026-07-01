@@ -403,10 +403,17 @@ describe("buildDocumentIntakeRun", () => {
       sensitive: true
     });
     expect(run.actionsToCreate[0].description).toContain("Documents pulled into the queue this run: 4.");
+    // No oversized files this run, so that line is omitted (not rendered as blank/null).
+    expect(run.actionsToCreate[0].description).not.toContain("Oversized files skipped");
     expect(run.responseSummary).toContain("Document intake triage - approved run");
     expect(run.responseSummary).toContain("Safety: APPROVAL_REQUIRED");
     expect(run.responseSummary).toContain("local OCR + Ollama only");
     expect(run.responseSummary).toContain("Duplicates skipped (same content hash): 1.");
     expect(run.responseSummary).toContain("No payment execution");
+  });
+
+  it("surfaces oversized skipped files in the run description", () => {
+    const run = buildDocumentIntakeRun({ now: new Date("2026-06-28T09:00:00Z"), ingested: 1, duplicates: 0, skippedOversize: 2 });
+    expect(run.actionsToCreate[0].description).toContain("Oversized files skipped (over the 20MB limit, still in the watched folder): 2.");
   });
 });

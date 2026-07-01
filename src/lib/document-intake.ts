@@ -609,7 +609,12 @@ export type DocumentIntakeRun = {
  * records a review action. It never creates per-document actions and never
  * contacts an external service; each document still needs human approval.
  */
-export function buildDocumentIntakeRun({ now = new Date(), ingested = 0, duplicates = 0 }: { now?: Date; ingested?: number; duplicates?: number } = {}): DocumentIntakeRun {
+export function buildDocumentIntakeRun({
+  now = new Date(),
+  ingested = 0,
+  duplicates = 0,
+  skippedOversize = 0
+}: { now?: Date; ingested?: number; duplicates?: number; skippedOversize?: number } = {}): DocumentIntakeRun {
   const today = dateKey(now);
 
   return {
@@ -622,10 +627,15 @@ export function buildDocumentIntakeRun({ now = new Date(), ingested = 0, duplica
           `Workflow contract JSON: ${CONTRACT_JSON_PATH}`,
           `Documents pulled into the queue this run: ${ingested}.`,
           `Duplicates skipped this run: ${duplicates}.`,
+          skippedOversize > 0
+            ? `Oversized files skipped (over the 20MB limit, still in the watched folder): ${skippedOversize}.`
+            : null,
           "Intake sources: watched scan folder, in-cockpit upload, and emailed documents synced into the intake folder.",
           "Reading is local only: Tesseract OCR plus the local Ollama model. No document bytes or text leave the box.",
           "Each captured document is triaged into Business/Personal/Mixed and held for human approval; no action is created automatically."
-        ].join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n"),
         priority: "HIGH",
         dueAt: today,
         reviewAt: today,

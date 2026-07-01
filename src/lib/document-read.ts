@@ -97,13 +97,17 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
     if (files.length === 0) return { text: "", engine: "none", error: "pdftoppm produced no page images." };
 
     // Only OCR up to the cap; the sentinel (if present) means further pages exist.
-    const truncated = files.length > MAX_OCR_PAGES;
+    let truncated = files.length > MAX_OCR_PAGES;
     const pages: string[] = [];
     const failedPages: number[] = [];
     for (const file of files.slice(0, MAX_OCR_PAGES)) {
       try {
         const page = await ocrImage(join(workDir, file));
         if (page.text) pages.push(page.text);
+        // A single dense page can hit the per-page cap and be sliced to exactly
+        // MAX_TEXT_LENGTH; carry that truncation up (the joined-length check below
+        // would miss it because the slice makes it equal, not greater).
+        if (page.truncated) truncated = true;
       } catch {
         // Keep the pages that did read; one bad/timed-out page must not discard a
         // whole multi-page scan. The failed page is noted for the reviewer.
