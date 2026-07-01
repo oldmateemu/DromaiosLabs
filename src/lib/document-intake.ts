@@ -321,7 +321,14 @@ export function buildIntakeTriage({ filename, text, now = new Date() }: IntakeTr
 const intakeExtractionSchema = z.object({
   summary: z.string().trim().max(1200).optional(),
   docType: z.string().trim().max(60).optional(),
-  domain: z.enum(["BUSINESS", "PERSONAL", "MIXED", "UNKNOWN"]).optional(),
+  // Local models often echo the domain in lower/mixed case ("business"), which
+  // is still a useful extraction. Upcase before validating so a casing mismatch
+  // never rejects the whole object, and fall back to undefined for any value the
+  // enum doesn't recognise rather than discarding the summary/dates/title with it.
+  domain: z
+    .preprocess((v) => (typeof v === "string" ? v.trim().toUpperCase() : v), z.enum(["BUSINESS", "PERSONAL", "MIXED", "UNKNOWN"]))
+    .optional()
+    .catch(undefined),
   party: z.string().trim().max(160).optional(),
   amount: z.string().trim().max(60).optional(),
   documentDate: optionalDateString(),

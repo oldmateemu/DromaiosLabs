@@ -950,6 +950,7 @@ describe("document intake", () => {
     source: "FOLDER" as const,
     mimeType: "application/pdf",
     byteSize: 3,
+    mtimeMs: 1000,
     contentHash: "h1",
     bytes: Buffer.from("abc")
   };
@@ -994,7 +995,7 @@ describe("document intake", () => {
     const result = await services.ingestIntakeFolder();
 
     expect(result).toEqual({ ingested: 0, duplicates: 1 });
-    expect(store.discardInboxFile).toHaveBeenCalledWith(candidate.absPath);
+    expect(store.discardInboxFile).toHaveBeenCalledWith(candidate);
     expect(prismaMock.intakeDocument.create).not.toHaveBeenCalled();
   });
 

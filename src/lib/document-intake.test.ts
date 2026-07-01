@@ -174,6 +174,21 @@ describe("parseIntakeExtraction", () => {
     expect(extraction?.domain).toBe("BUSINESS");
     expect(extraction?.dueDate).toBeUndefined();
   });
+
+  it("accepts a lower/mixed-case domain from the model and upcases it", () => {
+    const { extraction, error } = parseIntakeExtraction(JSON.stringify({ summary: "Personal letter", domain: "personal" }));
+    expect(error).toBeUndefined();
+    expect(extraction?.domain).toBe("PERSONAL");
+    expect(extraction?.summary).toBe("Personal letter");
+  });
+
+  it("drops an unrecognised domain rather than discarding the rest of the extraction", () => {
+    const { extraction, error } = parseIntakeExtraction(JSON.stringify({ summary: "Useful summary", domain: "corporate", dueDate: "2026-07-15" }));
+    expect(error).toBeUndefined();
+    expect(extraction?.domain).toBeUndefined();
+    expect(extraction?.summary).toBe("Useful summary");
+    expect(extraction?.dueDate).toBe("2026-07-15");
+  });
 });
 
 describe("mergeExtractionIntoTriage", () => {

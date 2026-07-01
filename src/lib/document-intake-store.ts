@@ -24,6 +24,9 @@ export type InboxCandidate = {
   source: IntakeSource;
   mimeType: string;
   byteSize: number;
+  // The file's modified time at collect. Carried so discardInboxFile can confirm
+  // the path still holds the same file before deleting it (see below).
+  mtimeMs: number;
   contentHash: string;
   // The already-read bytes, carried so the commit step does not re-read the file.
   bytes: Buffer;
@@ -44,6 +47,12 @@ const ARCHIVE = "archive";
 // Watched-folder files above this size are skipped (not read into memory),
 // consistent with the in-cockpit upload limit.
 const MAX_INBOX_FILE_BYTES = 20 * 1024 * 1024;
+// A single ingest run only pulls this many files, and this many total bytes,
+// into memory at once. A large watched-folder backlog is drained across several
+// runs rather than materialising hundreds of MB in one server action and risking
+// an OOM/timeout. Files left behind stay in the inbox and are picked up next run.
+const MAX_INBOX_BATCH_FILES = 50;
+const MAX_INBOX_BATCH_BYTES = 128 * 1024 * 1024;
 
 export function intakeRoot(): string {
   return process.env.INTAKE_DIR ?? join(process.cwd(), ".intake");
@@ -77,8 +86,9 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
   const parsedSettleMs = rawSettleMs == null || rawSettleMs.trim() === "" ? NaN : Number(rawSettleMs);
   const settleMs = Number.isFinite(parsedSettleMs) ? parsedSettleMs : 3000;
   const now = Date.now();
+  let batchBytes = 0;
 
-  for (const [dir, source] of [
+  outer: for (const [dir, source] of [
     [INBOX_SCAN, "FOLDER"],
     [INBOX_EMAIL, "EMAIL"]
   ] as Array<[string, IntakeSource]>) {
@@ -106,6 +116,11 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
       // Skip oversized files before reading them into memory (they stay in the
       // inbox for the operator to notice), consistent with the upload limit.
       if (info.size > MAX_INBOX_FILE_BYTES) continue;
+      // Stop this run once the batch caps are reached; the remaining files stay
+      // in the inbox and are drained by the next ingest run. The byte cap always
+      // admits at least one file so a run can never stall on a large backlog.
+      if (candidates.length >= MAX_INBOX_BATCH_FILES) break outer;
+      if (candidates.length > 0 && batchBytes + info.size > MAX_INBOX_BATCH_BYTES) break outer;
 
       let bytes: Buffer;
       try {
@@ -115,12 +130,14 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
         throw error;
       }
+      batchBytes += bytes.byteLength;
       candidates.push({
         absPath,
         filename: entry.name,
         source,
         mimeType: guessMimeType(entry.name),
         byteSize: bytes.byteLength,
+        mtimeMs: info.mtimeMs,
         contentHash: hashContent(bytes),
         bytes
       });
@@ -151,9 +168,24 @@ export async function copyInboxCandidateToStore(candidate: InboxCandidate): Prom
   };
 }
 
-/** Removes a duplicate inbox original without storing it again. */
-export async function discardInboxFile(absPath: string): Promise<void> {
-  await rm(absPath, { force: true });
+/**
+ * Removes an inbox original once its bytes have been captured. Guards against a
+ * producer (scanner/email sync) that reuses a stable filename: if a newer file
+ * has replaced the one we read at this path, its size or mtime will differ, so
+ * we leave it in place for the next ingest rather than deleting an unread
+ * document. The stat+rm is not perfectly atomic, but the match check closes the
+ * realistic filename-reuse window.
+ */
+export async function discardInboxFile(
+  candidate: Pick<InboxCandidate, "absPath" | "byteSize" | "mtimeMs">
+): Promise<void> {
+  const info = await stat(candidate.absPath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!info) return; // Already gone.
+  if (info.size !== candidate.byteSize || info.mtimeMs !== candidate.mtimeMs) return; // Replaced since we read it.
+  await rm(candidate.absPath, { force: true });
 }
 
 /** Writes an uploaded file into the content-addressed store. Prefers the

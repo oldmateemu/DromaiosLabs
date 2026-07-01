@@ -118,6 +118,18 @@ describe("collectInboxCandidates", () => {
     await writeFile(join(root, "inbox", "scan", "still-writing.pdf"), "partial");
     expect(await collectInboxCandidates()).toEqual([]);
   });
+
+  it("caps a single run to at most 50 files, leaving the rest for the next run", async () => {
+    await ensureIntakeDirs();
+    await Promise.all(
+      Array.from({ length: 55 }, (_, i) => writeFile(join(root, "inbox", "scan", `scan-${String(i).padStart(3, "0")}.pdf`), `doc-${i}`))
+    );
+
+    const candidates = await collectInboxCandidates();
+    expect(candidates).toHaveLength(50);
+    // The remaining originals stay in the inbox to be drained next run.
+    expect(await readdir(join(root, "inbox", "scan"))).toHaveLength(55);
+  });
 });
 
 describe("copyInboxCandidateToStore and discardInboxFile", () => {
@@ -134,16 +146,32 @@ describe("copyInboxCandidateToStore and discardInboxFile", () => {
     // Inbox original is still present (deleted only after the DB row exists).
     expect(await readdir(join(root, "inbox", "scan"))).toEqual(["receipt.pdf"]);
 
-    await discardInboxFile(candidate.absPath);
+    await discardInboxFile(candidate);
     expect(await readdir(join(root, "inbox", "scan"))).toEqual([]);
   });
 
   it("discardInboxFile removes a duplicate original", async () => {
     await ensureIntakeDirs();
-    const dup = join(root, "inbox", "scan", "dup.pdf");
-    await writeFile(dup, "dup");
-    await discardInboxFile(dup);
+    await writeFile(join(root, "inbox", "scan", "dup.pdf"), "dup");
+    const [candidate] = await collectInboxCandidates();
+    await discardInboxFile(candidate);
     expect(await readdir(join(root, "inbox", "scan"))).toEqual([]);
+  });
+
+  it("discardInboxFile leaves a file that was replaced at the same path since it was read", async () => {
+    await ensureIntakeDirs();
+    const path = join(root, "inbox", "scan", "reused-name.pdf");
+    await writeFile(path, "original-bytes");
+    const [candidate] = await collectInboxCandidates();
+
+    // A scanner/email sync reuses the filename and drops a different document
+    // at the same path after we captured the original's bytes.
+    await writeFile(path, "a-different-and-longer-document");
+
+    await discardInboxFile(candidate);
+    // The newer file must survive to be ingested on the next run.
+    expect(await readdir(join(root, "inbox", "scan"))).toEqual(["reused-name.pdf"]);
+    expect((await readStoredFile(path)).toString()).toBe("a-different-and-longer-document");
   });
 });
 

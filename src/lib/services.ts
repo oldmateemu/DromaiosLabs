@@ -592,6 +592,28 @@ const INTAKE_HISTORY_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, Inta
 const INTAKE_FINALISED_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
 const MAX_INTAKE_UPLOAD_BYTES = 20 * 1024 * 1024;
 
+// The queue/history cards render only these columns. Selecting them explicitly
+// keeps the heavy columns (ocrText, up to 200k chars, plus the signals JSON) out
+// of a query that can return hundreds of pending rows, so opening /intake never
+// pulls tens of MB of OCR text that the UI does not display.
+const INTAKE_CARD_SELECT = {
+  id: true,
+  source: true,
+  status: true,
+  domain: true,
+  domainConfidence: true,
+  disposition: true,
+  docType: true,
+  originalFilename: true,
+  summary: true,
+  triageNote: true,
+  reviewerNote: true,
+  suggestedAction: true,
+  capturedAt: true,
+  reviewedAt: true,
+  action: { select: { id: true, title: true } }
+} as const;
+
 export async function getIntakeQueueData() {
   // Pending and history are fetched separately so a busy history never caps the
   // pending queue out of view, and the summary is computed from a full groupBy
@@ -600,13 +622,13 @@ export async function getIntakeQueueData() {
     prisma.intakeDocument.findMany({
       where: { status: { in: INTAKE_PENDING_STATUSES } },
       orderBy: [{ status: "asc" }, { capturedAt: "desc" }],
-      include: { action: { select: { id: true, title: true } } },
+      select: INTAKE_CARD_SELECT,
       take: 300
     }),
     prisma.intakeDocument.findMany({
       where: { status: { in: INTAKE_HISTORY_STATUSES } },
       orderBy: { reviewedAt: "desc" },
-      include: { action: { select: { id: true, title: true } } },
+      select: INTAKE_CARD_SELECT,
       take: 40
     }),
     prisma.intakeDocument.groupBy({ by: ["status", "domain"], _count: true }),
@@ -631,7 +653,7 @@ export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicat
   for (const candidate of candidates) {
     const existing = await prisma.intakeDocument.findFirst({ where: { contentHash: candidate.contentHash }, select: { id: true } });
     if (existing) {
-      await discardInboxFile(candidate.absPath);
+      await discardInboxFile(candidate);
       duplicates += 1;
       continue;
     }
@@ -656,7 +678,7 @@ export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicat
       if (isUniqueConstraintError(error)) {
         // Lost a race with a concurrent capture of the same bytes; the unique
         // contentHash constraint is the atomic dedupe guarantee.
-        await discardInboxFile(candidate.absPath);
+        await discardInboxFile(candidate);
         duplicates += 1;
         continue;
       }
@@ -664,7 +686,7 @@ export async function ingestIntakeFolder(): Promise<{ ingested: number; duplicat
       throw error;
     }
 
-    await discardInboxFile(candidate.absPath);
+    await discardInboxFile(candidate);
     ingested += 1;
   }
 
