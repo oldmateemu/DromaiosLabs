@@ -1584,8 +1584,9 @@ export async function getReviewData() {
   const sinceFilter = lastReviewAt ? { gte: lastReviewAt } : undefined;
 
   const [completedCount, createdCount, newRiskCount, decisionCount] = await Promise.all([
-    prisma.action.count({ where: { completedAt: lastReviewAt ? { gte: lastReviewAt } : { not: null } } }),
-    prisma.action.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
+    // Review momentum tracks company throughput; Personal actions are excluded.
+    prisma.action.count({ where: { domain: { not: IntakeDomain.PERSONAL }, completedAt: lastReviewAt ? { gte: lastReviewAt } : { not: null } } }),
+    prisma.action.count({ where: { domain: { not: IntakeDomain.PERSONAL }, ...(sinceFilter ? { createdAt: sinceFilter } : {}) } }),
     prisma.risk.count({ where: sinceFilter ? { createdAt: sinceFilter } : undefined }),
     prisma.decision.count({ where: sinceFilter ? { decidedAt: sinceFilter } : undefined })
   ]);
@@ -1694,6 +1695,9 @@ export async function getPortfolioData() {
     prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     prisma.action.findMany({
       where: {
+        // Company portfolio is per-stream company work; Personal actions have no
+        // stream and belong to the /personal pipeline.
+        domain: { not: IntakeDomain.PERSONAL },
         OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
       },
       select: { status: true, streamId: true, dueAt: true, completedAt: true }
@@ -1738,6 +1742,13 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
   if (!existing) throw new Error("Action not found.");
 
   const status = enumValue(formData, "status", ActionStatus, ActionStatus.OPEN);
+  // Domain is editable so a misclassified intake approval (e.g. Personal set by
+  // mistake, or a Mixed/Unknown item that admin later reclassifies) can be
+  // corrected; without this it would be stuck in the wrong pipeline.
+  const domain = enumValue(formData, "domain", IntakeDomain, existing.domain);
+  // Personal actions must carry no company stream/function per the pipeline
+  // contract, so reclassifying to Personal clears any posted route.
+  const isPersonal = domain === IntakeDomain.PERSONAL;
 
   await prisma.action.update({
     where: { id: actionId },
@@ -1746,15 +1757,12 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
       description: optionalString(formData, "description") ?? null,
       status,
       priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
-      // Domain is editable so a misclassified intake approval (e.g. Personal set by
-      // mistake, or a Mixed/Unknown item that admin later reclassifies) can be
-      // corrected; without this it would be stuck in the wrong pipeline.
-      domain: enumValue(formData, "domain", IntakeDomain, existing.domain),
+      domain,
       dueAt: dateValue(formData, "dueAt") ?? null,
       reviewAt: dateValue(formData, "reviewAt") ?? null,
       nextStep: optionalString(formData, "nextStep") ?? null,
-      streamId: optionalString(formData, "streamId") ?? null,
-      companyFunctionId: optionalString(formData, "companyFunctionId") ?? null,
+      streamId: isPersonal ? null : optionalString(formData, "streamId") ?? null,
+      companyFunctionId: isPersonal ? null : optionalString(formData, "companyFunctionId") ?? null,
       sensitive: formData.get("sensitive") === "on",
       completedAt: completedAtForStatus(status, existing.completedAt)
     }
@@ -1845,12 +1853,15 @@ export async function getActivityData() {
   const [completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews, completedForTrend] =
     await Promise.all([
       prisma.action.findMany({
-        where: { completedAt: { not: null } },
+        // Activity feed + throughput are company signals; Personal actions live in
+        // the /personal pipeline and must not inflate company activity.
+        where: { domain: { not: IntakeDomain.PERSONAL }, completedAt: { not: null } },
         orderBy: { completedAt: "desc" },
         take: 20,
         select: { id: true, title: true, completedAt: true, stream: { select: { name: true } } }
       }),
       prisma.action.findMany({
+        where: { domain: { not: IntakeDomain.PERSONAL } },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: { id: true, title: true, createdAt: true, source: true }
@@ -1864,7 +1875,11 @@ export async function getActivityData() {
       }),
       prisma.assistantDraft.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, sourceSummary: true, state: true, createdAt: true } }),
       prisma.review.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { id: true, type: true, createdAt: true } }),
-      prisma.action.findMany({ where: { completedAt: { gte: trendWindowStart } }, orderBy: { completedAt: "desc" }, select: { completedAt: true } })
+      prisma.action.findMany({
+        where: { domain: { not: IntakeDomain.PERSONAL }, completedAt: { gte: trendWindowStart } },
+        orderBy: { completedAt: "desc" },
+        select: { completedAt: true }
+      })
     ]);
 
   const feed = buildActivityFeed({ completedActions, createdActions, risks, decisions, automationRuns, drafts, reviews }, 40);

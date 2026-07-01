@@ -863,6 +863,20 @@ describe("updateActionFromForm", () => {
     const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
     expect(data.domain).toBe("PERSONAL");
   });
+
+  it("clears the company route when an action is reclassified to Personal", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+
+    await services.updateActionFromForm(
+      "act-1",
+      form({ title: "Medical bill", status: "OPEN", priority: "MEDIUM", domain: "PERSONAL", streamId: "stream-1", companyFunctionId: "fn-1" })
+    );
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("PERSONAL");
+    expect(data.streamId).toBeNull();
+    expect(data.companyFunctionId).toBeNull();
+  });
 });
 
 describe("prepareDraftAutomation", () => {
@@ -975,6 +989,30 @@ describe("read aggregators", () => {
     expect(rollupCalls.length).toBeGreaterThan(0);
     for (const call of rollupCalls) {
       expect(call[0].where.domain).toEqual({ not: "PERSONAL" });
+    }
+  });
+
+  it("excludes Personal actions from the company portfolio", async () => {
+    await services.getPortfolioData();
+    const call = prismaMock.action.findMany.mock.calls.find((c) => c[0]?.where?.OR);
+    expect(call?.[0].where.domain).toEqual({ not: "PERSONAL" });
+  });
+
+  it("excludes Personal actions from activity and throughput", async () => {
+    await services.getActivityData();
+    const actionCalls = prismaMock.action.findMany.mock.calls;
+    expect(actionCalls.length).toBeGreaterThan(0);
+    for (const call of actionCalls) {
+      expect(call[0]?.where?.domain).toEqual({ not: "PERSONAL" });
+    }
+  });
+
+  it("excludes Personal actions from review momentum counts", async () => {
+    await services.getReviewData();
+    const countCalls = prismaMock.action.count.mock.calls;
+    expect(countCalls.length).toBeGreaterThan(0);
+    for (const call of countCalls) {
+      expect(call[0]?.where?.domain).toEqual({ not: "PERSONAL" });
     }
   });
 
