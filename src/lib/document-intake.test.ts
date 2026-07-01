@@ -166,6 +166,14 @@ describe("parseIntakeExtraction", () => {
     expect(extraction).toBeUndefined();
     expect(error).toBeTruthy();
   });
+
+  it("treats present-but-null optional fields as omitted instead of failing", () => {
+    const { extraction, error } = parseIntakeExtraction(JSON.stringify({ summary: "Invoice", domain: "BUSINESS", dueDate: null, amount: null }));
+    expect(error).toBeUndefined();
+    expect(extraction?.summary).toBe("Invoice");
+    expect(extraction?.domain).toBe("BUSINESS");
+    expect(extraction?.dueDate).toBeUndefined();
+  });
 });
 
 describe("mergeExtractionIntoTriage", () => {
@@ -211,6 +219,18 @@ describe("mergeExtractionIntoTriage", () => {
     expect(merged.disposition).toBe("ACTION");
     expect(merged.proposedAction.priority).toBe("HIGH");
     expect(merged.proposedAction.companyFunction).toBe("finance");
+  });
+
+  it("preserves an ACTION disposition set by action-forcing language when adopting an AI docType", () => {
+    const base = buildIntakeTriage({ filename: "scan.pdf", text: "please respond by Friday" });
+    expect(base.docType).toBe("unknown");
+    expect(base.disposition).toBe("ACTION");
+
+    // "letter" on its own would recompute to UNSURE, but the response deadline
+    // the heuristic saw must not be silently dropped from the review queue.
+    const merged = mergeExtractionIntoTriage(base, { docType: "letter" });
+    expect(merged.docType).toBe("letter");
+    expect(merged.disposition).toBe("ACTION");
   });
 
   it("does not override a docType the heuristics already found", () => {

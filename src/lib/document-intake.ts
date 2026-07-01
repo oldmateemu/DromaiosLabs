@@ -335,11 +335,21 @@ export type IntakeExtraction = z.infer<typeof intakeExtractionSchema>;
 
 export function parseIntakeExtraction(raw: string): { extraction?: IntakeExtraction; error?: string } {
   try {
-    const extraction = intakeExtractionSchema.parse(JSON.parse(raw));
+    // Local models commonly emit present-but-null fields (e.g. "dueDate": null).
+    // Strip nulls so one null field doesn't reject the whole object and discard
+    // the useful extracted values; a missing field and a null field mean the same.
+    const extraction = intakeExtractionSchema.parse(stripNullValues(JSON.parse(raw)));
     return { extraction };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Extraction output was not valid JSON." };
   }
+}
+
+function stripNullValues(value: unknown): unknown {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== null));
+  }
+  return value;
 }
 
 /**
@@ -361,7 +371,14 @@ export function mergeExtractionIntoTriage(triage: IntakeTriageResult, extraction
   const docTypeChanged = docType !== triage.docType;
   const domainChanged = domain !== triage.domain;
 
-  const disposition = docTypeChanged ? proposeDisposition({ docType, domain }) : triage.disposition;
+  // Recompute disposition for the adopted type, but never downgrade an ACTION the
+  // heuristic set from action-forcing language ("respond by") that the recompute
+  // no longer sees, since that would hide a required response from the queue.
+  const disposition = docTypeChanged
+    ? triage.disposition === "ACTION"
+      ? "ACTION"
+      : proposeDisposition({ docType, domain })
+    : triage.disposition;
   const routing =
     docTypeChanged || domainChanged
       ? suggestRouting({ docType, domain })
