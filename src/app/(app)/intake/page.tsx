@@ -215,14 +215,26 @@ export default async function IntakePage() {
                       <input name="intakeId" type="hidden" value={doc.id} />
                       <button className="button button-secondary" type="submit">Re-read</button>
                     </form>
-                    <form action={fileIntakeDocumentAction}>
+                    <form action={fileIntakeDocumentAction} className="flex items-center gap-1">
                       <input name="intakeId" type="hidden" value={doc.id} />
-                      <input name="domain" type="hidden" value={doc.domain} />
+                      <select aria-label="Domain for filing" className="select" name="domain" defaultValue={doc.domain}>
+                        {DOMAINS.map((domain) => (
+                          <option key={domain} value={domain}>
+                            {domainLabel(domain)}
+                          </option>
+                        ))}
+                      </select>
                       <button className="button button-secondary" type="submit">File for records</button>
                     </form>
-                    <form action={archiveIntakeDocumentAction}>
+                    <form action={archiveIntakeDocumentAction} className="flex items-center gap-1">
                       <input name="intakeId" type="hidden" value={doc.id} />
-                      <input name="domain" type="hidden" value={doc.domain} />
+                      <select aria-label="Domain for archiving" className="select" name="domain" defaultValue={doc.domain}>
+                        {DOMAINS.map((domain) => (
+                          <option key={domain} value={domain}>
+                            {domainLabel(domain)}
+                          </option>
+                        ))}
+                      </select>
                       <button className="button button-secondary" type="submit">Archive</button>
                     </form>
                     <form action={rejectIntakeDocumentAction}>

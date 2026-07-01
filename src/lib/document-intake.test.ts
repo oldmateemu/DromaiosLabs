@@ -48,6 +48,13 @@ describe("classifyDocumentDomain", () => {
     expect(result.domain).toBe("UNKNOWN");
     expect(result.confidence).toBe(0);
   });
+
+  it("does not match a short signal inside a larger word", () => {
+    // "rent" must not fire inside current/apparent/parent.
+    const result = classifyDocumentDomain({ filename: "statement.pdf", text: "Your current balance is apparent to any parent." });
+    expect(result.signals.personal).not.toContain("rent");
+    expect(result.domain).toBe("UNKNOWN");
+  });
 });
 
 describe("detectDocumentType", () => {

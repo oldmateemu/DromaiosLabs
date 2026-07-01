@@ -1011,12 +1011,16 @@ describe("document intake", () => {
   });
 
   it("rejects an oversized upload before reading its bytes", async () => {
-    const file = fileWithBytes("big.pdf", "x");
+    const file = new File(["x"], "big.pdf", { type: "application/pdf" });
+    const arrayBuffer = vi.fn(async () => new TextEncoder().encode("x").buffer);
+    Object.defineProperty(file, "arrayBuffer", { value: arrayBuffer });
     Object.defineProperty(file, "size", { value: 21 * 1024 * 1024 });
     const fd = new FormData();
     fd.set("file", file);
 
     await expect(services.uploadIntakeDocument(fd)).rejects.toThrow(/upload limit/);
+    // The oversized file is rejected before its bytes are ever materialized.
+    expect(arrayBuffer).not.toHaveBeenCalled();
     expect(store.storeUploadedFile).not.toHaveBeenCalled();
   });
 
@@ -1043,27 +1047,47 @@ describe("document intake", () => {
 
     await services.readAndTriageIntakeDocument("d1");
 
-    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
     expect(updateArg.data.status).toBe("TRIAGED");
     expect(updateArg.data.docType).toBe("invoice");
     expect(updateArg.data.domain).toBe("BUSINESS");
+    // Writeback is guarded so a concurrently-finalised doc is never resurrected.
+    expect(updateArg.where.status).toEqual({ notIn: ["FILED", "ARCHIVED", "REJECTED"] });
   });
 
-  it("preserves a human-set domain when re-triaging", async () => {
+  it("preserves a human-locked domain when re-triaging (domain != suggestedDomain)", async () => {
     prismaMock.intakeDocument.findUnique.mockResolvedValue({
       id: "d1",
       storedPath: "/store/x.pdf",
       mimeType: "application/pdf",
       originalFilename: "acme-invoice.pdf",
-      domain: "PERSONAL"
+      domain: "PERSONAL",
+      suggestedDomain: "UNKNOWN"
     });
     vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
 
     await services.readAndTriageIntakeDocument("d1");
 
-    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
     expect(updateArg.data.domain).toBe("PERSONAL");
     expect(updateArg.data.suggestedDomain).toBe("BUSINESS");
+  });
+
+  it("updates a heuristic-set domain on re-read (domain == suggestedDomain)", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "PERSONAL",
+      suggestedDomain: "PERSONAL"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.domain).toBe("BUSINESS");
   });
 
   it("marks a failed read as FAILED", async () => {
@@ -1078,7 +1102,7 @@ describe("document intake", () => {
 
     await services.readAndTriageIntakeDocument("d1");
 
-    const updateArg = prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0];
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
     expect(updateArg.data.status).toBe("FAILED");
   });
 
@@ -1142,12 +1166,18 @@ describe("document intake", () => {
   });
 
   it("rejects a document and updates the intake domain", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
     await services.rejectIntakeDocument(form({ intakeId: "d1" }), "user-1");
-    expect(prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0].data.status).toBe("REJECTED");
+    expect(prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data.status).toBe("REJECTED");
 
     prismaMock.intakeDocument.findUnique.mockResolvedValue({ suggestedAction: { domain: "UNKNOWN", title: "x" } });
     await services.setIntakeDomain(form({ intakeId: "d1", domain: "PERSONAL" }));
     expect(prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0].data.domain).toBe("PERSONAL");
+  });
+
+  it("refuses to reject an already-finalized document", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
+    await expect(services.rejectIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);
   });
 
   it("runs the document intake triage automation on approval", async () => {

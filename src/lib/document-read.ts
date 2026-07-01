@@ -86,7 +86,11 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
     const prefix = join(workDir, "page");
     // Rasterise up to MAX_OCR_PAGES at 200 DPI as PNGs: page-1.png, page-2.png...
     await runCommand("pdftoppm", ["-png", "-r", "200", "-l", String(MAX_OCR_PAGES), storedPath, prefix]);
-    const files = (await readdir(workDir)).filter((name) => name.endsWith(".png")).sort();
+    // Sort by the numeric page index (page-2 before page-10), not lexically, so
+    // multi-page text reaches OCR/Ollama in reading order.
+    const files = (await readdir(workDir))
+      .filter((name) => name.endsWith(".png"))
+      .sort((a, b) => pageNumber(a) - pageNumber(b));
     if (files.length === 0) return { text: "", engine: "none", error: "pdftoppm produced no page images." };
 
     const pages: string[] = [];
@@ -125,6 +129,11 @@ function runCommand(command: string, args: string[]): Promise<{ ok: true; stdout
       resolve({ ok: true, stdout: typeof stdout === "string" ? stdout : String(stdout) });
     });
   });
+}
+
+function pageNumber(name: string): number {
+  const match = name.match(/(\d+)\.png$/);
+  return match ? Number(match[1]) : 0;
 }
 
 function clean(text: string): string {

@@ -68,7 +68,10 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
   // Skip files whose mtime is within the settle window: a scanner/sync may still
   // be writing them, and reading now would capture a truncated document. They are
   // picked up on the next ingest. Set INTAKE_SETTLE_MS=0 to disable (used in tests).
-  const settleMs = Number(process.env.INTAKE_SETTLE_MS ?? 3000);
+  // A non-numeric value (operator typo) falls back to the default rather than
+  // silently disabling the guard.
+  const parsedSettleMs = Number(process.env.INTAKE_SETTLE_MS);
+  const settleMs = Number.isFinite(parsedSettleMs) ? parsedSettleMs : 3000;
   const now = Date.now();
 
   for (const [dir, source] of [

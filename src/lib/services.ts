@@ -750,10 +750,13 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
       .filter(Boolean)
       .join(" | ");
 
-    // Respect a domain the operator (or an earlier triage) already committed to:
-    // a re-read of a low-quality scan must not silently overwrite a human
-    // correction. The fresh heuristic result is still recorded as suggestedDomain.
-    const preserved = doc.domain !== IntakeDomain.UNKNOWN ? (doc.domain as IntakeDomain) : null;
+    // Respect a domain the operator manually corrected, but let a re-read update
+    // a domain that only a prior heuristic set. A human override is detectable
+    // because setIntakeDomain changes `domain` without touching `suggestedDomain`,
+    // so a human-locked row has domain !== suggestedDomain; a heuristic row has
+    // them equal. The fresh heuristic is always recorded as suggestedDomain.
+    const humanLocked = doc.domain !== IntakeDomain.UNKNOWN && doc.domain !== doc.suggestedDomain;
+    const preserved = humanLocked ? (doc.domain as IntakeDomain) : null;
     const effectiveDomain = preserved ?? (triage.domain as IntakeDomain);
     let proposedAction = triage.proposedAction;
     if (preserved && preserved !== triage.domain) {
@@ -761,8 +764,11 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
       proposedAction = { ...proposedAction, domain: preserved, stream: routing.stream, companyFunction: routing.companyFunction };
     }
 
-    await prisma.intakeDocument.update({
-      where: { id: intakeId },
+    // Guard the writeback: OCR/Ollama can take many seconds, during which the
+    // operator may file/archive/reject the document from another tab. Only write
+    // back if it is still pending, so triage never resurrects a finalised row.
+    await prisma.intakeDocument.updateMany({
+      where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
       data: {
         status: IntakeStatus.TRIAGED,
         ocrText: text.length > 0 ? text : null,
@@ -782,8 +788,8 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
       }
     });
   } catch (error) {
-    await prisma.intakeDocument.update({
-      where: { id: intakeId },
+    await prisma.intakeDocument.updateMany({
+      where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
       data: {
         status: IntakeStatus.FAILED,
         readAt: new Date(),
@@ -811,8 +817,19 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   // stream and function; Personal/Unknown stay out of company ops.
   const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN);
   const attachesCompanyContext = domain === IntakeDomain.BUSINESS || domain === IntakeDomain.MIXED;
-  const streamName = optionalString(formData, "stream");
-  const functionName = optionalString(formData, "companyFunction");
+
+  // When the operator corrects a Personal suggestion to Business but leaves the
+  // routing blank, derive sensible defaults from the document type so the action
+  // still lands in Company Core rather than outside any stream/function.
+  let streamName = optionalString(formData, "stream");
+  let functionName = optionalString(formData, "companyFunction");
+  if (attachesCompanyContext && (!streamName || !functionName)) {
+    const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { docType: true } });
+    const routing = suggestRouting({ docType: doc?.docType ?? "unknown", domain });
+    streamName = streamName ?? routing.stream;
+    functionName = functionName ?? routing.companyFunction;
+  }
+
   const stream = attachesCompanyContext && streamName ? await prisma.stream.findUnique({ where: { name: streamName } }) : null;
   const companyFunction =
     attachesCompanyContext && functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
@@ -900,8 +917,10 @@ export async function archiveIntakeDocument(formData: FormData, userId: string) 
   }
 
   const archivedPath = await moveToArchive(doc.storedPath);
-  await prisma.intakeDocument.update({
-    where: { id: intakeId },
+  // Guarded: if another tab finalised the document while the file was moving,
+  // don't overwrite that state (moveToArchive is idempotent on a later retry).
+  await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
     data: {
       status: IntakeStatus.ARCHIVED,
       storedPath: archivedPath,
@@ -920,8 +939,10 @@ export async function rejectIntakeDocument(formData: FormData, userId: string) {
   const intakeId = stringValue(formData, "intakeId");
   if (!intakeId) throw new Error("Document is required.");
 
-  await prisma.intakeDocument.update({
-    where: { id: intakeId },
+  // Guarded so a stale form cannot reject an already filed/archived/rejected
+  // document (which could detach it from an action created in another tab).
+  const updated = await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
     data: {
       status: IntakeStatus.REJECTED,
       reviewedById: userId,
@@ -929,6 +950,7 @@ export async function rejectIntakeDocument(formData: FormData, userId: string) {
       reviewerNote: optionalString(formData, "reviewerNote")
     }
   });
+  if (updated.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
 
   revalidatePath("/intake");
 }

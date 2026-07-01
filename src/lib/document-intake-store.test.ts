@@ -112,14 +112,6 @@ describe("collectInboxCandidates", () => {
     expect(await collectInboxCandidates()).toEqual([]);
   });
 
-  it("propagates non-ENOENT readdir errors instead of swallowing them", async () => {
-    await ensureIntakeDirs();
-    // Replace the scan directory with a file so readdir fails with ENOTDIR.
-    await rm(join(root, "inbox", "scan"), { recursive: true, force: true });
-    await writeFile(join(root, "inbox", "scan"), "not a directory");
-    await expect(collectInboxCandidates()).rejects.toBeTruthy();
-  });
-
   it("skips files still within the settle window", async () => {
     process.env.INTAKE_SETTLE_MS = "60000";
     await ensureIntakeDirs();

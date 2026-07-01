@@ -576,12 +576,20 @@ function matchSignals(haystack: string, signals: Array<[string, number]>): { sco
   let score = 0;
   const terms: string[] = [];
   for (const [term, weight] of signals) {
-    if (haystack.includes(term)) {
+    // Match on word boundaries so a short signal like "rent" does not fire inside
+    // "current"/"parent". Boundaries are "not adjacent to an alphanumeric char",
+    // which also works for phrase and punctuated terms (e.g. "tax invoice", "a.b.n").
+    const pattern = new RegExp(`(?<![a-z0-9])${escapeRegExp(term)}(?![a-z0-9])`);
+    if (pattern.test(haystack)) {
       score += weight;
       terms.push(term);
     }
   }
   return { score, terms };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function derivePriority({ docType, disposition, text }: { docType: string; disposition: IntakeDisposition; text?: string | null }): IntakePriority {
