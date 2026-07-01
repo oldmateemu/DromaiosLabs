@@ -693,6 +693,10 @@ function optionalDateString() {
       // hallucinated model date never becomes an unparseable dueAt/reviewAt.
       .refine(isRealCalendarDate, "Invalid calendar date")
       .optional()
+      // A bad date is optional data: drop it to undefined rather than failing the
+      // whole extraction, so one hallucinated date doesn't discard the summary,
+      // domain, title, and next step alongside it (mirrors the domain field).
+      .catch(undefined)
   );
 }
 

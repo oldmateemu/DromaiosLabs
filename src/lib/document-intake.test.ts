@@ -189,6 +189,18 @@ describe("parseIntakeExtraction", () => {
     expect(extraction?.summary).toBe("Useful summary");
     expect(extraction?.dueDate).toBe("2026-07-15");
   });
+
+  it("drops an invalid optional date rather than discarding the rest of the extraction", () => {
+    const { extraction, error } = parseIntakeExtraction(
+      JSON.stringify({ summary: "Invoice", domain: "BUSINESS", suggestedTitle: "Pay Acme", dueDate: "2026-13-45", documentDate: "not-a-date" })
+    );
+    expect(error).toBeUndefined();
+    expect(extraction?.summary).toBe("Invoice");
+    expect(extraction?.domain).toBe("BUSINESS");
+    expect(extraction?.suggestedTitle).toBe("Pay Acme");
+    expect(extraction?.dueDate).toBeUndefined();
+    expect(extraction?.documentDate).toBeUndefined();
+  });
 });
 
 describe("mergeExtractionIntoTriage", () => {

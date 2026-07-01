@@ -1074,7 +1074,31 @@ describe("document intake", () => {
 
     const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
     expect(updateArg.data.domain).toBe("PERSONAL");
-    expect(updateArg.data.suggestedDomain).toBe("BUSINESS");
+    // The lock marker (domain != suggestedDomain) is kept intact, not refreshed
+    // to the fresh heuristic, so the manual choice survives future re-reads.
+    expect(updateArg.data.suggestedDomain).toBe("UNKNOWN");
+  });
+
+  it("does not erase a manual lock when the first triage agrees with the marked domain", async () => {
+    // Reviewer marked Business before the first read: domain=BUSINESS, the
+    // captured suggestedDomain is still UNKNOWN. The OCR triage also yields
+    // BUSINESS, which must NOT collapse domain == suggestedDomain (that would
+    // let a later re-read overwrite the manual choice).
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({
+      id: "d1",
+      storedPath: "/store/x.pdf",
+      mimeType: "application/pdf",
+      originalFilename: "acme-invoice.pdf",
+      domain: "BUSINESS",
+      suggestedDomain: "UNKNOWN"
+    });
+    vi.mocked(read.extractDocumentText).mockResolvedValue({ text: "tax invoice abn gst", engine: "pdftotext" });
+
+    await services.readAndTriageIntakeDocument("d1");
+
+    const updateArg = prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0];
+    expect(updateArg.data.domain).toBe("BUSINESS");
+    expect(updateArg.data.suggestedDomain).toBe("UNKNOWN");
   });
 
   it("updates a heuristic-set domain on re-read (domain == suggestedDomain)", async () => {

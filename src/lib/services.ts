@@ -783,7 +783,9 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
     // a domain that only a prior heuristic set. A human override is detectable
     // because setIntakeDomain changes `domain` without touching `suggestedDomain`,
     // so a human-locked row has domain !== suggestedDomain; a heuristic row has
-    // them equal. The fresh heuristic is always recorded as suggestedDomain.
+    // them equal. For a locked row we deliberately do NOT refresh suggestedDomain
+    // below, otherwise a triage that happens to agree with the manual choice would
+    // make them equal again and a later re-read could silently overwrite it.
     const humanLocked = doc.domain !== IntakeDomain.UNKNOWN && doc.domain !== doc.suggestedDomain;
     const preserved = humanLocked ? (doc.domain as IntakeDomain) : null;
     const effectiveDomain = preserved ?? (triage.domain as IntakeDomain);
@@ -806,7 +808,9 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
         docType: triage.docType,
         disposition: triage.disposition as IntakeDisposition,
         domain: effectiveDomain,
-        suggestedDomain: triage.domain as IntakeDomain,
+        // Keep the existing suggestedDomain for a human-locked row so the lock
+        // marker (domain !== suggestedDomain) survives a matching re-read.
+        suggestedDomain: preserved ? doc.suggestedDomain : (triage.domain as IntakeDomain),
         domainConfidence: triage.domainConfidence,
         signals: triage.signals,
         suggestedAction: proposedAction,
