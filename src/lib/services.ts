@@ -1747,30 +1747,35 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
   // corrected; without this it would be stuck in the wrong pipeline.
   const domain = enumValue(formData, "domain", IntakeDomain, existing.domain);
 
-  // Resolve the company route for the chosen domain, matching the intake approval
-  // contract so a reclassified action is never mis-routed or left unrouted:
-  // Personal carries no route; Mixed/Unknown ignore any stale posted route; and
-  // every non-Personal domain falls back to the Company Core/admin default for any
-  // route field left blank (e.g. a Personal->Business correction posts no route),
-  // so corrected company work always lands in a stream/function view.
+  // Resolve the company route. Route adjustments only apply to a genuine domain
+  // change (reclassification); a plain edit honours the operator's posted route,
+  // including an explicit "Unassigned", so a normal Business action is never
+  // silently pulled into admin. On reclassification, match the intake contract:
+  // Personal carries no route; Mixed/Unknown are forced to Company Core/admin; and
+  // a Personal->company correction (which posts no route) falls back to that same
+  // admin default so corrected work is not left unrouted.
+  const reclassified = domain !== existing.domain;
   let streamId = optionalString(formData, "streamId") ?? null;
   let companyFunctionId = optionalString(formData, "companyFunctionId") ?? null;
   if (domain === IntakeDomain.PERSONAL) {
+    // Personal never carries a company route, regardless of reclassification.
     streamId = null;
     companyFunctionId = null;
-  } else {
-    if (domain === IntakeDomain.MIXED || domain === IntakeDomain.UNKNOWN) {
-      streamId = null;
-      companyFunctionId = null;
+  } else if (reclassified && (domain === IntakeDomain.MIXED || domain === IntakeDomain.UNKNOWN)) {
+    const routing = suggestRouting({ docType: "unknown", domain });
+    streamId = routing.stream ? (await prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }))?.id ?? null : null;
+    companyFunctionId = routing.companyFunction
+      ? (await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }))?.id ?? null
+      : null;
+  } else if (reclassified && existing.domain === IntakeDomain.PERSONAL) {
+    // Personal->Business/etc.: the form posts no route, so fill blanks with the
+    // admin default; keep any route the operator did provide.
+    const routing = suggestRouting({ docType: "unknown", domain });
+    if (!streamId && routing.stream) {
+      streamId = (await prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }))?.id ?? null;
     }
-    if (!streamId || !companyFunctionId) {
-      const routing = suggestRouting({ docType: "unknown", domain });
-      if (!streamId && routing.stream) {
-        streamId = (await prisma.stream.findUnique({ where: { name: routing.stream }, select: { id: true } }))?.id ?? null;
-      }
-      if (!companyFunctionId && routing.companyFunction) {
-        companyFunctionId = (await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }))?.id ?? null;
-      }
+    if (!companyFunctionId && routing.companyFunction) {
+      companyFunctionId = (await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction }, select: { id: true } }))?.id ?? null;
     }
   }
 

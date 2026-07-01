@@ -915,6 +915,21 @@ describe("updateActionFromForm", () => {
     expect(docUpdate.where).toEqual({ actionId: "act-1" });
     expect(docUpdate.data.domain).toBe("PERSONAL");
   });
+
+  it("preserves an explicitly unassigned route on a normal (non-reclassifying) Business edit", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "BUSINESS" });
+    // If the admin fallback wrongly fired, these would resolve the route.
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "admin" ? { id: "fn-admin" } : null));
+
+    await services.updateActionFromForm("act-1", form({ title: "Just a title edit", status: "OPEN", priority: "MEDIUM", domain: "BUSINESS" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.streamId).toBeNull();
+    expect(data.companyFunctionId).toBeNull();
+    // The fallback must not have run for a same-domain edit.
+    expect(prismaMock.stream.findUnique).not.toHaveBeenCalled();
+  });
 });
 
 describe("prepareDraftAutomation", () => {
