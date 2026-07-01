@@ -845,6 +845,26 @@ function companyMailroomAutomation({ webhookUrl = null }: { webhookUrl?: string 
   };
 }
 
+describe("updateActionFromForm", () => {
+  it("writes an edited domain so a misclassified action can be reclassified", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "PERSONAL" });
+
+    await services.updateActionFromForm("act-1", form({ title: "Renew rego", status: "OPEN", priority: "MEDIUM", domain: "BUSINESS" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("BUSINESS");
+  });
+
+  it("keeps the existing domain when the form omits it", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null, domain: "PERSONAL" });
+
+    await services.updateActionFromForm("act-1", form({ title: "Renew rego", status: "OPEN", priority: "MEDIUM" }));
+
+    const data = prismaMock.action.update.mock.calls.at(-1)?.[0].data;
+    expect(data.domain).toBe("PERSONAL");
+  });
+});
+
 describe("prepareDraftAutomation", () => {
   it("throws when the automation does not exist", async () => {
     prismaMock.automation.findUnique.mockResolvedValue(null);
@@ -864,6 +884,9 @@ describe("prepareDraftAutomation", () => {
     const run = prismaMock.automationRun.create.mock.calls[0][0].data;
     expect(run.status).toBe(AutomationRunStatus.SUCCESS);
     expect(run.responseSummary).toContain("Weekly review prep - draft only");
+    // The company draft summary reads company actions only, not Personal ones.
+    const actionQuery = prismaMock.action.findMany.mock.calls.find((call) => call[0]?.take === 120);
+    expect(actionQuery?.[0].where).toEqual({ domain: { not: "PERSONAL" } });
   });
 
   it("produces a stale task summary draft", async () => {
@@ -941,11 +964,18 @@ describe("read aggregators", () => {
     expect(call.where).toEqual({ status: "OPEN", domain: { not: "PERSONAL" } });
   });
 
-  it("keeps Personal-domain actions off the Today board", async () => {
+  it("keeps Personal-domain actions off the Today board and its company rollups", async () => {
     await services.getTodayData();
     // getTodayData also queries setup actions by title; find the domain-scoped one.
-    const todayCall = prismaMock.action.findMany.mock.calls.find((call) => call[0]?.where?.domain);
+    const todayCall = prismaMock.action.findMany.mock.calls.find((call) => call[0]?.where?.domain && !call[0]?.where?.OR);
     expect(todayCall?.[0].where).toEqual({ domain: { not: "PERSONAL" } });
+    // Company Pulse and Stream Portfolio rollup queries (those with an OR) must
+    // also exclude Personal, or private tasks would count as company work.
+    const rollupCalls = prismaMock.action.findMany.mock.calls.filter((call) => call[0]?.where?.OR);
+    expect(rollupCalls.length).toBeGreaterThan(0);
+    for (const call of rollupCalls) {
+      expect(call[0].where.domain).toEqual({ not: "PERSONAL" });
+    }
   });
 
   it("loads reference, launchpad, review, draft, and automation data", async () => {

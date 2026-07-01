@@ -236,14 +236,16 @@ export async function moveToArchive(storedPath: string): Promise<string> {
     throw error;
   });
   if (!exists) {
-    // Source already gone (e.g. a retry after a prior move succeeded): return the
-    // archive target if it now holds the file, so the caller persists the correct
-    // path rather than a stale store path.
+    // Source already gone. If a prior move already placed it in the archive, return
+    // that target (idempotent retry). If neither the source nor an archive copy
+    // exists, there is nothing to archive — throw so the caller does not finalise a
+    // document as archived while pointing at a file that was never created.
     const archived = await stat(target).then(() => true).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return false;
       throw error;
     });
-    return archived ? target : storedPath;
+    if (archived) return target;
+    throw new Error(`Cannot archive: neither the stored file (${storedPath}) nor an archive copy exists.`);
   }
   await rename(storedPath, target).catch(async () => {
     // rename can fail across devices; fall back to copy+delete.

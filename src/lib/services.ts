@@ -116,6 +116,8 @@ export async function getTodayData() {
   const [pulseActions, pulseRuns, pulseLinks, streamRefs, portfolioActions, portfolioRisks] = await Promise.all([
     prisma.action.findMany({
       where: {
+        // Company Pulse metrics (overdue/throughput) are company work only.
+        domain: { not: IntakeDomain.PERSONAL },
         OR: [
           { completedAt: { gte: pulseSince } },
           { createdAt: { gte: weekStart } },
@@ -134,6 +136,9 @@ export async function getTodayData() {
     prisma.stream.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     prisma.action.findMany({
       where: {
+        // Stream Portfolio is a per-stream company view; Personal actions carry no
+        // stream and are not company work, so keep them out.
+        domain: { not: IntakeDomain.PERSONAL },
         OR: [{ status: { notIn: [ActionStatus.DONE, ActionStatus.CANCELLED] } }, { completedAt: { gte: weekStart } }]
       },
       select: { status: true, streamId: true, dueAt: true, completedAt: true }
@@ -1312,6 +1317,9 @@ export async function prepareDraftAutomation(automationId: string, userId: strin
 
     const now = new Date();
     const actions = await prisma.action.findMany({
+      // Company draft summaries (weekly review / stale tasks / daily inbox) are
+      // company work only; Personal-domain actions belong to the /personal pipeline.
+      where: { domain: { not: IntakeDomain.PERSONAL } },
       include: { stream: true, companyFunction: true },
       orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { updatedAt: "asc" }],
       take: 120
@@ -1726,7 +1734,7 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
   const title = stringValue(formData, "title");
   if (!title) throw new Error("Action title is required.");
 
-  const existing = await prisma.action.findUnique({ where: { id: actionId }, select: { completedAt: true } });
+  const existing = await prisma.action.findUnique({ where: { id: actionId }, select: { completedAt: true, domain: true } });
   if (!existing) throw new Error("Action not found.");
 
   const status = enumValue(formData, "status", ActionStatus, ActionStatus.OPEN);
@@ -1738,6 +1746,10 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
       description: optionalString(formData, "description") ?? null,
       status,
       priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+      // Domain is editable so a misclassified intake approval (e.g. Personal set by
+      // mistake, or a Mixed/Unknown item that admin later reclassifies) can be
+      // corrected; without this it would be stuck in the wrong pipeline.
+      domain: enumValue(formData, "domain", IntakeDomain, existing.domain),
       dueAt: dateValue(formData, "dueAt") ?? null,
       reviewAt: dateValue(formData, "reviewAt") ?? null,
       nextStep: optionalString(formData, "nextStep") ?? null,

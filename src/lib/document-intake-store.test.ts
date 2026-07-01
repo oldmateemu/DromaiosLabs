@@ -202,10 +202,10 @@ describe("moveToArchive", () => {
     await expect(readFile(stored.storedPath)).rejects.toBeTruthy();
   });
 
-  it("returns the original path when the source is missing", async () => {
+  it("throws when neither the source nor an archive copy exists", async () => {
     await mkdir(join(root, "archive"), { recursive: true });
     const missing = join(root, "store", "does-not-exist.pdf");
-    expect(await moveToArchive(missing)).toBe(missing);
+    await expect(moveToArchive(missing)).rejects.toThrow(/Cannot archive/);
   });
 
   it("returns the archive target when the source was already moved", async () => {
