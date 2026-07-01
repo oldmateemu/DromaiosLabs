@@ -70,7 +70,8 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
   // picked up on the next ingest. Set INTAKE_SETTLE_MS=0 to disable (used in tests).
   // A non-numeric value (operator typo) falls back to the default rather than
   // silently disabling the guard.
-  const parsedSettleMs = Number(process.env.INTAKE_SETTLE_MS);
+  const rawSettleMs = process.env.INTAKE_SETTLE_MS;
+  const parsedSettleMs = rawSettleMs == null || rawSettleMs.trim() === "" ? NaN : Number(rawSettleMs);
   const settleMs = Number.isFinite(parsedSettleMs) ? parsedSettleMs : 3000;
   const now = Date.now();
 

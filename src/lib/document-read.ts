@@ -84,8 +84,9 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
   try {
     workDir = await mkdtemp(join(tmpdir(), "intake-ocr-"));
     const prefix = join(workDir, "page");
-    // Rasterise up to MAX_OCR_PAGES at 200 DPI as PNGs: page-1.png, page-2.png...
-    await runCommand("pdftoppm", ["-png", "-r", "200", "-l", String(MAX_OCR_PAGES), storedPath, prefix]);
+    // Rasterise one extra "sentinel" page beyond the cap so we can tell a PDF that
+    // is exactly MAX_OCR_PAGES long (not truncated) from one that is longer.
+    await runCommand("pdftoppm", ["-png", "-r", "200", "-l", String(MAX_OCR_PAGES + 1), storedPath, prefix]);
     // Sort by the numeric page index (page-2 before page-10), not lexically, so
     // multi-page text reaches OCR/Ollama in reading order.
     const files = (await readdir(workDir))
@@ -93,13 +94,13 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
       .sort((a, b) => pageNumber(a) - pageNumber(b));
     if (files.length === 0) return { text: "", engine: "none", error: "pdftoppm produced no page images." };
 
+    // Only OCR up to the cap; the sentinel (if present) means further pages exist.
+    const truncated = files.length > MAX_OCR_PAGES;
     const pages: string[] = [];
-    for (const file of files) {
+    for (const file of files.slice(0, MAX_OCR_PAGES)) {
       const page = await ocrImage(join(workDir, file));
       if (page.text) pages.push(page.text);
     }
-    // Hitting the page cap means the PDF may have further, unread pages.
-    const truncated = files.length >= MAX_OCR_PAGES;
     return { text: capText(pages.join("\n\n")), engine: "tesseract+pdftoppm", truncated };
   } catch (error) {
     return { text: "", engine: "none", error: toMessage(error) };
