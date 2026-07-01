@@ -9,6 +9,7 @@ import {
   uploadIntakeDocumentAction
 } from "@/app/actions";
 import { getIntakeQueueData } from "@/lib/services";
+import { IntakeSourceText } from "./source-text";
 
 export const dynamic = "force-dynamic";
 
@@ -242,6 +243,8 @@ export default async function IntakePage() {
                       <button className="button button-secondary" type="submit">Reject</button>
                     </form>
                   </div>
+
+                  <IntakeSourceText intakeId={doc.id} />
                 </>
               )}
             </article>

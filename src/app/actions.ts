@@ -15,6 +15,7 @@ import {
   createQuickCaptureDraft,
   createRisk,
   fileIntakeDocument,
+  getIntakeDocumentText,
   ingestIntakeFolder,
   prepareDraftAutomation,
   readAndTriageIntakeDocument,
@@ -255,4 +256,10 @@ export async function setIntakeDomainAction(formData: FormData) {
   await requireUser();
   await setIntakeDomain(formData);
   redirect("/intake");
+}
+
+export async function getIntakeDocumentTextAction(intakeId: string) {
+  await requireUser();
+  if (!intakeId) throw new Error("Document is required.");
+  return getIntakeDocumentText(intakeId);
 }

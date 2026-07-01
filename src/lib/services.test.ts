@@ -23,7 +23,16 @@ const { prismaMock } = vi.hoisted(() => ({
     review: { create: vi.fn(), findMany: vi.fn() },
     risk: { findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
     decision: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
-    intakeDocument: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), groupBy: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    intakeDocument: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      groupBy: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn()
+    },
     $transaction: vi.fn()
   }
 }));
@@ -116,6 +125,7 @@ beforeEach(() => {
   prismaMock.intakeDocument.findFirst.mockResolvedValue(null);
   prismaMock.intakeDocument.findUnique.mockResolvedValue(null);
   prismaMock.intakeDocument.groupBy.mockResolvedValue([]);
+  prismaMock.intakeDocument.count.mockResolvedValue(0);
   prismaMock.intakeDocument.create.mockResolvedValue({ id: "intake-1" });
   prismaMock.intakeDocument.update.mockResolvedValue({ id: "intake-1" });
   prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
@@ -1352,5 +1362,41 @@ describe("document intake", () => {
     const runArg = prismaMock.automationRun.create.mock.calls.at(-1)?.[0];
     expect(runArg.data.status).toBe("SUCCESS");
     expect(runArg.data.responseSummary).toContain("Document intake triage");
+  });
+
+  it("loads a single document's extracted text on demand", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ ocrText: "TAX INVOICE ABN GST", ocrEngine: "pdftotext" });
+
+    const result = await services.getIntakeDocumentText("d1");
+
+    expect(result.text).toBe("TAX INVOICE ABN GST");
+    expect(result.engine).toBe("pdftotext");
+    expect(result.truncated).toBe(false);
+  });
+
+  it("throws when the on-demand text is requested for a missing document", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue(null);
+    await expect(services.getIntakeDocumentText("missing")).rejects.toThrow(/not found/);
+  });
+
+  it("builds the personal pipeline from personal-domain actions and documents", async () => {
+    prismaMock.action.findMany.mockResolvedValue([
+      { id: "a1", title: "Renew car rego", status: "OPEN", priority: "HIGH", dueAt: null, nextStep: "Pay online", sensitive: false }
+    ]);
+    prismaMock.intakeDocument.findMany.mockResolvedValue([
+      { id: "d1", originalFilename: "medicare.pdf", status: "FILED", docType: "medical", reviewedAt: new Date("2026-06-01"), action: null }
+    ]);
+    prismaMock.action.count.mockResolvedValue(3);
+    prismaMock.intakeDocument.count.mockResolvedValue(5);
+
+    const data = await services.getPersonalPipelineData();
+
+    expect(data.openActions).toHaveLength(1);
+    expect(data.recentDocuments).toHaveLength(1);
+    expect(data.actionCount).toBe(3);
+    expect(data.documentCount).toBe(5);
+    // Both queries are scoped to the Personal domain.
+    expect(prismaMock.action.findMany.mock.calls.at(-1)?.[0].where.domain).toBe("PERSONAL");
+    expect(prismaMock.intakeDocument.findMany.mock.calls.at(-1)?.[0].where.domain).toBe("PERSONAL");
   });
 });

@@ -590,6 +590,9 @@ const INTAKE_REVIEW_READY_STATUSES = [IntakeStatus.READ, IntakeStatus.TRIAGED, I
 const INTAKE_HISTORY_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
 const INTAKE_FINALISED_STATUSES = [IntakeStatus.FILED, IntakeStatus.ARCHIVED, IntakeStatus.REJECTED];
 const MAX_INTAKE_UPLOAD_BYTES = 20 * 1024 * 1024;
+// Matches the OCR text cap in document-read.ts; stored text at this length was
+// sliced, so the on-demand viewer flags it as truncated.
+const MAX_OCR_TEXT_PREVIEW = 200_000;
 
 // The queue/history cards render only these columns. Selecting them explicitly
 // keeps the heavy columns (ocrText, up to 200k chars, plus the signals JSON) out
@@ -648,6 +651,56 @@ export async function getIntakeQueueData() {
   const summary = summariseIntakeQueueFromCounts(grouped.map((row) => ({ status: row.status, domain: row.domain, count: row._count })));
 
   return { pending, history, summary, ...reference };
+}
+
+/**
+ * Loads a single document's extracted OCR/AI text on demand. The queue query
+ * deliberately omits ocrText (up to 200k chars per row); this fetches it for one
+ * document so a reviewer can inspect what was read before approving, without
+ * bloating the list. Local-only: the text never leaves the box.
+ */
+export async function getIntakeDocumentText(intakeId: string): Promise<{ text: string; engine: string | null; truncated: boolean }> {
+  const doc = await prisma.intakeDocument.findUnique({
+    where: { id: intakeId },
+    select: { ocrText: true, ocrEngine: true }
+  });
+  if (!doc) throw new Error("Intake document not found.");
+  const text = doc.ocrText ?? "";
+  return { text, engine: doc.ocrEngine, truncated: text.length >= MAX_OCR_TEXT_PREVIEW };
+}
+
+/**
+ * The Personal pipeline view: documents and actions triaged into the PERSONAL
+ * domain, kept deliberately out of the company streams/functions. Business flows
+ * into company ops; this is the orthogonal destination for household, medical,
+ * vehicle, school, and private-finance items.
+ */
+export async function getPersonalPipelineData() {
+  const [openActions, recentDocuments, actionCount, documentCount] = await Promise.all([
+    prisma.action.findMany({
+      where: { domain: IntakeDomain.PERSONAL, status: { not: ActionStatus.DONE } },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      select: { id: true, title: true, status: true, priority: true, dueAt: true, nextStep: true, sensitive: true },
+      take: 100
+    }),
+    prisma.intakeDocument.findMany({
+      where: { domain: IntakeDomain.PERSONAL, status: { in: [IntakeStatus.FILED, IntakeStatus.ARCHIVED] } },
+      orderBy: { reviewedAt: "desc" },
+      select: {
+        id: true,
+        originalFilename: true,
+        status: true,
+        docType: true,
+        reviewedAt: true,
+        action: { select: { id: true, title: true } }
+      },
+      take: 50
+    }),
+    prisma.action.count({ where: { domain: IntakeDomain.PERSONAL } }),
+    prisma.intakeDocument.count({ where: { domain: IntakeDomain.PERSONAL } })
+  ]);
+
+  return { openActions, recentDocuments, actionCount, documentCount };
 }
 
 /**

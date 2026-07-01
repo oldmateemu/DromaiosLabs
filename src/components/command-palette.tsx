@@ -18,6 +18,7 @@ const NAV_ITEMS: CommandItem[] = [
   { id: "nav-actions", label: "Actions", hint: "Action register", group: "Pages", href: "/actions" },
   { id: "nav-launchpad", label: "Launchpad", hint: "Systems and links", group: "Pages", href: "/launchpad" },
   { id: "nav-intake", label: "Intake", hint: "Document scan, triage, and review queue", group: "Pages", href: "/intake" },
+  { id: "nav-personal", label: "Personal", hint: "Personal-domain documents and actions", group: "Pages", href: "/personal" },
   { id: "nav-governance", label: "Governance", hint: "Risks and decisions", group: "Pages", href: "/governance" },
   { id: "nav-reviews", label: "Reviews", hint: "Weekly company review", group: "Pages", href: "/reviews" },
   { id: "nav-activity", label: "Activity", hint: "Company timeline and throughput", group: "Pages", href: "/activity" },

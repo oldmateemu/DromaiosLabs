@@ -57,7 +57,10 @@ All three converge on one review queue:
    suggested title. A proposed Action draft is attached. Status `TRIAGED`.
 4. **Review (human in the loop)** — the operator approves into an Action (carrying
    the chosen domain), files for records, archives, or rejects. Status becomes
-   `FILED`, `ARCHIVED`, or `REJECTED`.
+   `FILED`, `ARCHIVED`, or `REJECTED`. Each review card can load the full extracted
+   text on demand ("View extracted text") so the operator can verify what was read
+   before deciding; the text is fetched per-document, never bulk-loaded into the
+   queue.
 
 ## Business vs Personal Routing
 
@@ -67,7 +70,10 @@ All three converge on one review queue:
   for invoices/receipts/statements, legal for contracts/insurance, admin
   otherwise) and become normal company actions.
 - **Personal** documents are deliberately **not** attached to a company Stream or
-  Function; they flow into the Personal pipeline and stay out of company ops.
+  Function; they flow into the Personal pipeline and stay out of company ops. The
+  `/personal` view surfaces this pipeline — open Personal actions plus filed and
+  archived Personal documents — so household/medical/vehicle/private-finance items
+  have a dedicated home separate from the company streams.
 - **Mixed / Unknown** documents are routed to admin and flagged for the human to
   split or reclassify.
 
