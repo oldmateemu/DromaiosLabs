@@ -140,3 +140,9 @@ duplicate noise, reviewed read-failure handling, and a written rollback check.
 - Authenticated original-file preview/download in the queue.
 - Vision-model reading for low-quality scans.
 - Per-document re-routing into the Drive folder structure used by mailroom filing.
+- Background reading: OCR + local-LLM extraction currently runs synchronously in
+  the `Read & triage` server action (bounded by the 120s OCR and 60s Ollama
+  timeouts). Acceptable for the single-operator self-hosted box, where there is no
+  platform request timeout. If the deployment moves to a request-timeout-limited
+  platform, or reads grow large, move this to a background worker (or a
+  `PROCESSING` status with polling) so the review page stays responsive.
