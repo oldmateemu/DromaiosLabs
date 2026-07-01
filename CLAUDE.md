@@ -20,13 +20,15 @@ Before changing behavior, read the relevant doc — these are authoritative and
 kept current:
 
 1. `AI_CONTEXT.md` — entry point and safety defaults.
-2. `docs/OPERATING_MODEL.md` — streams, company functions, daily/weekly rhythm.
-3. `docs/DATA_MODEL.md` — core records and the approval rule.
-4. `docs/AUTOMATIONS.md` — **read before touching any automation behavior.**
-5. `docs/AI_GUIDE.md` — **read before changing assistant/model behavior.**
-6. `docs/CHANGE_GUIDES.md` — step-by-step recipes (add a stream, automation, etc.).
-7. `docs/DECISIONS.md` — durable architectural decisions and their rationale.
-8. `docs/superpowers/specs/` and `docs/superpowers/plans/` — approved product design.
+2. `docs/DIRECTION.md` — current SWOT, strategic direction, and binding
+   guardrails for AI sessions. **Read before starting any new feature.**
+3. `docs/OPERATING_MODEL.md` — streams, company functions, daily/weekly rhythm.
+4. `docs/DATA_MODEL.md` — core records and the approval rule.
+5. `docs/AUTOMATIONS.md` — **read before touching any automation behavior.**
+6. `docs/AI_GUIDE.md` — **read before changing assistant/model behavior.**
+7. `docs/CHANGE_GUIDES.md` — step-by-step recipes (add a stream, automation, etc.).
+8. `docs/DECISIONS.md` — durable architectural decisions and their rationale.
+9. `docs/superpowers/specs/` and `docs/superpowers/plans/` — approved product design.
 
 ## Tech Stack
 
