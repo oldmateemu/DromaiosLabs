@@ -703,6 +703,15 @@ function labelDomain(domain: IntakeDomain): string {
   return domain.charAt(0) + domain.slice(1).toLowerCase();
 }
 
+/** Rewrites the generated "Domain: <label>" line in an intake action description
+ * to the given domain. Used when a reviewer changes only the domain dropdown at
+ * approval so the created action's description does not keep naming the original
+ * triage domain. Only the exact generated token is replaced, so any hand-typed
+ * description text is left untouched. */
+export function alignDescriptionDomain(description: string, domain: IntakeDomain): string {
+  return description.replace(/(^|\n)Domain: (?:Business|Personal|Mixed|Unknown)\b/g, `$1Domain: ${labelDomain(domain)}`);
+}
+
 function tidyFilename(filename: string): string {
   const base = filename.replace(/\.[a-z0-9]{1,5}$/i, "");
   const cleaned = base.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();

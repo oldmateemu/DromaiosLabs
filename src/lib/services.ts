@@ -40,6 +40,7 @@ import {
   getLocalDraftAutomationKind
 } from "./draft-automations";
 import {
+  alignDescriptionDomain,
   buildDocumentIntakeRun,
   buildIntakeTriage,
   mergeExtractionIntoTriage,
@@ -857,6 +858,11 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   // the workflow contract); Personal stays out of company streams entirely.
   const attachesCompanyContext = domain !== IntakeDomain.PERSONAL;
 
+  // Load the triaged document once: its docType feeds the routing fallback and
+  // its suggestedAction domain tells us whether the reviewer changed the domain
+  // (so the prefilled description can be realigned below).
+  const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { docType: true, suggestedAction: true } });
+
   // Resolve the company route. An UNKNOWN (uncertain) domain is forced to the
   // Company Core/admin fallback and deliberately ignores any route the form
   // pre-filled from the original suggestion: when the operator downgrades a
@@ -882,7 +888,6 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
     // action would be created with no stream/function and drop out of the finance/
     // legal/admin views entirely.
     if (!stream || !companyFunction) {
-      const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { docType: true } });
       const routing = suggestRouting({ docType: doc?.docType ?? "unknown", domain });
       if (!stream && routing.stream) stream = await prisma.stream.findUnique({ where: { name: routing.stream } });
       if (!companyFunction && routing.companyFunction) {
@@ -890,6 +895,17 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
       }
     }
   }
+
+  // When the reviewer changed only the domain dropdown, the prefilled description
+  // still names the original triage domain. Realign the generated "Domain:" line
+  // to the chosen domain so the created action does not contradict its own domain
+  // field (hand-typed description text is left untouched).
+  const suggested = (doc?.suggestedAction as IntakeProposedAction | null) ?? null;
+  const postedDescription = optionalString(formData, "description");
+  const description =
+    postedDescription && suggested && suggested.domain !== domain
+      ? alignDescriptionDomain(postedDescription, domain)
+      : postedDescription;
 
   await prisma.$transaction(async (tx) => {
     // Atomically claim the row with a single guarded UPDATE: only a not-yet-filed,
@@ -912,7 +928,7 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
     const action = await tx.action.create({
       data: {
         title,
-        description: optionalString(formData, "description"),
+        description,
         status: enumValue(formData, "status", ActionStatus, ActionStatus.OPEN),
         priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
         source: ActionSource.ASSISTANT,
@@ -973,14 +989,14 @@ export async function archiveIntakeDocument(formData: FormData, userId: string) 
     throw new Error("This document has already been filed, archived, or rejected.");
   }
 
-  const archivedPath = await moveToArchive(doc.storedPath);
-  // Guarded: if another tab finalised the document while the file was moving,
-  // don't overwrite that state (moveToArchive is idempotent on a later retry).
-  await prisma.intakeDocument.updateMany({
+  // Claim the row BEFORE moving any bytes. If an Approve/File from another tab
+  // finalises the document first, this matches zero rows and we stop without
+  // touching the file — so a FILED/action record can never be left pointing at a
+  // path we already moved into archive/.
+  const claim = await prisma.intakeDocument.updateMany({
     where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
     data: {
       status: IntakeStatus.ARCHIVED,
-      storedPath: archivedPath,
       disposition: IntakeDisposition.ARCHIVE,
       domain: enumValue(formData, "domain", IntakeDomain, doc.domain),
       reviewedById: userId,
@@ -988,6 +1004,14 @@ export async function archiveIntakeDocument(formData: FormData, userId: string) 
       reviewerNote: optionalString(formData, "reviewerNote")
     }
   });
+  if (claim.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
+
+  // The row is now ours (ARCHIVED), so no other tab can finalise it. Move the
+  // bytes and record the new path. If the move fails, the row stays ARCHIVED with
+  // its store/ path still valid (bytes not moved) — acceptable for a single
+  // operator; a manual re-run is blocked by the finalised guard above.
+  const archivedPath = await moveToArchive(doc.storedPath);
+  await prisma.intakeDocument.update({ where: { id: intakeId }, data: { storedPath: archivedPath } });
 
   revalidatePath("/intake");
 }

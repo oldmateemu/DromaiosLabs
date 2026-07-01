@@ -1197,6 +1197,20 @@ describe("document intake", () => {
     expect(action.data.companyFunctionId).toBe("fn-finance");
   });
 
+  it("realigns the action description domain when the reviewer changes only the dropdown", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    const prefill = "Captured document triaged locally on 2026-07-01.\nDomain: Business (confidence 0.9).\nProposed disposition: ACTION.";
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ docType: "invoice", suggestedAction: { domain: "BUSINESS", description: prefill } });
+
+    // Reviewer flipped the domain to Personal but left the prefilled description.
+    await services.approveIntakeDocument(form({ intakeId: "d1", title: "Pay invoice", domain: "PERSONAL", description: prefill }), "user-1");
+
+    const action = prismaMock.action.create.mock.calls.at(-1)?.[0];
+    expect(action.data.domain).toBe("PERSONAL");
+    expect(action.data.description).toContain("Domain: Personal");
+    expect(action.data.description).not.toContain("Domain: Business");
+  });
+
   it("files a document for records without creating an action", async () => {
     prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
 
@@ -1234,6 +1248,18 @@ describe("document intake", () => {
 
     prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "ARCHIVED", storedPath: "/x", domain: "BUSINESS" });
     await expect(services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);
+  });
+
+  it("does not move archived bytes when the claim loses a race with another finaliser", async () => {
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ status: "TRIAGED", storedPath: "/store/x.pdf", domain: "BUSINESS" });
+    // The guarded claim matches nothing (another tab finalised it first).
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 0 });
+    vi.mocked(store.moveToArchive).mockClear();
+
+    await expect(services.archiveIntakeDocument(form({ intakeId: "d1" }), "user-1")).rejects.toThrow(/already been filed/);
+    // The bytes are never moved, so a FILED/action record can't be left pointing
+    // at a path that was archived away.
+    expect(store.moveToArchive).not.toHaveBeenCalled();
   });
 
   it("rejects a document and updates the intake domain", async () => {
