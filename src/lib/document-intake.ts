@@ -471,10 +471,21 @@ export type IntakeQueueSummary = {
 const PENDING_STATUSES = new Set(["CAPTURED", "READ", "TRIAGED", "IN_REVIEW"]);
 const NEEDS_REVIEW_STATUSES = new Set(["READ", "TRIAGED", "IN_REVIEW"]);
 
+export type IntakeStatusDomainCount = { status: string; domain: string; count: number };
+
 export function summariseIntakeQueue(items: IntakeQueueItem[]): IntakeQueueSummary {
+  return summariseIntakeQueueFromCounts(items.map((item) => ({ status: item.status, domain: item.domain, count: 1 })));
+}
+
+/**
+ * Builds the queue summary from pre-aggregated status/domain counts (e.g. a
+ * Prisma groupBy), so the work stays bounded by the number of groups rather than
+ * the total number of documents.
+ */
+export function summariseIntakeQueueFromCounts(rows: IntakeStatusDomainCount[]): IntakeQueueSummary {
   const byDomain: Record<IntakeDomain, number> = { BUSINESS: 0, PERSONAL: 0, MIXED: 0, UNKNOWN: 0 };
   const summary: IntakeQueueSummary = {
-    total: items.length,
+    total: 0,
     pending: 0,
     needsReview: 0,
     captured: 0,
@@ -485,15 +496,17 @@ export function summariseIntakeQueue(items: IntakeQueueItem[]): IntakeQueueSumma
     byDomain
   };
 
-  for (const item of items) {
-    if (PENDING_STATUSES.has(item.status)) summary.pending += 1;
-    if (NEEDS_REVIEW_STATUSES.has(item.status)) summary.needsReview += 1;
-    if (item.status === "CAPTURED") summary.captured += 1;
-    if (item.status === "FAILED") summary.failed += 1;
-    if (item.status === "FILED") summary.filed += 1;
-    if (item.status === "ARCHIVED") summary.archived += 1;
-    if (item.status === "REJECTED") summary.rejected += 1;
-    if (item.domain in byDomain) byDomain[item.domain as IntakeDomain] += 1;
+  for (const row of rows) {
+    const count = row.count;
+    summary.total += count;
+    if (PENDING_STATUSES.has(row.status)) summary.pending += count;
+    if (NEEDS_REVIEW_STATUSES.has(row.status)) summary.needsReview += count;
+    if (row.status === "CAPTURED") summary.captured += count;
+    if (row.status === "FAILED") summary.failed += count;
+    if (row.status === "FILED") summary.filed += count;
+    if (row.status === "ARCHIVED") summary.archived += count;
+    if (row.status === "REJECTED") summary.rejected += count;
+    if (row.domain in byDomain) byDomain[row.domain as IntakeDomain] += count;
   }
 
   return summary;

@@ -41,6 +41,9 @@ const INBOX_SCAN = join("inbox", "scan");
 const INBOX_EMAIL = join("inbox", "email");
 const STORE = "store";
 const ARCHIVE = "archive";
+// Watched-folder files above this size are skipped (not read into memory),
+// consistent with the in-cockpit upload limit.
+const MAX_INBOX_FILE_BYTES = 20 * 1024 * 1024;
 
 export function intakeRoot(): string {
   return process.env.INTAKE_DIR ?? join(process.cwd(), ".intake");
@@ -100,6 +103,9 @@ export async function collectInboxCandidates(): Promise<InboxCandidate[]> {
         throw error;
       }
       if (settleMs > 0 && now - info.mtimeMs < settleMs) continue;
+      // Skip oversized files before reading them into memory (they stay in the
+      // inbox for the operator to notice), consistent with the upload limit.
+      if (info.size > MAX_INBOX_FILE_BYTES) continue;
 
       let bytes: Buffer;
       try {
@@ -150,15 +156,18 @@ export async function discardInboxFile(absPath: string): Promise<void> {
   await rm(absPath, { force: true });
 }
 
-/** Writes an uploaded file into the content-addressed store. */
-export async function storeUploadedFile(filename: string, bytes: Buffer): Promise<StoredFile> {
+/** Writes an uploaded file into the content-addressed store. Prefers the
+ * browser-provided MIME type (so extensionless mobile uploads keep their real
+ * type) and falls back to guessing from the filename. */
+export async function storeUploadedFile(filename: string, bytes: Buffer, mimeType?: string): Promise<StoredFile> {
   await ensureIntakeDirs();
   const root = intakeRoot();
   const contentHash = hashContent(bytes);
   const storedName = `${contentHash}${extname(filename).toLowerCase()}`;
   const storedPath = join(root, STORE, storedName);
   await writeFile(storedPath, bytes);
-  return { storedPath, filename, contentHash, mimeType: guessMimeType(filename), byteSize: bytes.byteLength };
+  const resolvedMime = mimeType && mimeType !== "application/octet-stream" ? mimeType : guessMimeType(filename);
+  return { storedPath, filename, contentHash, mimeType: resolvedMime, byteSize: bytes.byteLength };
 }
 
 /** Moves a stored file into the archive folder, returning the new path (or the

@@ -44,7 +44,7 @@ import {
   buildIntakeTriage,
   mergeExtractionIntoTriage,
   suggestRouting,
-  summariseIntakeQueue,
+  summariseIntakeQueueFromCounts,
   type IntakeProposedAction
 } from "./document-intake";
 import { extractDocumentText } from "./document-read";
@@ -613,9 +613,7 @@ export async function getIntakeQueueData() {
     getReferenceData()
   ]);
 
-  const summary = summariseIntakeQueue(
-    grouped.flatMap((row) => Array.from({ length: row._count }, () => ({ status: row.status, domain: row.domain })))
-  );
+  const summary = summariseIntakeQueueFromCounts(grouped.map((row) => ({ status: row.status, domain: row.domain, count: row._count })));
 
   return { pending, history, summary, ...reference };
 }
@@ -692,7 +690,7 @@ export async function uploadIntakeDocument(formData: FormData) {
   const contentHash = hashContent(bytes);
   const existing = await prisma.intakeDocument.findFirst({ where: { contentHash }, select: { id: true } });
   if (!existing) {
-    const stored = await storeUploadedFile(file.name, bytes);
+    const stored = await storeUploadedFile(file.name, bytes, file.type);
     try {
       await prisma.intakeDocument.create({
         data: {
@@ -816,7 +814,10 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   // attaches company context. Only Business/Mixed documents route into a company
   // stream and function; Personal/Unknown stay out of company ops.
   const domain = enumValue(formData, "domain", IntakeDomain, IntakeDomain.UNKNOWN);
-  const attachesCompanyContext = domain === IntakeDomain.BUSINESS || domain === IntakeDomain.MIXED;
+  // Everything except Personal routes into company ops. Business/Mixed/Unknown
+  // get a stream + function (Unknown lands in Company Core/admin for review per
+  // the workflow contract); Personal stays out of company streams entirely.
+  const attachesCompanyContext = domain !== IntakeDomain.PERSONAL;
 
   // When the operator corrects a Personal suggestion to Business but leaves the
   // routing blank, derive sensible defaults from the document type so the action
@@ -963,13 +964,16 @@ export async function setIntakeDomain(formData: FormData) {
   const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { suggestedAction: true } });
   const suggested = (doc?.suggestedAction as IntakeProposedAction | null) ?? null;
 
-  await prisma.intakeDocument.update({
-    where: { id: intakeId },
+  // Guarded so a stale "Mark Business/Personal" cannot rewrite the domain of a
+  // document another tab already filed/archived/rejected.
+  const updated = await prisma.intakeDocument.updateMany({
+    where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
     data: {
       domain,
       suggestedAction: suggested ? { ...suggested, domain } : suggested ?? undefined
     }
   });
+  if (updated.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
 
   revalidatePath("/intake");
 }

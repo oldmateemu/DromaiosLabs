@@ -1171,8 +1171,9 @@ describe("document intake", () => {
     expect(prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data.status).toBe("REJECTED");
 
     prismaMock.intakeDocument.findUnique.mockResolvedValue({ suggestedAction: { domain: "UNKNOWN", title: "x" } });
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
     await services.setIntakeDomain(form({ intakeId: "d1", domain: "PERSONAL" }));
-    expect(prismaMock.intakeDocument.update.mock.calls.at(-1)?.[0].data.domain).toBe("PERSONAL");
+    expect(prismaMock.intakeDocument.updateMany.mock.calls.at(-1)?.[0].data.domain).toBe("PERSONAL");
   });
 
   it("refuses to reject an already-finalized document", async () => {
