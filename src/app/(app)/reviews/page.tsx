@@ -3,6 +3,7 @@ import { weeklyReviewAction } from "@/app/actions";
 import { WeeklyReviewForm } from "@/components/forms";
 import { ReviewMomentumPanel } from "@/components/review-momentum-panel";
 import { buildSetupReadiness, selectOutstandingSetupItems, setupItemStatusLabel } from "@/lib/company-setup-checklist";
+import { humanizeEnum, priorityLabel } from "@/lib/domain";
 import { getCompanySetupData, getReviewData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export default async function ReviewsPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={item.priority === "HIGH" || item.priority === "CRITICAL" ? "status-pill status-high" : "meta-pill"}>
-                  {item.priority}
+                  {priorityLabel(item.priority)}
                 </span>
                 <span className="meta-pill">{setupItemStatusLabel(item.status)}</span>
               </div>
@@ -72,7 +73,7 @@ export default async function ReviewsPage() {
           <article className="action-row" key={review.id}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-semibold">{review.type} review</p>
+                <p className="font-semibold">{humanizeEnum(review.type)} review</p>
                 <p className="muted whitespace-pre-line">{review.assistantSummary}</p>
               </div>
               <span className="meta-pill">{review.actions.length} actions</span>

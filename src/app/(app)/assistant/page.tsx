@@ -1,5 +1,6 @@
 import { approveDraftAction } from "@/app/actions";
 import { PostingGuardrailChecker } from "@/components/posting-guardrail-checker";
+import { humanizeEnum } from "@/lib/domain";
 import { getAssistantDraftData } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -32,11 +33,11 @@ export default async function AssistantPage() {
             <article className="panel border-l-4 border-l-command-amber" key={draft.id}>
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">{draft.provider} / {draft.model}</p>
+                  <p className="eyebrow">{humanizeEnum(draft.provider)} / {draft.model}</p>
                   <h2>{String(output?.title ?? draft.sourceSummary)}</h2>
-                  <p className="muted">{draft.state} - {draft.sourceText}</p>
+                  <p className="muted">{humanizeEnum(draft.state)} - {draft.sourceText}</p>
                 </div>
-                <span className="status-pill status-draft">{draft.state}</span>
+                <span className="status-pill status-draft">{humanizeEnum(draft.state)}</span>
               </div>
               {draft.error ? <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-command-amber">{draft.error}</p> : null}
               <form action={approveDraftAction} className="grid gap-3 md:grid-cols-2">
@@ -56,13 +57,13 @@ export default async function AssistantPage() {
                 <label className="field-label">
                   Priority
                   <select className="select mt-1" name="priority" defaultValue={String(output?.priority ?? "MEDIUM")}>
-                    {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((priority) => <option key={priority}>{priority}</option>)}
+                    {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((priority) => <option key={priority} value={priority}>{humanizeEnum(priority)}</option>)}
                   </select>
                 </label>
                 <label className="field-label">
                   Status
                   <select className="select mt-1" name="status" defaultValue={String(output?.status ?? "OPEN")}>
-                    {["OPEN", "IN_PROGRESS", "BLOCKED", "WAITING"].map((status) => <option key={status}>{status}</option>)}
+                    {["OPEN", "IN_PROGRESS", "BLOCKED", "WAITING"].map((status) => <option key={status} value={status}>{humanizeEnum(status)}</option>)}
                   </select>
                 </label>
                 <label className="field-label">
@@ -104,9 +105,9 @@ export default async function AssistantPage() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="font-medium text-command-ink">{draft.action?.title ?? draft.sourceSummary}</p>
-                    <p className="muted">{draft.provider} / {draft.model} - {draft.sourceText}</p>
+                    <p className="muted">{humanizeEnum(draft.provider)} / {draft.model} - {draft.sourceText}</p>
                   </div>
-                  <span className="status-pill status-approved">APPROVED</span>
+                  <span className="status-pill status-approved">Approved</span>
                 </div>
               </article>
             ))}

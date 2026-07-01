@@ -2,7 +2,7 @@ import { CheckSquare2, Square } from "lucide-react";
 import { setSetupItemStatusAction, updateSetupItemAction } from "@/app/actions";
 import { SetupQuickEditForm } from "@/components/quick-edit-forms";
 import { getCompanySetupData } from "@/lib/services";
-import { dateKey } from "@/lib/domain";
+import { dateKey, priorityLabel } from "@/lib/domain";
 import { buildSetupReadiness, setupItemStatusLabel, SETUP_BAND_PILL_CLASS } from "@/lib/company-setup-checklist";
 import type { SetupItemStatus, SetupItemView, SetupPriority } from "@/lib/company-setup-checklist";
 
@@ -81,7 +81,7 @@ function SetupItemRow({ item }: { item: SetupItemView }) {
             </p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className={priorityPillClass(item.priority)}>{item.priority}</span>
+            <span className={priorityPillClass(item.priority)}>{priorityLabel(item.priority)}</span>
             <span className="meta-pill">{item.companyFunction}</span>
             {item.sensitive ? <span className="meta-pill">Sensitive</span> : null}
             {!item.done && item.overdue ? <span className="status-pill status-high">Overdue</span> : null}

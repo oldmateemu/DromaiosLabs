@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { GovernanceSummary } from "@/lib/cockpit-insights";
+import { humanizeEnum } from "@/lib/domain";
 
 export function GovernanceSummaryPanel({ summary }: { summary: GovernanceSummary }) {
   return (
@@ -23,7 +24,7 @@ export function GovernanceSummaryPanel({ summary }: { summary: GovernanceSummary
               summary.topRisks.map((risk) => (
                 <article className="action-row" key={risk.id}>
                   <p className="font-medium text-command-ink">{risk.issue}</p>
-                  <p className="muted">{risk.severity} - {risk.status}</p>
+                  <p className="muted">{humanizeEnum(risk.severity)} - {humanizeEnum(risk.status)}</p>
                 </article>
               ))
             )}

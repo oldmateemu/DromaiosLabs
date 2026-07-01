@@ -1,4 +1,5 @@
 import { canAutomationRun, type AutomationSafetyLevel } from "@/lib/automations";
+import { humanizeEnum } from "@/lib/domain";
 import { getLocalDraftAutomationKind } from "@/lib/draft-automations";
 import { getLocalApprovalAutomationKind, type LocalApprovalAutomationKind } from "@/lib/renewal-reminders";
 
@@ -90,12 +91,12 @@ function AutomationCard({
           <p className="muted">{automation.description ?? "No description yet."}</p>
         </div>
         <span className={automation.safetyLevel === "BLOCKED" ? "status-pill status-high" : "meta-pill"}>
-          {automation.safetyLevel.replaceAll("_", " ")}
+          {humanizeEnum(automation.safetyLevel)}
         </span>
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <span className="meta-pill">Status: {automation.status}</span>
+        <span className="meta-pill">Status: {humanizeEnum(automation.status)}</span>
         <span className="meta-pill">Trigger: {automation.trigger}</span>
         <span className="meta-pill">Webhook: {automation.webhookUrl ? "Configured" : "Missing"}</span>
         <span className="meta-pill">Rollback: {automation.rollbackNote ? "Saved" : "Not set"}</span>
@@ -144,7 +145,7 @@ function AutomationCard({
           ) : (
             automation.runs.map((run) => (
               <div className="rounded-md border border-command-line bg-white px-3 py-2" key={run.id}>
-                <p className="text-sm font-medium text-command-ink">{run.status}</p>
+                <p className="text-sm font-medium text-command-ink">{humanizeEnum(run.status)}</p>
                 {run.responseSummary ? (
                   <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-command-line bg-command-panel p-3 text-sm leading-6 text-command-ink">
                     {run.responseSummary}

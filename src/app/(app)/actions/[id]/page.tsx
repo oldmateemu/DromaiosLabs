@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addDecisionToActionAction, addRiskToActionAction, updateActionAction } from "@/app/actions";
 import { ActionEditForm, InlineDecisionForm, InlineRiskForm } from "@/components/forms";
-import { priorityLabel, statusLabel } from "@/lib/domain";
+import { humanizeEnum, priorityLabel, statusLabel } from "@/lib/domain";
 import { getActionDetail } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export default async function ActionDetailPage({ params }: { params: Params }) {
         <div className="flex flex-wrap gap-2">
           <span className="meta-pill">Status: {statusLabel(action.status)}</span>
           <span className="meta-pill">Priority: {priorityLabel(action.priority)}</span>
-          <span className="meta-pill">Source: {action.source}</span>
+          <span className="meta-pill">Source: {humanizeEnum(action.source)}</span>
           <span className="meta-pill">Stream: {action.stream?.name ?? "Unassigned"}</span>
           <span className="meta-pill">Function: {action.companyFunction?.name ?? "Unassigned"}</span>
           <span className="meta-pill">Due: {action.dueAt ? action.dueAt.toISOString().slice(0, 10) : "No date"}</span>
@@ -63,7 +63,7 @@ export default async function ActionDetailPage({ params }: { params: Params }) {
                 <article className="action-row" key={risk.id}>
                   <div className="flex items-start justify-between gap-3">
                     <p className="font-medium text-command-ink">{risk.issue}</p>
-                    <span className={riskSeverityClass(risk.severity)}>{risk.severity}</span>
+                    <span className={riskSeverityClass(risk.severity)}>{humanizeEnum(risk.severity)}</span>
                   </div>
                   {risk.mitigation ? <p className="muted">{risk.mitigation}</p> : null}
                 </article>

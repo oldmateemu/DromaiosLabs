@@ -1,3 +1,5 @@
+import { humanizeEnum } from "@/lib/domain";
+
 const CLOSED_STATUSES = new Set(["CLOSED", "RESOLVED", "DONE"]);
 
 export type RiskRegisterRisk = {
@@ -96,8 +98,8 @@ function RiskTable({
               <p className="font-medium text-command-ink">{risk.issue}</p>
               {risk.mitigation ? <p className="muted">{risk.mitigation}</p> : null}
             </td>
-            <td><span className={severityClass(risk.severity)}>{risk.severity}</span></td>
-            <td>{risk.status}</td>
+            <td><span className={severityClass(risk.severity)}>{humanizeEnum(risk.severity)}</span></td>
+            <td>{humanizeEnum(risk.status)}</td>
             <td>{risk.companyFunction?.name ?? risk.stream?.name ?? "-"}</td>
             <td>{risk.nextReviewAt ? risk.nextReviewAt.toISOString().slice(0, 10) : "No date"}</td>
             <td>

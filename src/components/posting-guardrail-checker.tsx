@@ -2,6 +2,7 @@
 
 import { Ban, Clipboard, Search, ShieldAlert } from "lucide-react";
 import { useState } from "react";
+import { humanizeEnum } from "@/lib/domain";
 import {
   checkPublicPostingDraft,
   type PostingGuardrailFlag,
@@ -37,7 +38,7 @@ export function PostingGuardrailChecker() {
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-2">
-          <span className="status-pill status-draft">DRAFT ONLY</span>
+          <span className="status-pill status-draft">Draft Only</span>
           <button className="button button-secondary" disabled type="button">
             <Ban aria-hidden="true" size={16} />
             No publish action
@@ -99,10 +100,10 @@ function PostingGuardrailResultView({ result }: { result: PostingGuardrailResult
             <h3>Guardrail status</h3>
             <p className="muted">{result.flags.length === 0 ? "No red or amber claims were detected." : `${result.flags.length} claim flags need review.`}</p>
           </div>
-          <span className={severityClass(result.overallSeverity)}>{result.overallSeverity}</span>
+          <span className={severityClass(result.overallSeverity)}>{humanizeEnum(result.overallSeverity)}</span>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <span className="meta-pill">Safety: {result.safetyLevel.replaceAll("_", " ")}</span>
+          <span className="meta-pill">Safety: {humanizeEnum(result.safetyLevel)}</span>
           <span className="meta-pill">Publishing: disabled</span>
         </div>
       </div>
@@ -134,7 +135,7 @@ function FlagRow({ flag }: { flag: PostingGuardrailFlag }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={severityClass(flag.severity)}>{flag.severity}</span>
+            <span className={severityClass(flag.severity)}>{humanizeEnum(flag.severity)}</span>
             <span className="meta-pill">{flag.category}</span>
           </div>
           <p className="mt-2 text-sm font-medium text-command-ink">{flag.guidance}</p>

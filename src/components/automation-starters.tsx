@@ -1,4 +1,5 @@
 import { AutomationSafetyLevel } from "@prisma/client";
+import { humanizeEnum } from "@/lib/domain";
 
 const templates = [
   {
@@ -82,7 +83,7 @@ export function AutomationStarterTemplates({ action }: { action: (formData: Form
               <p className="font-semibold text-command-ink">{template.name}</p>
               <p className="muted mt-1">{template.description}</p>
             </div>
-            <span className="meta-pill w-fit">{template.safetyLevel.replaceAll("_", " ")}</span>
+            <span className="meta-pill w-fit">{humanizeEnum(template.safetyLevel)}</span>
             <button className="button button-secondary" type="submit">Add starter</button>
           </form>
         ))}

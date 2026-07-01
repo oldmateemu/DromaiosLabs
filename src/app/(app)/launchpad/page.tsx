@@ -5,6 +5,7 @@ import { LaunchpadHealthPanel } from "@/components/launchpad-health";
 import { LaunchpadQuickEditForm } from "@/components/quick-edit-forms";
 import { RenewalCalendarPanel } from "@/components/renewal-calendar-panel";
 import { buildLaunchpadHealth } from "@/lib/cockpit-insights";
+import { humanizeEnum } from "@/lib/domain";
 import { buildRenewalCalendar } from "@/lib/renewal-calendar";
 import { getLaunchpadData, getReferenceData } from "@/lib/services";
 
@@ -50,7 +51,7 @@ export default async function LaunchpadPage() {
                       <p className="muted">{link.description ?? link.url}</p>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
-                      <span className="meta-pill">{link.riskLevel}</span>
+                      <span className="meta-pill">{humanizeEnum(link.riskLevel)}</span>
                       <a className="button button-secondary px-3 py-1 text-xs" href={link.url} rel="noreferrer" target="_blank">
                         Open
                       </a>

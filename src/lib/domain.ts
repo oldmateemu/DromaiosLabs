@@ -154,15 +154,23 @@ export function mapReviewAnswersToDraftActions(answers: Record<string, string>) 
     }));
 }
 
+// Turn an internal enum token (e.g. "DRAFT_ONLY", "IN_PROGRESS", "SUCCESS") into
+// a human-readable label ("Draft Only", "In Progress", "Success"). This is the
+// single place enum tokens become client-facing text, so raw SCREAMING_SNAKE_CASE
+// codes never leak onto a surface.
+export function humanizeEnum(value: string) {
+  return value
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1).toLowerCase() : part))
+    .join(" ");
+}
+
 export function priorityLabel(priority: Priority) {
-  return priority[0] + priority.slice(1).toLowerCase();
+  return humanizeEnum(priority);
 }
 
 export function statusLabel(status: ActionStatus) {
-  return status
-    .split("_")
-    .map((part) => part[0] + part.slice(1).toLowerCase())
-    .join(" ");
+  return humanizeEnum(status);
 }
 
 // Shared date/priority helpers. Kept here (next to the Priority/ActionStatus
