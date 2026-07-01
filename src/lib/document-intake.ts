@@ -51,6 +51,10 @@ export type IntakeTriageInput = {
   filename: string;
   text?: string | null;
   now?: Date;
+  // Forces the domain (e.g. a human-locked review), so disposition, routing,
+  // priority, and all user-facing text reflect the operator's choice rather than
+  // the OCR-derived domain and never contradict the stored domain.
+  domainOverride?: IntakeDomain;
 };
 
 export type IntakeTriageResult = {
@@ -264,8 +268,13 @@ export function suggestRouting({
   return { stream: "Company Core", companyFunction: "admin" };
 }
 
-export function buildIntakeTriage({ filename, text, now = new Date() }: IntakeTriageInput): IntakeTriageResult {
-  const domainClass = classifyDocumentDomain({ filename, text });
+export function buildIntakeTriage({ filename, text, now = new Date(), domainOverride }: IntakeTriageInput): IntakeTriageResult {
+  const classified = classifyDocumentDomain({ filename, text });
+  // A forced domain is treated as human-certain (confidence 1) while keeping the
+  // text signals for context; it then drives everything derived below.
+  const domainClass: DomainClassification = domainOverride
+    ? { domain: domainOverride, confidence: 1, signals: classified.signals }
+    : classified;
   const docTypeClass = detectDocumentType({ filename, text });
   const disposition = proposeDisposition({ docType: docTypeClass.docType, domain: domainClass.domain, text, filename });
   const routing = suggestRouting({ docType: docTypeClass.docType, domain: domainClass.domain });
@@ -335,7 +344,15 @@ const intakeExtractionSchema = z.object({
   dueDate: optionalDateString(),
   suggestedTitle: optionalCoercedString(160),
   suggestedNextStep: optionalCoercedString(400),
-  sensitive: z.boolean().optional()
+  // Local models often return the flag as a string ("true"/"false"); coerce those
+  // and drop any other wrong-shaped value to undefined rather than failing.
+  sensitive: z
+    .preprocess((v) => {
+      if (typeof v !== "string") return v;
+      const lowered = v.trim().toLowerCase();
+      return lowered === "true" ? true : lowered === "false" ? false : v;
+    }, z.boolean().optional())
+    .catch(undefined)
 });
 
 export type IntakeExtraction = z.infer<typeof intakeExtractionSchema>;
@@ -345,11 +362,20 @@ export function parseIntakeExtraction(raw: string): { extraction?: IntakeExtract
     // Local models commonly emit present-but-null fields (e.g. "dueDate": null).
     // Strip nulls so one null field doesn't reject the whole object and discard
     // the useful extracted values; a missing field and a null field mean the same.
-    const extraction = intakeExtractionSchema.parse(stripNullValues(JSON.parse(raw)));
+    const extraction = intakeExtractionSchema.parse(stripNullValues(JSON.parse(stripCodeFence(raw))));
     return { extraction };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Extraction output was not valid JSON." };
   }
+}
+
+/** Strips a single surrounding Markdown code fence (```json ... ```), a common
+ * LLM response shape even when asked to "return only JSON", so a fenced but
+ * otherwise valid extraction is not discarded by JSON.parse. */
+function stripCodeFence(raw: string): string {
+  const trimmed = raw.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+  return fenced ? fenced[1].trim() : trimmed;
 }
 
 function stripNullValues(value: unknown): unknown {

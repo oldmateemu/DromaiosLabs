@@ -190,6 +190,25 @@ describe("parseIntakeExtraction", () => {
     expect(extraction?.dueDate).toBe("2026-07-15");
   });
 
+  it("coerces a string sensitive flag instead of discarding the extraction", () => {
+    const { extraction, error } = parseIntakeExtraction(JSON.stringify({ summary: "Invoice", domain: "BUSINESS", sensitive: "true" }));
+    expect(error).toBeUndefined();
+    expect(extraction?.sensitive).toBe(true);
+    expect(extraction?.summary).toBe("Invoice");
+
+    const falsey = parseIntakeExtraction(JSON.stringify({ summary: "Flyer", sensitive: "false" }));
+    expect(falsey.extraction?.sensitive).toBe(false);
+  });
+
+  it("parses an extraction wrapped in a Markdown code fence", () => {
+    const fenced = "```json\n" + JSON.stringify({ summary: "Fenced invoice", domain: "BUSINESS", dueDate: "2026-07-15" }) + "\n```";
+    const { extraction, error } = parseIntakeExtraction(fenced);
+    expect(error).toBeUndefined();
+    expect(extraction?.summary).toBe("Fenced invoice");
+    expect(extraction?.domain).toBe("BUSINESS");
+    expect(extraction?.dueDate).toBe("2026-07-15");
+  });
+
   it("coerces a numeric amount to a string instead of discarding the extraction", () => {
     const { extraction, error } = parseIntakeExtraction(JSON.stringify({ summary: "Invoice", domain: "BUSINESS", amount: 420.5 }));
     expect(error).toBeUndefined();

@@ -770,15 +770,6 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
       extractionError = result.error;
     }
 
-    const triage = mergeExtractionIntoTriage(buildIntakeTriage({ filename: doc.originalFilename, text, now: new Date() }), extraction);
-    const note = [
-      read.error,
-      extractionError,
-      read.truncated ? "Long document: only the first pages were read (OCR page limit) — check later pages manually." : null
-    ]
-      .filter(Boolean)
-      .join(" | ");
-
     // Respect a domain the operator manually corrected, but let a re-read update
     // a domain that only a prior heuristic set. A human override is detectable
     // because setIntakeDomain changes `domain` without touching `suggestedDomain`,
@@ -788,12 +779,24 @@ export async function readAndTriageIntakeDocument(intakeId: string) {
     // make them equal again and a later re-read could silently overwrite it.
     const humanLocked = doc.domain !== IntakeDomain.UNKNOWN && doc.domain !== doc.suggestedDomain;
     const preserved = humanLocked ? (doc.domain as IntakeDomain) : null;
-    const effectiveDomain = preserved ?? (triage.domain as IntakeDomain);
-    let proposedAction = triage.proposedAction;
-    if (preserved && preserved !== triage.domain) {
-      const routing = suggestRouting({ docType: triage.docType, domain: preserved });
-      proposedAction = { ...proposedAction, domain: preserved, stream: routing.stream, companyFunction: routing.companyFunction };
-    }
+
+    // Force the locked domain into triage so the disposition, routing, AND all
+    // user-facing action text (title/description/summary) reflect the operator's
+    // choice — never a mix where the stored domain and the description disagree.
+    const triage = mergeExtractionIntoTriage(
+      buildIntakeTriage({ filename: doc.originalFilename, text, now: new Date(), domainOverride: preserved ?? undefined }),
+      extraction
+    );
+    const note = [
+      read.error,
+      extractionError,
+      read.truncated ? "Long document: only the first pages were read (OCR page limit) — check later pages manually." : null
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const effectiveDomain = triage.domain as IntakeDomain;
+    const proposedAction = triage.proposedAction;
 
     // Guard the writeback: OCR/Ollama can take many seconds, during which the
     // operator may file/archive/reject the document from another tab. Only write

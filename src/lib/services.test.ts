@@ -1077,6 +1077,12 @@ describe("document intake", () => {
     // The lock marker (domain != suggestedDomain) is kept intact, not refreshed
     // to the fresh heuristic, so the manual choice survives future re-reads.
     expect(updateArg.data.suggestedDomain).toBe("UNKNOWN");
+    // The user-facing action text must reflect the preserved Personal domain, not
+    // the OCR-derived Business one, so an approved action never self-contradicts.
+    expect(updateArg.data.suggestedAction.domain).toBe("PERSONAL");
+    expect(updateArg.data.suggestedAction.description).toContain("Domain: Personal");
+    expect(updateArg.data.suggestedAction.description).not.toContain("Domain: Business");
+    expect(updateArg.data.summary.startsWith("Personal")).toBe(true);
   });
 
   it("does not erase a manual lock when the first triage agrees with the marked domain", async () => {

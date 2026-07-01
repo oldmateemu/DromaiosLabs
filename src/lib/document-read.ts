@@ -115,7 +115,10 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
       return { text: "", engine: "none", error, truncated };
     }
     const error = failedPages.length > 0 ? `OCR failed on page(s) ${failedPages.join(", ")}; text from those pages is missing.` : undefined;
-    return { text: capText(pages.join("\n\n")), engine: "tesseract+pdftoppm", truncated, error };
+    const joined = pages.join("\n\n");
+    // Flag truncation for either reason: more pages than the OCR cap, or dense
+    // pages whose combined text exceeds the character cap and gets sliced away.
+    return { text: capText(joined), engine: "tesseract+pdftoppm", truncated: truncated || joined.length > MAX_TEXT_LENGTH, error };
   } catch (error) {
     return { text: "", engine: "none", error: toMessage(error) };
   } finally {
