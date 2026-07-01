@@ -1,5 +1,6 @@
 import { CheckSquare2, Square } from "lucide-react";
-import { setSetupItemStatusAction } from "@/app/actions";
+import { setSetupItemStatusAction, updateSetupItemAction } from "@/app/actions";
+import { SetupQuickEditForm } from "@/components/quick-edit-forms";
 import { getCompanySetupData } from "@/lib/services";
 import { dateKey } from "@/lib/domain";
 import { buildSetupReadiness, setupItemStatusLabel, SETUP_BAND_PILL_CLASS } from "@/lib/company-setup-checklist";
@@ -104,6 +105,17 @@ function SetupItemRow({ item }: { item: SetupItemView }) {
               ))}
             </div>
           ) : null}
+          <SetupQuickEditForm
+            action={updateSetupItemAction}
+            item={{
+              key: item.key,
+              title: item.title,
+              status: item.status,
+              priority: item.priority,
+              dueAt: item.dueAt,
+              nextStep: item.nextStep
+            }}
+          />
         </div>
       </div>
     </article>

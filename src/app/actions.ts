@@ -22,8 +22,12 @@ import {
   setIntakeDomain,
   setSetupItemStatus,
   updateActionFromForm,
+  updateActionQuickEditFromForm,
   updateActionStatus,
+  updateLaunchpadLinkFromForm,
+  updateLaunchpadQuickFieldsFromForm,
   updateRiskStatus,
+  updateSetupItemFromForm,
   uploadIntakeDocument
 } from "@/lib/services";
 
@@ -67,6 +71,14 @@ export async function updateActionAction(formData: FormData) {
   redirect(`/actions/${actionId}`);
 }
 
+export async function updateActionQuickEditAction(formData: FormData) {
+  await requireUser();
+  const actionId = String(formData.get("actionId") ?? "").trim();
+  if (!actionId) throw new Error("Action id is required.");
+  await updateActionQuickEditFromForm(actionId, formData);
+  redirect("/actions");
+}
+
 export async function approveDraftAction(formData: FormData) {
   const user = await requireUser();
   await approveAssistantDraft(formData, user.id);
@@ -95,10 +107,34 @@ export async function setSetupItemStatusAction(formData: FormData) {
   redirect("/setup");
 }
 
+export async function updateSetupItemAction(formData: FormData) {
+  const user = await requireUser();
+  const itemKey = String(formData.get("itemKey") ?? "").trim();
+  if (!itemKey) throw new Error("Missing setup item key.");
+  await updateSetupItemFromForm(itemKey, formData, user.id);
+  redirect("/setup");
+}
+
 export async function createLaunchpadLinkAction(formData: FormData) {
   await requireUser();
   await createLaunchpadLink(formData);
   redirect("/launchpad");
+}
+
+export async function updateLaunchpadQuickEditAction(formData: FormData) {
+  await requireUser();
+  const linkId = String(formData.get("linkId") ?? "").trim();
+  if (!linkId) throw new Error("Launchpad link id is required.");
+  await updateLaunchpadQuickFieldsFromForm(linkId, formData);
+  redirect("/launchpad");
+}
+
+export async function updateLaunchpadLinkAction(formData: FormData) {
+  await requireUser();
+  const linkId = String(formData.get("linkId") ?? "").trim();
+  if (!linkId) throw new Error("Launchpad link id is required.");
+  await updateLaunchpadLinkFromForm(linkId, formData);
+  redirect(`/launchpad/${encodeURIComponent(linkId)}`);
 }
 
 export async function weeklyReviewAction(formData: FormData) {

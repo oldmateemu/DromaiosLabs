@@ -1,6 +1,8 @@
-import { createLaunchpadLinkAction } from "@/app/actions";
+import Link from "next/link";
+import { createLaunchpadLinkAction, updateLaunchpadQuickEditAction } from "@/app/actions";
 import { CollapsiblePanel, LaunchpadForm } from "@/components/forms";
 import { LaunchpadHealthPanel } from "@/components/launchpad-health";
+import { LaunchpadQuickEditForm } from "@/components/quick-edit-forms";
 import { RenewalCalendarPanel } from "@/components/renewal-calendar-panel";
 import { buildLaunchpadHealth } from "@/lib/cockpit-insights";
 import { buildRenewalCalendar } from "@/lib/renewal-calendar";
@@ -39,13 +41,20 @@ export default async function LaunchpadPage() {
             <p className="eyebrow">{group}</p>
             <div className="mt-4 space-y-3">
               {groupLinks.map((link) => (
-                <a className="action-row block" href={link.url} key={link.id} rel="noreferrer" target="_blank">
+                <article className="action-row" key={link.id}>
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-command-ink">{link.name}</p>
+                      <Link className="font-semibold text-command-ink hover:text-command-navy hover:underline" href={`/launchpad/${link.id}`}>
+                        {link.name}
+                      </Link>
                       <p className="muted">{link.description ?? link.url}</p>
                     </div>
-                    <span className="meta-pill">{link.riskLevel}</span>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <span className="meta-pill">{link.riskLevel}</span>
+                      <a className="button button-secondary px-3 py-1 text-xs" href={link.url} rel="noreferrer" target="_blank">
+                        Open
+                      </a>
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {link.streamId && streamNames.has(link.streamId) ? <span className="meta-pill">{streamNames.get(link.streamId)}</span> : null}
@@ -53,7 +62,20 @@ export default async function LaunchpadPage() {
                     {link.cost ? <span className="meta-pill">${link.cost.toString()}</span> : null}
                     {link.loginNote ? <span className="meta-pill">Login note saved</span> : null}
                   </div>
-                </a>
+                  <div className="mt-3">
+                    <LaunchpadQuickEditForm
+                      action={updateLaunchpadQuickEditAction}
+                      link={{
+                        id: link.id,
+                        group: link.group,
+                        cost: link.cost,
+                        renewalAt: link.renewalAt,
+                        owner: link.owner,
+                        riskLevel: link.riskLevel
+                      }}
+                    />
+                  </div>
+                </article>
               ))}
             </div>
           </div>

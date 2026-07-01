@@ -58,10 +58,10 @@ import { buildRenewalCalendar } from "./renewal-calendar";
 import { buildReviewMomentum } from "./review-momentum";
 import { buildStreamPortfolio } from "./stream-portfolio";
 import { buildStreamSpend } from "./stream-spend";
-import { bucketActionsForToday, mapReviewAnswersToDraftActions } from "./domain";
+import { bucketActionsForToday, mapReviewAnswersToDraftActions, normaliseQuickCaptureDraft } from "./domain";
 import { buildCompanyMailroomFilingRun } from "./mailroom-filing";
 import { prisma } from "./db";
-import { draftActionFromQuickCapture, extractIntakeFieldsFromDocument } from "./ollama";
+import { buildQuickCaptureDraftRequest, draftActionFromQuickCapture, extractIntakeFieldsFromDocument } from "./ollama";
 import { buildOperatingBrief } from "./operating-brief";
 import { buildRenewalReminderRun, getLocalApprovalAutomationKind, planRenewalReminderPersistence } from "./renewal-reminders";
 import { SALES_PIPELINE_STAGES, summariseSalesPipeline } from "./sales-pipeline";
@@ -209,7 +209,7 @@ export async function updateActionStatus(actionId: string, status: ActionStatus)
     where: { id: actionId },
     data: {
       status,
-      completedAt: status === ActionStatus.DONE ? new Date() : null
+      completedAt: completedAtForStatus(status, null)
     }
   });
   revalidatePath("/");
@@ -220,22 +220,57 @@ export async function createQuickCaptureDraft(text: string, userId: string) {
   const trimmed = text.trim();
   if (!trimmed) throw new Error("Quick capture text is required.");
 
-  const result = await draftActionFromQuickCapture(trimmed);
-  const state = result.draft.state === "READY" ? AssistantDraftState.READY : AssistantDraftState.FAILED;
-
-  return prisma.assistantDraft.create({
+  const request = buildQuickCaptureDraftRequest(trimmed);
+  const fallback = normaliseQuickCaptureDraft(trimmed, "").proposedAction;
+  const draft = await prisma.assistantDraft.create({
     data: {
       provider: AssistantProvider.OLLAMA,
-      model: result.model,
-      state,
+      model: request.model,
+      state: AssistantDraftState.PENDING,
       sourceSummary: "Quick capture",
       sourceText: trimmed,
-      prompt: result.prompt,
-      output: result.draft.proposedAction,
-      error: result.error ?? result.draft.error,
+      prompt: request.prompt,
+      output: fallback,
       createdById: userId
     }
   });
+
+  void finaliseQuickCaptureDraft(draft.id, trimmed).catch(() => undefined);
+
+  revalidatePath("/");
+  revalidatePath("/assistant");
+  return draft;
+}
+
+async function finaliseQuickCaptureDraft(draftId: string, sourceText: string) {
+  const request = buildQuickCaptureDraftRequest(sourceText);
+
+  try {
+    const result = await draftActionFromQuickCapture(sourceText);
+    const state = result.draft.state === "READY" ? AssistantDraftState.READY : AssistantDraftState.FAILED;
+
+    await prisma.assistantDraft.update({
+      where: { id: draftId },
+      data: {
+        model: result.model,
+        state,
+        prompt: result.prompt,
+        output: result.draft.proposedAction,
+        error: result.error ?? result.draft.error ?? null
+      }
+    });
+  } catch (error) {
+    await prisma.assistantDraft.update({
+      where: { id: draftId },
+      data: {
+        model: request.model,
+        state: AssistantDraftState.FAILED,
+        prompt: request.prompt,
+        output: normaliseQuickCaptureDraft(sourceText, "").proposedAction,
+        error: error instanceof Error ? error.message : "Local assistant draft failed."
+      }
+    });
+  }
 }
 
 export async function approveAssistantDraft(formData: FormData, userId: string) {
@@ -303,6 +338,55 @@ export async function createLaunchpadLink(formData: FormData) {
 
   revalidatePath("/launchpad");
   revalidatePath("/portfolio");
+}
+
+export async function updateLaunchpadQuickFieldsFromForm(linkId: string, formData: FormData) {
+  await prisma.launchpadLink.update({
+    where: { id: linkId },
+    data: {
+      group: stringValue(formData, "group") || "Ungrouped",
+      cost: decimalValue(formData, "cost") ?? null,
+      renewalAt: dateValue(formData, "renewalAt") ?? null,
+      owner: optionalString(formData, "owner") ?? null,
+      riskLevel: enumValue(formData, "riskLevel", RiskLevel, RiskLevel.LOW)
+    }
+  });
+
+  revalidatePath("/launchpad");
+  revalidatePath(`/launchpad/${linkId}`);
+  revalidatePath("/");
+  revalidatePath("/portfolio");
+  revalidatePath("/automations");
+}
+
+export async function updateLaunchpadLinkFromForm(linkId: string, formData: FormData) {
+  const name = stringValue(formData, "name");
+  const url = stringValue(formData, "url");
+  const group = stringValue(formData, "group");
+  if (!name || !url || !group) throw new Error("Name, URL, and group are required.");
+
+  await prisma.launchpadLink.update({
+    where: { id: linkId },
+    data: {
+      name,
+      url,
+      group,
+      description: optionalString(formData, "description") ?? null,
+      cost: decimalValue(formData, "cost") ?? null,
+      renewalAt: dateValue(formData, "renewalAt") ?? null,
+      loginNote: optionalString(formData, "loginNote") ?? null,
+      riskLevel: enumValue(formData, "riskLevel", RiskLevel, RiskLevel.LOW),
+      owner: optionalString(formData, "owner") ?? null,
+      streamId: optionalString(formData, "streamId") ?? null,
+      sensitive: formData.get("sensitive") === "on"
+    }
+  });
+
+  revalidatePath("/launchpad");
+  revalidatePath(`/launchpad/${linkId}`);
+  revalidatePath("/");
+  revalidatePath("/portfolio");
+  revalidatePath("/automations");
 }
 
 export async function completeWeeklyReview(formData: FormData, userId: string) {
@@ -993,14 +1077,20 @@ export async function getCompanySetupData() {
     // Oldest first so that if a title is ever duplicated, this view and
     // setSetupItemStatus deterministically resolve to the same row.
     orderBy: { createdAt: "asc" },
-    select: { id: true, title: true, status: true, dueAt: true }
+    select: { id: true, title: true, status: true, dueAt: true, priority: true, description: true, nextStep: true }
   });
 
   const stateByTitle = new Map<string, SetupActionState>();
   for (const action of actions) {
     const key = normaliseSetupTitle(action.title);
     if (stateByTitle.has(key)) continue;
-    stateByTitle.set(key, { status: action.status as SetupActionState["status"], dueAt: action.dueAt });
+    stateByTitle.set(key, {
+      status: action.status as SetupActionState["status"],
+      dueAt: action.dueAt,
+      priority: action.priority as SetupActionState["priority"],
+      description: action.description,
+      nextStep: action.nextStep
+    });
   }
 
   return summariseSetupChecklist(COMPANY_SETUP_CHECKLIST, stateByTitle);
@@ -1068,6 +1158,63 @@ export async function setSetupItemStatus(itemKey: string, status: ActionStatus, 
   revalidatePath("/reviews");
 }
 
+export async function updateSetupItemFromForm(itemKey: string, formData: FormData, userId: string) {
+  const item = COMPANY_SETUP_CHECKLIST.find((entry) => entry.key === itemKey);
+  if (!item) throw new Error("Unknown setup checklist item.");
+
+  const status = enumValue(formData, "status", ActionStatus, ActionStatus.OPEN);
+  const priority = enumValue(formData, "priority", Priority, item.priority as Priority);
+  const dueAt = dateValue(formData, "dueAt") ?? null;
+  const nextStep = optionalString(formData, "nextStep") ?? item.nextStep;
+
+  const existing = await prisma.action.findFirst({
+    where: { title: item.title },
+    orderBy: { createdAt: "asc" }
+  });
+
+  if (existing) {
+    await prisma.action.update({
+      where: { id: existing.id },
+      data: {
+        status,
+        priority,
+        dueAt,
+        nextStep,
+        completedAt: completedAtForStatus(status, existing.completedAt)
+      }
+    });
+  } else {
+    const [stream, companyFunction] = await Promise.all([
+      prisma.stream.findUnique({ where: { name: SETUP_CHECKLIST_STREAM } }),
+      prisma.companyFunction.findUnique({ where: { name: item.companyFunction } })
+    ]);
+    if (!stream) throw new Error(`Missing setup stream: ${SETUP_CHECKLIST_STREAM}.`);
+    if (!companyFunction) throw new Error(`Missing company function: ${item.companyFunction}.`);
+
+    await prisma.action.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        nextStep,
+        sensitive: item.sensitive,
+        priority,
+        status,
+        dueAt: dueAt ?? setupDueDate(item),
+        completedAt: completedAtForStatus(status, null),
+        source: ActionSource.USER,
+        streamId: stream.id,
+        companyFunctionId: companyFunction.id,
+        createdById: userId
+      }
+    });
+  }
+
+  revalidatePath("/setup");
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath("/reviews");
+}
+
 const HUBSPOT_DEFAULT_URL = "https://app.hubspot.com/";
 
 export async function getSalesPipelineData() {
@@ -1095,6 +1242,23 @@ export async function getSalesPipelineData() {
 
 export async function getLaunchpadData() {
   return prisma.launchpadLink.findMany({ orderBy: [{ group: "asc" }, { riskLevel: "desc" }, { name: "asc" }] });
+}
+
+export async function getLaunchpadDetail(id: string) {
+  const [link, reference] = await Promise.all([
+    prisma.launchpadLink.findUnique({
+      where: { id },
+      include: {
+        stream: true,
+        actions: {
+          orderBy: [{ status: "asc" }, { priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+          take: 20
+        }
+      }
+    }),
+    getReferenceData()
+  ]);
+  return { link, ...reference };
 }
 
 export async function getReviewData() {
@@ -1271,7 +1435,29 @@ export async function updateActionFromForm(actionId: string, formData: FormData)
       streamId: optionalString(formData, "streamId") ?? null,
       companyFunctionId: optionalString(formData, "companyFunctionId") ?? null,
       sensitive: formData.get("sensitive") === "on",
-      completedAt: status === ActionStatus.DONE ? existing.completedAt ?? new Date() : null
+      completedAt: completedAtForStatus(status, existing.completedAt)
+    }
+  });
+
+  revalidatePath("/");
+  revalidatePath("/actions");
+  revalidatePath(`/actions/${actionId}`);
+}
+
+export async function updateActionQuickEditFromForm(actionId: string, formData: FormData) {
+  const existing = await prisma.action.findUnique({ where: { id: actionId }, select: { completedAt: true } });
+  if (!existing) throw new Error("Action not found.");
+
+  const status = enumValue(formData, "status", ActionStatus, ActionStatus.OPEN);
+
+  await prisma.action.update({
+    where: { id: actionId },
+    data: {
+      status,
+      priority: enumValue(formData, "priority", Priority, Priority.MEDIUM),
+      dueAt: dateValue(formData, "dueAt") ?? null,
+      reviewAt: dateValue(formData, "reviewAt") ?? null,
+      completedAt: completedAtForStatus(status, existing.completedAt)
     }
   });
 
@@ -1404,6 +1590,10 @@ function dateValue(formData: FormData, key: string) {
 function decimalValue(formData: FormData, key: string) {
   const value = optionalString(formData, key);
   return value ? value : undefined;
+}
+
+function completedAtForStatus(status: ActionStatus, existingCompletedAt?: Date | null) {
+  return status === ActionStatus.DONE ? existingCompletedAt ?? new Date() : null;
 }
 
 function dateFromKey(value: string) {

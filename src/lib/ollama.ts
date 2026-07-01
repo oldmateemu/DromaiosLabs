@@ -4,7 +4,7 @@ import { parseIntakeExtraction, type IntakeExtraction } from "./document-intake"
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_OLLAMA_MODEL = "gemma3:1b";
 
-export async function draftActionFromQuickCapture(sourceText: string) {
+export function buildQuickCaptureDraftRequest(sourceText: string) {
   const model = process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
   const baseUrl = process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL;
   const localDate = currentLocalDateKey();
@@ -16,6 +16,12 @@ export async function draftActionFromQuickCapture(sourceText: string) {
     "Use YYYY-MM-DD dates when a date is clearly implied; omit date fields when unsure. Do not return empty strings for omitted fields.",
     `Rough note: ${sourceText}`
   ].join("\n");
+
+  return { baseUrl, model, prompt };
+}
+
+export async function draftActionFromQuickCapture(sourceText: string) {
+  const { baseUrl, model, prompt } = buildQuickCaptureDraftRequest(sourceText);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45_000);

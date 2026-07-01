@@ -16,7 +16,7 @@ const { prismaMock } = vi.hoisted(() => ({
     stream: { findMany: vi.fn(), findUnique: vi.fn() },
     companyFunction: { findMany: vi.fn(), findUnique: vi.fn() },
     action: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
-    launchpadLink: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
+    launchpadLink: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
     automation: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     automationRun: { findMany: vi.fn(), create: vi.fn() },
     assistantDraft: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
@@ -29,7 +29,14 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("./db", () => ({ prisma: prismaMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("./ollama", () => ({ draftActionFromQuickCapture: vi.fn() }));
+vi.mock("./ollama", () => ({
+  buildQuickCaptureDraftRequest: vi.fn((sourceText: string) => ({
+    baseUrl: "http://localhost:11434",
+    model: "gemma3:1b",
+    prompt: `prompt:${sourceText}`
+  })),
+  draftActionFromQuickCapture: vi.fn()
+}));
 
 const { revalidatePath } = await import("next/cache");
 const { draftActionFromQuickCapture } = await import("./ollama");
@@ -39,6 +46,10 @@ function form(values: Record<string, string>) {
   const fd = new FormData();
   for (const [key, value] of Object.entries(values)) fd.set(key, value);
   return fd;
+}
+
+async function waitForBackgroundTasks() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
@@ -64,6 +75,7 @@ beforeEach(() => {
   prismaMock.action.findUnique.mockResolvedValue(null);
   prismaMock.action.count.mockResolvedValue(0);
   prismaMock.launchpadLink.findFirst.mockResolvedValue(null);
+  prismaMock.launchpadLink.findUnique.mockResolvedValue(null);
   prismaMock.automation.findUnique.mockResolvedValue(null);
   prismaMock.assistantDraft.count.mockResolvedValue(0);
   prismaMock.risk.count.mockResolvedValue(0);
@@ -71,6 +83,7 @@ beforeEach(() => {
   prismaMock.action.create.mockResolvedValue({ id: "action-1" });
   prismaMock.action.update.mockResolvedValue({ id: "action-1" });
   prismaMock.launchpadLink.create.mockResolvedValue({ id: "link-1" });
+  prismaMock.launchpadLink.update.mockResolvedValue({ id: "link-1" });
   prismaMock.automation.create.mockResolvedValue({ id: "auto-1" });
   prismaMock.automationRun.create.mockResolvedValue({ id: "run-1" });
   prismaMock.assistantDraft.create.mockResolvedValue({ id: "draft-1" });
@@ -152,9 +165,272 @@ describe("updateActionStatus", () => {
   });
 });
 
+describe("updateSetupItemFromForm", () => {
+  it("updates the backing setup action with mutable operating fields", async () => {
+    prismaMock.action.findFirst.mockResolvedValue({
+      id: "setup-action-1",
+      status: ActionStatus.OPEN,
+      dueAt: null,
+      completedAt: null
+    });
+
+    await services.updateSetupItemFromForm(
+      "legal-asic-current",
+      form({
+        status: "IN_PROGRESS",
+        priority: "CRITICAL",
+        dueAt: "2026-07-15",
+        nextStep: "Call accountant"
+      }),
+      "user-1"
+    );
+
+    expect(prismaMock.action.update).toHaveBeenCalledWith({
+      where: { id: "setup-action-1" },
+      data: expect.objectContaining({
+        status: ActionStatus.IN_PROGRESS,
+        priority: Priority.CRITICAL,
+        nextStep: "Call accountant",
+        completedAt: null
+      })
+    });
+    expect(prismaMock.action.update.mock.calls[0][0].data.dueAt.toISOString()).toBe("2026-07-15T00:00:00.000Z");
+    expect(revalidatePath).toHaveBeenCalledWith("/setup");
+    expect(revalidatePath).toHaveBeenCalledWith("/actions");
+  });
+
+  it("clears the backing setup action due date when the quick edit value is blank", async () => {
+    prismaMock.action.findFirst.mockResolvedValue({
+      id: "setup-action-1",
+      status: ActionStatus.OPEN,
+      dueAt: new Date("2026-07-15T00:00:00.000Z"),
+      completedAt: null
+    });
+
+    await services.updateSetupItemFromForm(
+      "legal-asic-current",
+      form({ status: "OPEN", priority: "HIGH", dueAt: "", nextStep: "Call accountant" }),
+      "user-1"
+    );
+
+    expect(prismaMock.action.update.mock.calls[0][0].data.dueAt).toBeNull();
+  });
+
+  it("self-heals a missing setup action before applying quick edit values", async () => {
+    prismaMock.action.findFirst.mockResolvedValue(null);
+    prismaMock.stream.findUnique.mockResolvedValue({ id: "stream-company-core" });
+    prismaMock.companyFunction.findUnique.mockResolvedValue({ id: "function-legal" });
+
+    await services.updateSetupItemFromForm(
+      "legal-asic-current",
+      form({ status: "WAITING", priority: "HIGH", dueAt: "2026-08-01", nextStep: "Wait for ASIC extract" }),
+      "user-1"
+    );
+
+    const data = prismaMock.action.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      title: "Confirm ASIC company details are current",
+      status: ActionStatus.WAITING,
+      priority: Priority.HIGH,
+      nextStep: "Wait for ASIC extract",
+      streamId: "stream-company-core",
+      companyFunctionId: "function-legal",
+      createdById: "user-1"
+    });
+    expect(data.dueAt.toISOString()).toBe("2026-08-01T00:00:00.000Z");
+  });
+});
+
+describe("updateActionQuickEditFromForm", () => {
+  it("updates only status, priority, due date, and review date", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: null });
+
+    await services.updateActionQuickEditFromForm(
+      "action-1",
+      form({ status: "DONE", priority: "HIGH", dueAt: "2026-07-20", reviewAt: "2026-07-25" })
+    );
+
+    const call = prismaMock.action.update.mock.calls[0][0];
+    expect(call.where).toEqual({ id: "action-1" });
+    expect(call.data).toMatchObject({
+      status: ActionStatus.DONE,
+      priority: Priority.HIGH
+    });
+    expect(call.data.dueAt.toISOString()).toBe("2026-07-20T00:00:00.000Z");
+    expect(call.data.reviewAt.toISOString()).toBe("2026-07-25T00:00:00.000Z");
+    expect(call.data.completedAt).toBeInstanceOf(Date);
+    expect(call.data.title).toBeUndefined();
+  });
+
+  it("clears completedAt when an action is reopened from quick edit", async () => {
+    prismaMock.action.findUnique.mockResolvedValue({ completedAt: new Date("2026-07-01T00:00:00.000Z") });
+
+    await services.updateActionQuickEditFromForm("action-1", form({ status: "OPEN", priority: "MEDIUM" }));
+
+    expect(prismaMock.action.update.mock.calls[0][0].data.completedAt).toBeNull();
+  });
+});
+
+describe("launchpad update services", () => {
+  it("updates quick-edit launchpad metadata and revalidates dependent views", async () => {
+    await services.updateLaunchpadQuickFieldsFromForm(
+      "link-1",
+      form({
+        group: "Money",
+        cost: "99.00",
+        renewalAt: "2026-09-01",
+        owner: "Callum",
+        riskLevel: "HIGH"
+      })
+    );
+
+    const call = prismaMock.launchpadLink.update.mock.calls[0][0];
+    expect(call.where).toEqual({ id: "link-1" });
+    expect(call.data).toMatchObject({
+      group: "Money",
+      cost: "99.00",
+      owner: "Callum",
+      riskLevel: RiskLevel.HIGH
+    });
+    expect(call.data.renewalAt.toISOString()).toBe("2026-09-01T00:00:00.000Z");
+    expect(revalidatePath).toHaveBeenCalledWith("/launchpad");
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+    expect(revalidatePath).toHaveBeenCalledWith("/portfolio");
+    expect(revalidatePath).toHaveBeenCalledWith("/automations");
+  });
+
+  it("clears nullable launchpad quick-edit fields when form values are blank", async () => {
+    await services.updateLaunchpadQuickFieldsFromForm(
+      "link-1",
+      form({
+        group: "Money",
+        cost: "",
+        renewalAt: "",
+        owner: "",
+        riskLevel: "LOW"
+      })
+    );
+
+    const data = prismaMock.launchpadLink.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      cost: null,
+      renewalAt: null,
+      owner: null
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("updates the full launchpad detail record", async () => {
+    await services.updateLaunchpadLinkFromForm(
+      "link-1",
+      form({
+        name: "Xero",
+        url: "https://xero.com",
+        group: "Money",
+        streamId: "stream-1",
+        cost: "88.00",
+        renewalAt: "2026-10-01",
+        owner: "Callum",
+        riskLevel: "CRITICAL",
+        loginNote: "Password manager entry",
+        description: "Accounting source of truth",
+        sensitive: "on"
+      })
+    );
+
+    expect(prismaMock.launchpadLink.update).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: expect.objectContaining({
+        name: "Xero",
+        url: "https://xero.com",
+        group: "Money",
+        streamId: "stream-1",
+        cost: "88.00",
+        owner: "Callum",
+        riskLevel: RiskLevel.CRITICAL,
+        loginNote: "Password manager entry",
+        description: "Accounting source of truth",
+        sensitive: true
+      })
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("clears nullable launchpad detail fields when optional form values are blank", async () => {
+    await services.updateLaunchpadLinkFromForm(
+      "link-1",
+      form({
+        name: "Xero",
+        url: "https://xero.com",
+        group: "Money",
+        description: "",
+        cost: "",
+        renewalAt: "",
+        loginNote: "",
+        owner: "",
+        streamId: "",
+        riskLevel: "LOW"
+      })
+    );
+
+    expect(prismaMock.launchpadLink.update.mock.calls[0][0].data).toMatchObject({
+      description: null,
+      cost: null,
+      renewalAt: null,
+      loginNote: null,
+      owner: null,
+      streamId: null
+    });
+  });
+
+  it("loads launchpad detail with linked actions and reference data", async () => {
+    prismaMock.launchpadLink.findUnique.mockResolvedValue({
+      id: "link-1",
+      name: "Xero",
+      actions: [{ id: "action-1", title: "Review Xero renewal" }]
+    });
+
+    const detail = await services.getLaunchpadDetail("link-1");
+
+    expect(prismaMock.launchpadLink.findUnique).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      include: {
+        stream: true,
+        actions: {
+          orderBy: [{ status: "asc" }, { priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+          take: 20
+        }
+      }
+    });
+    expect(detail.link?.name).toBe("Xero");
+  });
+});
+
 describe("createQuickCaptureDraft", () => {
   it("requires non-empty capture text", async () => {
     await expect(services.createQuickCaptureDraft("   ", "user-1")).rejects.toThrow("Quick capture text is required.");
+  });
+
+  it("persists a pending draft immediately when the local assistant is still generating", async () => {
+    vi.mocked(draftActionFromQuickCapture).mockReturnValue(new Promise(() => {}));
+    prismaMock.assistantDraft.create.mockResolvedValue({ id: "draft-pending" });
+
+    const result = await Promise.race([
+      services.createQuickCaptureDraft("  call supplier  ", "user-1"),
+      new Promise((resolve) => setTimeout(() => resolve("timed out"), 25))
+    ]);
+
+    expect(result).toMatchObject({ id: "draft-pending" });
+    const data = prismaMock.assistantDraft.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      provider: AssistantProvider.OLLAMA,
+      model: "gemma3:1b",
+      state: AssistantDraftState.PENDING,
+      sourceSummary: "Quick capture",
+      sourceText: "call supplier",
+      createdById: "user-1"
+    });
+    expect(draftActionFromQuickCapture).toHaveBeenCalledWith("call supplier");
   });
 
   it("persists a READY draft from a successful assistant run", async () => {
@@ -172,16 +448,27 @@ describe("createQuickCaptureDraft", () => {
     });
 
     await services.createQuickCaptureDraft("  pay bas  ", "user-1");
+    await waitForBackgroundTasks();
 
-    const data = prismaMock.assistantDraft.create.mock.calls[0][0].data;
-    expect(data).toMatchObject({
+    const created = prismaMock.assistantDraft.create.mock.calls[0][0].data;
+    expect(created).toMatchObject({
       provider: AssistantProvider.OLLAMA,
       model: "gemma3:1b",
-      state: AssistantDraftState.READY,
+      state: AssistantDraftState.PENDING,
       sourceText: "pay bas",
-      prompt: "prompt-text"
+      prompt: "prompt:pay bas"
     });
-    expect(data.output).toMatchObject({ title: "Pay BAS" });
+    const update = prismaMock.assistantDraft.update.mock.calls[0][0];
+    expect(update).toMatchObject({
+      where: { id: "draft-1" },
+      data: {
+        model: "gemma3:1b",
+        state: AssistantDraftState.READY,
+        prompt: "prompt-text",
+        error: null
+      }
+    });
+    expect(update.data.output).toMatchObject({ title: "Pay BAS" });
   });
 
   it("persists a FAILED draft and surfaces the assistant error", async () => {
@@ -200,10 +487,13 @@ describe("createQuickCaptureDraft", () => {
     });
 
     await services.createQuickCaptureDraft("broken", "user-1");
+    await waitForBackgroundTasks();
 
-    const data = prismaMock.assistantDraft.create.mock.calls[0][0].data;
-    expect(data.state).toBe(AssistantDraftState.FAILED);
-    expect(data.error).toBe("Ollama returned HTTP 503.");
+    const created = prismaMock.assistantDraft.create.mock.calls[0][0].data;
+    expect(created.state).toBe(AssistantDraftState.PENDING);
+    const update = prismaMock.assistantDraft.update.mock.calls[0][0];
+    expect(update.data.state).toBe(AssistantDraftState.FAILED);
+    expect(update.data.error).toBe("Ollama returned HTTP 503.");
   });
 });
 
