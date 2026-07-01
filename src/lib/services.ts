@@ -859,24 +859,34 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   // pre-filled from the original suggestion: when the operator downgrades a
   // finance/legal suggestion to "unsure", the action must not still be filed
   // into finance/legal as if it were confidently Business (the form inputs keep
-  // their stale defaults with no client JS to clear them). Business/Mixed honour
-  // the operator's route, deriving docType defaults only for a left-blank field.
+  // their stale defaults with no client JS to clear them).
   let streamName = optionalString(formData, "stream");
   let functionName = optionalString(formData, "companyFunction");
-  if (domain === IntakeDomain.UNKNOWN) {
-    const routing = suggestRouting({ docType: "unknown", domain });
-    streamName = routing.stream;
-    functionName = routing.companyFunction;
-  } else if (attachesCompanyContext && (!streamName || !functionName)) {
-    const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { docType: true } });
-    const routing = suggestRouting({ docType: doc?.docType ?? "unknown", domain });
-    streamName = streamName ?? routing.stream;
-    functionName = functionName ?? routing.companyFunction;
-  }
+  let stream: { id: string } | null = null;
+  let companyFunction: { id: string } | null = null;
+  if (attachesCompanyContext) {
+    if (domain === IntakeDomain.UNKNOWN) {
+      const routing = suggestRouting({ docType: "unknown", domain });
+      streamName = routing.stream;
+      functionName = routing.companyFunction;
+    }
+    stream = streamName ? await prisma.stream.findUnique({ where: { name: streamName } }) : null;
+    companyFunction = functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
 
-  const stream = attachesCompanyContext && streamName ? await prisma.stream.findUnique({ where: { name: streamName } }) : null;
-  const companyFunction =
-    attachesCompanyContext && functionName ? await prisma.companyFunction.findUnique({ where: { name: functionName } }) : null;
+    // A blank OR unresolved route falls back to the docType-derived default. The
+    // /intake route controls are free-text datalist inputs, so a typo/case
+    // mismatch like "Finance" resolves to nothing; without this fallback the
+    // action would be created with no stream/function and drop out of the finance/
+    // legal/admin views entirely.
+    if (!stream || !companyFunction) {
+      const doc = await prisma.intakeDocument.findUnique({ where: { id: intakeId }, select: { docType: true } });
+      const routing = suggestRouting({ docType: doc?.docType ?? "unknown", domain });
+      if (!stream && routing.stream) stream = await prisma.stream.findUnique({ where: { name: routing.stream } });
+      if (!companyFunction && routing.companyFunction) {
+        companyFunction = await prisma.companyFunction.findUnique({ where: { name: routing.companyFunction } });
+      }
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     // Atomically claim the row with a single guarded UPDATE: only a not-yet-filed,

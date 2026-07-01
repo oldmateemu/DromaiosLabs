@@ -19,8 +19,9 @@ export type DocumentTextResult = {
   text: string;
   engine: string;
   error?: string;
-  // True when a multi-page PDF was only OCR'd up to MAX_OCR_PAGES, so a reviewer
-  // knows later pages were not read.
+  // True when the returned text is incomplete — a multi-page PDF only OCR'd up to
+  // MAX_OCR_PAGES, or any text capped at MAX_TEXT_LENGTH — so a reviewer knows the
+  // later part of the document was not read.
   truncated?: boolean;
 };
 
@@ -67,7 +68,7 @@ async function readPdf(storedPath: string): Promise<DocumentTextResult> {
   // First try the embedded text layer (fast, exact for digital PDFs).
   const digital = await runCommand("pdftotext", ["-layout", storedPath, "-"]).catch((error) => ({ ok: false as const, stdout: "", error: toMessage(error) }));
   if (digital.ok && clean(digital.stdout).length >= MIN_DIGITAL_TEXT_LENGTH) {
-    return { text: capText(digital.stdout), engine: "pdftotext" };
+    return { text: capText(digital.stdout), engine: "pdftotext", truncated: digital.stdout.length > MAX_TEXT_LENGTH };
   }
 
   // Otherwise rasterise pages and OCR them (scanned PDF).
@@ -76,7 +77,8 @@ async function readPdf(storedPath: string): Promise<DocumentTextResult> {
 
   // Nothing worked: surface the most useful error.
   const error = ocr.error ?? (digital.ok ? "PDF had no extractable text layer and OCR produced nothing." : digital.error);
-  return { text: capText(digital.ok ? digital.stdout : ""), engine: digital.ok ? "pdftotext" : "none", error };
+  const fallbackText = digital.ok ? digital.stdout : "";
+  return { text: capText(fallbackText), engine: digital.ok ? "pdftotext" : "none", error, truncated: fallbackText.length > MAX_TEXT_LENGTH };
 }
 
 async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> {
@@ -97,11 +99,23 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
     // Only OCR up to the cap; the sentinel (if present) means further pages exist.
     const truncated = files.length > MAX_OCR_PAGES;
     const pages: string[] = [];
+    const failedPages: number[] = [];
     for (const file of files.slice(0, MAX_OCR_PAGES)) {
-      const page = await ocrImage(join(workDir, file));
-      if (page.text) pages.push(page.text);
+      try {
+        const page = await ocrImage(join(workDir, file));
+        if (page.text) pages.push(page.text);
+      } catch {
+        // Keep the pages that did read; one bad/timed-out page must not discard a
+        // whole multi-page scan. The failed page is noted for the reviewer.
+        failedPages.push(pageNumber(file));
+      }
     }
-    return { text: capText(pages.join("\n\n")), engine: "tesseract+pdftoppm", truncated };
+    if (pages.length === 0) {
+      const error = failedPages.length > 0 ? `OCR failed on every page (e.g. page ${failedPages[0]}).` : "OCR produced no text.";
+      return { text: "", engine: "none", error, truncated };
+    }
+    const error = failedPages.length > 0 ? `OCR failed on page(s) ${failedPages.join(", ")}; text from those pages is missing.` : undefined;
+    return { text: capText(pages.join("\n\n")), engine: "tesseract+pdftoppm", truncated, error };
   } catch (error) {
     return { text: "", engine: "none", error: toMessage(error) };
   } finally {

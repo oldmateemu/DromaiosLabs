@@ -1172,6 +1172,25 @@ describe("document intake", () => {
     expect(prismaMock.stream.findUnique).toHaveBeenCalledWith({ where: { name: "Company Core" } });
   });
 
+  it("falls back to the docType route when a posted free-text route name does not resolve", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+    // Operator typed invalid route names into the free-text datalist inputs.
+    prismaMock.intakeDocument.findUnique.mockResolvedValue({ docType: "invoice" });
+    prismaMock.stream.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "Company Core" ? { id: "stream-core" } : null));
+    prismaMock.companyFunction.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => (where.name === "finance" ? { id: "fn-finance" } : null));
+
+    await services.approveIntakeDocument(
+      form({ intakeId: "d1", title: "Pay invoice", domain: "BUSINESS", stream: "Finance", companyFunction: "Payroll" }),
+      "user-1"
+    );
+
+    // The invalid names resolved to null, so the invoice's docType route
+    // (Company Core / finance) is used instead of leaving the action unrouted.
+    const action = prismaMock.action.create.mock.calls.at(-1)?.[0];
+    expect(action.data.streamId).toBe("stream-core");
+    expect(action.data.companyFunctionId).toBe("fn-finance");
+  });
+
   it("files a document for records without creating an action", async () => {
     prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
 
