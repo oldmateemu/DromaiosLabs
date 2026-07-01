@@ -129,7 +129,10 @@ async function ocrPdfViaRaster(storedPath: string): Promise<DocumentTextResult> 
 async function ocrImage(imagePath: string): Promise<DocumentTextResult> {
   // `tesseract <img> stdout` writes recognised text to stdout.
   const result = await runCommand("tesseract", [imagePath, "stdout"]);
-  return { text: capText(result.stdout), engine: "tesseract" };
+  // Flag truncation so a dense image / multipage TIFF whose OCR exceeds the cap
+  // warns the reviewer, matching the PDF paths. (When called per-page by the PDF
+  // rasteriser, this flag is ignored in favour of that path's own accounting.)
+  return { text: capText(result.stdout), engine: "tesseract", truncated: result.stdout.length > MAX_TEXT_LENGTH };
 }
 
 function runCommand(command: string, args: string[]): Promise<{ ok: true; stdout: string }> {

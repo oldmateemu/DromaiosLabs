@@ -50,6 +50,7 @@ import {
 } from "./document-intake";
 import { extractDocumentText } from "./document-read";
 import {
+  archiveTargetPath,
   collectInboxCandidates,
   copyInboxCandidateToStore,
   discardInboxFile,
@@ -81,6 +82,9 @@ export async function getReferenceData() {
 export async function getTodayData() {
   const [actions, links, automations, drafts, risks, decisions, setupSummary] = await Promise.all([
     prisma.action.findMany({
+      // Personal-domain actions live in the /personal pipeline, not the company
+      // Today board, so keep private tasks out of the company work view.
+      where: { domain: { not: IntakeDomain.PERSONAL } },
       orderBy: [{ priority: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
       include: { stream: true, companyFunction: true },
       take: 80
@@ -938,7 +942,10 @@ export async function approveIntakeDocument(formData: FormData, userId: string) 
   let stream: { id: string } | null = null;
   let companyFunction: { id: string } | null = null;
   if (attachesCompanyContext) {
-    if (domain === IntakeDomain.UNKNOWN) {
+    if (domain === IntakeDomain.UNKNOWN || domain === IntakeDomain.MIXED) {
+      // Ambiguous domains are forced to the admin fallback and ignore any route
+      // the form pre-filled from the original suggestion, per the contract that
+      // Mixed/Unknown documents land in Company Core/admin for reclassification.
       const routing = suggestRouting({ docType: "unknown", domain });
       streamName = routing.stream;
       functionName = routing.companyFunction;
@@ -1053,14 +1060,17 @@ export async function archiveIntakeDocument(formData: FormData, userId: string) 
     throw new Error("This document has already been filed, archived, or rejected.");
   }
 
-  // Claim the row BEFORE moving any bytes. If an Approve/File from another tab
-  // finalises the document first, this matches zero rows and we stop without
-  // touching the file — so a FILED/action record can never be left pointing at a
-  // path we already moved into archive/.
+  // Claim the row AND record its archive path in one guarded update, BEFORE
+  // moving any bytes. Claiming first means a concurrent Approve/File matches zero
+  // rows and we stop without touching the file; recording the (deterministic)
+  // archive path in the same write means there is no separate post-move update
+  // that could fail and leave the stored path out of sync with the file location.
+  const archivedPath = archiveTargetPath(doc.storedPath);
   const claim = await prisma.intakeDocument.updateMany({
     where: { id: intakeId, status: { notIn: INTAKE_FINALISED_STATUSES } },
     data: {
       status: IntakeStatus.ARCHIVED,
+      storedPath: archivedPath,
       disposition: IntakeDisposition.ARCHIVE,
       domain: enumValue(formData, "domain", IntakeDomain, doc.domain),
       reviewedById: userId,
@@ -1070,19 +1080,19 @@ export async function archiveIntakeDocument(formData: FormData, userId: string) 
   });
   if (claim.count === 0) throw new Error("This document has already been filed, archived, or rejected.");
 
-  // The row is now ours (ARCHIVED), so no other tab can finalise it. Move the
-  // bytes and record the new path. If the move fails (disk full, permissions, an
-  // unreadable file), roll the row back to its pre-archive state — guarded on our
-  // own claim — so it returns to the queue as retryable instead of being stranded
-  // ARCHIVED with its bytes still at the old store path and no way to re-archive.
-  let archivedPath: string;
+  // The row is now ours (ARCHIVED). Move the bytes to the recorded path. If the
+  // move fails (disk full, permissions, an unreadable file), roll the row AND its
+  // stored path back together — guarded on our own claim — so it returns to the
+  // queue as retryable instead of being stranded ARCHIVED with its path pointing
+  // at a location the bytes never reached.
   try {
-    archivedPath = await moveToArchive(doc.storedPath);
+    await moveToArchive(doc.storedPath);
   } catch (error) {
     await prisma.intakeDocument.updateMany({
       where: { id: intakeId, status: IntakeStatus.ARCHIVED },
       data: {
         status: doc.status,
+        storedPath: doc.storedPath,
         disposition: doc.disposition,
         domain: doc.domain,
         reviewedById: doc.reviewedById,
@@ -1092,7 +1102,6 @@ export async function archiveIntakeDocument(formData: FormData, userId: string) 
     });
     throw error;
   }
-  await prisma.intakeDocument.update({ where: { id: intakeId }, data: { storedPath: archivedPath } });
 
   revalidatePath("/intake");
 }

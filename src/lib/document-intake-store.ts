@@ -219,12 +219,18 @@ export async function storeUploadedFile(filename: string, bytes: Buffer, mimeTyp
   return { storedPath, filename, contentHash, mimeType: resolvedMime, byteSize: bytes.byteLength };
 }
 
+/** The deterministic archive destination for a stored file. Exposed so a caller
+ * can record the target path atomically (in the same DB claim) before the bytes
+ * are moved, avoiding a separate post-move write that could fail and desync the
+ * stored path from the file location. */
+export function archiveTargetPath(storedPath: string): string {
+  return join(intakeRoot(), ARCHIVE, basename(storedPath) || "archived-file");
+}
+
 /** Moves a stored file into the archive folder, returning the new path (or the
  * original path if the source no longer exists). */
 export async function moveToArchive(storedPath: string): Promise<string> {
-  const root = intakeRoot();
-  const name = basename(storedPath) || `archived-${Date.now()}`;
-  const target = join(root, ARCHIVE, name);
+  const target = archiveTargetPath(storedPath);
   const exists = await stat(storedPath).then(() => true).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return false;
     throw error;

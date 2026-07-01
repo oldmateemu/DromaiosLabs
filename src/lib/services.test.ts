@@ -49,6 +49,7 @@ vi.mock("./ollama", () => ({
   extractIntakeFieldsFromDocument: vi.fn()
 }));
 vi.mock("./document-intake-store", () => ({
+  archiveTargetPath: vi.fn((path: string) => `/archive/${String(path).split("/").pop()}`),
   collectInboxCandidates: vi.fn(),
   copyInboxCandidateToStore: vi.fn(),
   discardInboxFile: vi.fn(),
@@ -934,10 +935,17 @@ describe("read aggregators", () => {
     expect(today.actions).toEqual([]);
   });
 
-  it("builds the action register query from filters", async () => {
+  it("builds the action register query from filters, excluding Personal by default", async () => {
     await services.getActionRegisterData({ status: "OPEN" });
     const call = prismaMock.action.findMany.mock.calls.at(-1)?.[0];
-    expect(call.where).toEqual({ status: "OPEN" });
+    expect(call.where).toEqual({ status: "OPEN", domain: { not: "PERSONAL" } });
+  });
+
+  it("keeps Personal-domain actions off the Today board", async () => {
+    await services.getTodayData();
+    // getTodayData also queries setup actions by title; find the domain-scoped one.
+    const todayCall = prismaMock.action.findMany.mock.calls.find((call) => call[0]?.where?.domain);
+    expect(todayCall?.[0].where).toEqual({ domain: { not: "PERSONAL" } });
   });
 
   it("loads reference, launchpad, review, draft, and automation data", async () => {
@@ -1224,6 +1232,18 @@ describe("document intake", () => {
     expect(prismaMock.companyFunction.findUnique).toHaveBeenCalledWith({ where: { name: "admin" } });
     expect(prismaMock.companyFunction.findUnique).not.toHaveBeenCalledWith({ where: { name: "finance" } });
     expect(prismaMock.stream.findUnique).toHaveBeenCalledWith({ where: { name: "Company Core" } });
+  });
+
+  it("routes a MIXED approval to admin, ignoring stale finance routing", async () => {
+    prismaMock.intakeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    await services.approveIntakeDocument(
+      form({ intakeId: "d1", title: "Mixed doc", domain: "MIXED", stream: "Company Core", companyFunction: "finance" }),
+      "user-1"
+    );
+
+    expect(prismaMock.companyFunction.findUnique).toHaveBeenCalledWith({ where: { name: "admin" } });
+    expect(prismaMock.companyFunction.findUnique).not.toHaveBeenCalledWith({ where: { name: "finance" } });
   });
 
   it("falls back to the docType route when a posted free-text route name does not resolve", async () => {

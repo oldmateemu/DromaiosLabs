@@ -111,6 +111,11 @@ describe("suggestRouting", () => {
   it("does not route personal documents into a company stream", () => {
     expect(suggestRouting({ docType: "invoice", domain: "PERSONAL" })).toEqual({});
   });
+
+  it("routes mixed and unknown documents to admin regardless of document type", () => {
+    expect(suggestRouting({ docType: "invoice", domain: "MIXED" })).toEqual({ stream: "Company Core", companyFunction: "admin" });
+    expect(suggestRouting({ docType: "contract", domain: "UNKNOWN" })).toEqual({ stream: "Company Core", companyFunction: "admin" });
+  });
 });
 
 describe("buildIntakeTriage", () => {

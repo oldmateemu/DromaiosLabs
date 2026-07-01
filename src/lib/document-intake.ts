@@ -262,6 +262,11 @@ export function suggestRouting({
   // function; they belong to the Personal pipeline and stay out of company ops.
   if (domain === "PERSONAL") return {};
 
+  // Mixed and Unknown are ambiguous (both signal sets present, or none): route to
+  // Company Core/admin for human reclassification per the workflow contract,
+  // rather than guessing finance/legal from the document type.
+  if (domain === "MIXED" || domain === "UNKNOWN") return { stream: "Company Core", companyFunction: "admin" };
+
   const financeTypes = new Set(["invoice", "receipt", "statement", "payslip", "bill", "utility-bill", "rates-notice"]);
   const legalTypes = new Set(["contract", "insurance", "certificate"]);
 
